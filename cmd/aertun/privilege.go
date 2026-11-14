@@ -327,9 +327,11 @@ var commandNeeds = map[string]need{
 	// nothing, and is the job an analyst does first.
 	"triage": {action: auth.ActView},
 
-	// Counting values in a file it is handed. No store, no network, no
-	// writes. The person running it is hunting, which is the job view exists
-	// for.
+	// Counting values in a file it is handed: no store, no network, no
+	// writes, and the person running it is hunting, which is the job view
+	// exists for. With no file it counts the store's events instead, and
+	// asks there for what the console's Hunt screen asks, triage
+	// (cmdHunt): reading every event is an analyst's reach, not a viewer's.
 	"hunt": {action: auth.ActView},
 
 	// Reading a file somebody hands it and saying whether the events in it

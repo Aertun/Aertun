@@ -105,7 +105,7 @@ Detecting and deciding
   aertun sigma import ./rules              bring your own detections, in the open standard
   aertun correlate demo                    detections about several events, and when a window closes
   aertun triage [FILE] --rules DIR         run the rules, rank what they found
-  aertun hunt --field F [FILE]             what is rare, which is what is worth a look
+  aertun hunt --field F [--hours 24] [FILE]   what is rare, in the store or in a file, which is what is worth a look
   aertun finding list [--state S --kind K] | risk | decide ID STATE | story [ID]
   aertun intel import FILE --source NAME | add VALUE --source NAME | list | remove ID
   aertun analyst plan | triage [--limit N] [--dry-run] [--calibration F --calibration-key F] | eval [--k 3]

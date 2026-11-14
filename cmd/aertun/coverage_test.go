@@ -411,11 +411,12 @@ var coverage = map[string]surfaces{
 		MCP: []string{"list_findings"},
 	},
 
-	// Stacking over a file somebody exported, at the point where they are
-	// looking for something and do not yet know what.
+	// Stacking, at the point where somebody is looking for something and
+	// does not yet know what: over the store, as the screen does, or over a
+	// file they exported.
 	"hunt": {GUI: "/security/hunt",
-		Why: "the command stacks a file the analyst chose; the screen " +
-			"stacks the store, where the events are",
+		Why: "the command and the screen both stack the store, where the " +
+			"events are; the command also takes a file the analyst chose",
 		NoMCP: "an agent given the rarity list is given the map of what is " +
 			"least likely to be noticed",
 	},

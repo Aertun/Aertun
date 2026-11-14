@@ -8,10 +8,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/aertun/aertun/internal/auth"
 	"github.com/aertun/aertun/internal/baseline"
+	"github.com/aertun/aertun/internal/spool"
 	"github.com/aertun/aertun/internal/telemetry"
 )
 
@@ -32,24 +36,18 @@ func cmdHunt(root string, args []string) error {
 	field := fs.String("field", "", "the field to stack, e.g. raw.user_agent")
 	by := fs.String("by", "", "count per entity: actor, device or target")
 	top := fs.Int("top", 20, "how many of the rarest to show")
+	hours := fs.Int("hours", 24, "with no FILE: how far back in the store to "+
+		"look, 1 to 720")
 	rest, err := eventFileArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(*field) == "" {
 		return fmt.Errorf(
-			"usage: aertun hunt --field FIELD [--by actor] [FILE]\n" +
+			"usage: aertun hunt --field FIELD [--by actor] [--hours 24] [FILE]\n" +
+				"  with no FILE, the events in the store; with one, or with " +
+				"events piped in, those\n" +
 				"  aertun telemetry fields FILE lists what a file carries")
-	}
-
-	in := os.Stdin
-	if len(rest) > 0 && rest[0] != "-" {
-		f, err := os.Open(rest[0])
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		in = f
 	}
 
 	pop := baseline.NewPopulation()
@@ -57,50 +55,74 @@ func cmdHunt(root string, args []string) error {
 	// Not named dim: that is the package-level escape code for dim text,
 	// and shadowing it printed the field name where the colour belonged.
 	stack := baseline.Dimension(*field)
-
-	sc := bufio.NewScanner(in)
-	sc.Buffer(make([]byte, 0, 64<<10), MaxTelemetryLine)
 	var read, used int
-	for line := 1; sc.Scan(); line++ {
-		text := strings.TrimSpace(sc.Text())
-		if text == "" {
-			continue
-		}
+	observe := func(e telemetry.Event) {
 		read++
-		var e telemetry.Event
-		if err := json.Unmarshal([]byte(text), &e); err != nil {
-			return fmt.Errorf("line %d is not an event: %w", line, err)
-		}
-		if err := e.Validate(); err != nil {
-			// Refused rather than skipped. A hunt that quietly drops the
-			// events it could not read reports a rarity computed over an
-			// unknown fraction of the data, which is worse than no answer:
-			// the rarest value might be rare because most of the file was
-			// discarded.
-			return fmt.Errorf("line %d cannot be used: %w", line, err)
-		}
 		value, present := e.Fields()[*field]
 		if !present {
-			continue
+			return
 		}
 		used++
 		whole.Observe(stack, value, e.Time)
 		if *by != "" {
-			entity, ok := e.Fields()[*by]
-			if !ok {
-				continue
+			if entity, ok := e.Fields()[*by]; ok {
+				pop.For(entity).Observe(stack, value, e.Time)
 			}
-			pop.For(entity).Observe(stack, value, e.Time)
 		}
 	}
-	if err := sc.Err(); err != nil {
-		return fmt.Errorf("reading: %w", err)
+
+	// What is hunted through: a file named, events piped in, or — with
+	// neither — the store, where the events are and where the console's Hunt
+	// screen looks. Standard input is read only when something is on it: a
+	// terminal, or nothing at all, is nobody piping events in.
+	from := "the file"
+	switch {
+	case len(rest) > 0 && rest[0] != "-":
+		f, err := os.Open(rest[0])
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := huntLines(f, observe); err != nil {
+			return err
+		}
+	case len(rest) > 0 || piped(os.Stdin):
+		from = "standard input"
+		if err := huntLines(os.Stdin, observe); err != nil {
+			return err
+		}
+	default:
+		if *hours < 1 || *hours > 720 {
+			return fmt.Errorf("--hours is 1 to 720, not %d", *hours)
+		}
+		caller := resolveCaller(root, flagToken)
+		if err := authorise(root, caller, auth.ActTriage, auth.AreaSecurity); err != nil {
+			return err
+		}
+		sp, err := openSpoolReadOnly(root)
+		if err != nil {
+			return fmt.Errorf("no FILE was given and nothing was piped in, so this "+
+				"hunts the store: %w", err)
+		}
+		defer sp.Close()
+		from = fmt.Sprintf("the store's last %d hour(s)", *hours)
+		since := time.Now().UTC().Add(-time.Duration(*hours) * time.Hour)
+		if err := sp.Scan(since, time.Time{}, func(r *spool.Row) error {
+			e, err := r.Event()
+			if err != nil {
+				return err
+			}
+			observe(e)
+			return nil
+		}); err != nil {
+			return fmt.Errorf("reading the store: %w", err)
+		}
 	}
 	if used == 0 {
 		return fmt.Errorf(
-			"none of the %d event(s) carries %s. A field the data does not "+
-				"have is the commonest reason an analysis returns nothing "+
-				"and reads as a clean result", read, *field)
+			"none of the %d event(s) in %s carries %s. A field the data does "+
+				"not have is the commonest reason an analysis returns nothing "+
+				"and reads as a clean result", read, from, *field)
 	}
 
 	counts := whole.Values(stack)
@@ -108,14 +130,14 @@ func cmdHunt(root string, args []string) error {
 		counts = counts[:*top]
 	}
 	if w.JSON(map[string]any{
-		"field": *field, "events": used, "distinct": len(whole.Values(stack)),
+		"field": *field, "from": from, "events": used, "distinct": len(whole.Values(stack)),
 		"rarest": counts, "entities": pop.Size(),
 	}) {
 		return nil
 	}
 
-	w.Human("%s%s%s across %d event(s), %d distinct value(s)\n",
-		bold, *field, reset, used, len(whole.Values(stack)))
+	w.Human("%s%s%s across %d event(s) in %s, %d distinct value(s)\n",
+		bold, *field, reset, used, from, len(whole.Values(stack)))
 	for _, c := range counts {
 		w.Human("  %6d  %s\n", c.Seen, c.Value)
 	}
@@ -141,6 +163,43 @@ func cmdHunt(root string, args []string) error {
 	}
 	for _, c := range rare {
 		w.Human("  %6d %s(s)  %s\n", c.Seen, *by, c.Value)
+	}
+	return nil
+}
+
+// piped says whether something is on a stream for this to read: a pipe or a
+// file. A terminal is not, and neither is the null device a container or a
+// scheduler hands a command that was given nothing.
+func piped(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice == 0
+}
+
+// huntLines reads events one to a line and hands each to observe.
+func huntLines(in io.Reader, observe func(telemetry.Event)) error {
+	sc := bufio.NewScanner(in)
+	sc.Buffer(make([]byte, 0, 64<<10), MaxTelemetryLine)
+	for line := 1; sc.Scan(); line++ {
+		text := strings.TrimSpace(sc.Text())
+		if text == "" {
+			continue
+		}
+		var e telemetry.Event
+		if err := json.Unmarshal([]byte(text), &e); err != nil {
+			return fmt.Errorf("line %d is not an event: %w", line, err)
+		}
+		if err := e.Validate(); err != nil {
+			// Refused rather than skipped. A hunt that quietly drops the
+			// events it could not read reports a rarity computed over an
+			// unknown fraction of the data, which is worse than no answer:
+			// the rarest value might be rare because most of the file was
+			// discarded.
+			return fmt.Errorf("line %d cannot be used: %w", line, err)
+		}
+		observe(e)
+	}
+	if err := sc.Err(); err != nil {
+		return fmt.Errorf("reading: %w", err)
 	}
 	return nil
 }

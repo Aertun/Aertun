@@ -4,8 +4,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/aertun/aertun/internal/audit"
 	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/finding"
+	"github.com/aertun/aertun/internal/out"
 	"github.com/aertun/aertun/internal/telemetry"
 )
 
@@ -221,5 +224,72 @@ func TestAModelCannotQuietenADetection(t *testing.T) {
 	}
 	if _, serr := os.Stat(ringsPath(root)); serr == nil {
 		t.Error("the refused change was written")
+	}
+}
+
+// `detect test`, `detect list` and `triage` read the rules every other
+// detect command reads: the store's own, wherever the command is run from.
+// They once looked only in ./detections, so in a container, or from any
+// directory but one, a store full of rules answered "no such file".
+func TestTheRulesCheckedAreTheStoresWhereverTheCommandRuns(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if w == nil {
+		w = out.New(false)
+	}
+	root := t.TempDir()
+	if err := cmdInit(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdDetect(root, []string{"pack", "install"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir()) // nowhere near a ./detections
+	for _, sub := range []string{"test", "list"} {
+		if err := cmdDetect(root, []string{sub}); err != nil {
+			t.Errorf("detect %s, run from elsewhere: %v", sub, err)
+		}
+	}
+	events := filepath.Join(t.TempDir(), "none.jsonl")
+	if err := os.WriteFile(events, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdTriage(root, []string{events}); err != nil && strings.Contains(err.Error(), "no such file") {
+		t.Errorf("triage, run from elsewhere: %v", err)
+	}
+	// A directory given is still the one read.
+	if err := cmdDetect(root, []string{"list", filepath.Join(root, "nowhere")}); err == nil {
+		t.Error("a directory that does not exist was listed")
+	}
+}
+
+// With no file and nothing piped in, a hunt stacks the store's events, as
+// the console's Hunt screen does. A file named is still the file read.
+func TestAHuntWithNoFileStacksTheStore(t *testing.T) {
+	root, _ := siemSite(t, []labelled{failedBy("dana", 5), failedBy("dana", 4), failedBy("eve", 3)})
+	if piped(os.Stdin) {
+		t.Skip("the test's own standard input is a pipe, which a hunt reads")
+	}
+	got := capture(t, func() error { return cmdHunt(root, []string{"--field", "actor.value"}) })
+	if !strings.Contains(got, "3 event(s) in the store's last 24 hour(s), 2 distinct") ||
+		strings.Contains(got, "ERROR") {
+		t.Errorf("the hunt did not stack the store's three events:\n%s", got)
+	}
+	// An hour that holds none of them finds none, and says where it looked.
+	old := capture(t, func() error { return cmdHunt(root, []string{"--field", "raw.nothing-carries-this"}) })
+	if !strings.Contains(old, "none of the 3 event(s) in the store") {
+		t.Errorf("a field nothing carries: %s", old)
+	}
+	if err := cmdHunt(root, []string{"--field", "actor.value", "--hours", "0"}); err == nil {
+		t.Error("a hunt over no time at all was run")
+	}
+	// A file named is the file read, not the store.
+	file := filepath.Join(t.TempDir(), "one.jsonl")
+	line, _ := json.Marshal(failedBy("mallory", 1).event)
+	if err := os.WriteFile(file, append(line, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	one := capture(t, func() error { return cmdHunt(root, []string{"--field", "actor.value", file}) })
+	if !strings.Contains(one, "1 event(s) in the file") || !strings.Contains(one, "mallory") {
+		t.Errorf("a file named was not what was read: %s", one)
 	}
 }

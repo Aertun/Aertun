@@ -39,9 +39,9 @@ func cmdDetect(root string, args []string) error {
 	}
 	switch args[0] {
 	case "test":
-		return detectTest(args[1:])
+		return detectTest(root, args[1:])
 	case "list":
-		return detectList(args[1:])
+		return detectList(root, args[1:])
 	case "fields":
 		return detectFields(args[1:])
 	case "run":
@@ -136,17 +136,21 @@ func rulesIn(path string) ([]detect.Rule, error) {
 	return out, nil
 }
 
-func detectTest(args []string) error {
+// detectTest checks the rules in a directory given, or the ones every
+// other detect command reads: the store's own, and ./detections where
+// there is no store.
+func detectTest(root string, args []string) error {
 	path := ""
 	if len(args) > 0 {
 		path = args[0]
 	}
+	path = rulesDir(root, path)
 	rules, err := rulesIn(path)
 	if err != nil {
 		return err
 	}
 	if len(rules) == 0 {
-		return fmt.Errorf("no rules found in %s", orDefault(path))
+		return fmt.Errorf("no rules found in %s", path)
 	}
 
 	var refused, failed, checked int
@@ -184,12 +188,12 @@ func detectTest(args []string) error {
 		refused, failed)
 }
 
-func detectList(args []string) error {
+func detectList(root string, args []string) error {
 	path := ""
 	if len(args) > 0 {
 		path = args[0]
 	}
-	rules, err := rulesIn(path)
+	rules, err := rulesIn(rulesDir(root, path))
 	if err != nil {
 		return err
 	}
@@ -236,11 +240,4 @@ func detectFields(args []string) error {
 	w.Human("  %sa rule naming anything else is refused at load, because it "+
 		"would otherwise run and match nothing forever%s\n", dim, reset)
 	return nil
-}
-
-func orDefault(p string) string {
-	if p == "" {
-		return "detections/"
-	}
-	return p
 }

@@ -34,13 +34,15 @@ import (
 
 func cmdTriage(root string, args []string) error {
 	fs := flag.NewFlagSet("triage", flag.ContinueOnError)
-	rules := fs.String("rules", "detections", "where the rules live")
+	rules := fs.String("rules", "", "where the rules live (default: the "+
+		"store's own, or ./detections)")
 	top := fs.Int("top", 20, "how many findings to show")
 	rest, err := eventFileArgs(fs, args)
 	if err != nil {
 		return err
 	}
 
+	*rules = rulesDir(root, *rules)
 	loaded, err := rulesIn(*rules)
 	if err != nil {
 		return err
