@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840" role="img" aria-labelledby="t d" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <title id="t">Aertun architecture</title>
+  <desc id="d">Four ways in, all through one set of declared operations and one authorisation check. An append-only event store with detection, decisions and response is the evidence. The proving ground checks AI-produced security work against that evidence and signs the result with two algorithms. Everything rests on one Owner, roles, two-person control, trusted proof signers and a signed audit log.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .band { fill: #f3f6fb; stroke: #d5deeb; }
+    .prove { fill: #e6f7fa; stroke: #7fd3e2; }
+    .trust { fill: #eef0f6; stroke: #c9d0e0; }
+    .box { fill: #ffffff; stroke: #c3cddd; }
+    .accent { fill: #0096B4; }
+    .h { font-size: 15px; font-weight: 700; fill: #0A1F44; letter-spacing: .2px; }
+    .t { font-size: 13px; font-weight: 600; fill: #0A1F44; }
+    .s { font-size: 11.5px; fill: #3d4a63; }
+    .w { font-size: 11.5px; fill: #ffffff; font-weight: 600; }
+    .arrow { stroke: #6b7a95; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+    .arrowp { stroke: #0096B4; stroke-width: 1.8; fill: none; marker-end: url(#ap); }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .band { fill: #141b26; stroke: #2a3546; }
+      .prove { fill: #0d2a31; stroke: #1b6f80; }
+      .trust { fill: #161c2a; stroke: #2c3650; }
+      .box { fill: #0f1520; stroke: #33415a; }
+      .accent { fill: #1DE9B6; }
+      .h, .t { fill: #E8EEF8; }
+      .s { fill: #a9b6cc; }
+      .w { fill: #0d1117; }
+      .arrow { stroke: #8492ab; }
+      .arrowp { stroke: #1DE9B6; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6b7a95"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0096B4"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="840"/>
+
+  <!-- Ways in -->
+  <rect class="band" x="24" y="20" width="1152" height="118" rx="14"/>
+  <text class="h" x="44" y="48">Four ways in — operations declared once, one authorisation check on every request</text>
+  <rect class="box" x="44" y="62" width="262" height="62" rx="10"/>
+  <text class="t" x="60" y="86">Console</text>
+  <text class="s" x="60" y="106">passkeys · OpenID Connect · SAML · SCIM</text>
+  <rect class="box" x="322" y="62" width="262" height="62" rx="10"/>
+  <text class="t" x="338" y="86">Command line</text>
+  <text class="s" x="338" y="106">every capability, scriptable, --json</text>
+  <rect class="box" x="600" y="62" width="262" height="62" rx="10"/>
+  <text class="t" x="616" y="86">Agents over MCP</text>
+  <text class="s" x="616" y="106">read, propose, verify · OAuth · DPoP</text>
+  <rect class="box" x="878" y="62" width="278" height="62" rx="10"/>
+  <text class="t" x="894" y="86">Pushed in</text>
+  <text class="s" x="894" y="106">signed webhooks · SSF/CAEP · OTLP · collector</text>
+
+  <!-- Evidence core -->
+  <rect class="band" x="24" y="158" width="700" height="412" rx="14"/>
+  <text class="h" x="44" y="186">The evidence: security operations</text>
+
+  <rect class="box" x="44" y="202" width="206" height="150" rx="10"/>
+  <text class="t" x="60" y="226">Collect</text>
+  <text class="s" x="60" y="248">10 connectors, sealed</text>
+  <text class="s" x="60" y="264">credentials · 20 log sources</text>
+  <text class="s" x="60" y="280">AI providers' audit logs</text>
+  <text class="s" x="60" y="296">agent telemetry (OTel)</text>
+  <text class="s" x="60" y="312">each outbound call a declared kind</text>
+
+  <rect class="box" x="264" y="202" width="206" height="150" rx="10"/>
+  <text class="t" x="280" y="226">Normalise and keep</text>
+  <text class="s" x="280" y="248">one event shape, modelled on OCSF</text>
+  <text class="s" x="280" y="264">append-only, indexed spool</text>
+  <text class="s" x="280" y="280">retention with legal holds</text>
+  <text class="s" x="280" y="296">attacker-writable text</text>
+  <text class="s" x="280" y="312">marked as such</text>
+
+  <rect class="box" x="484" y="202" width="220" height="150" rx="10"/>
+  <text class="t" x="500" y="226">Detect</text>
+  <text class="s" x="500" y="248">rules with fixtures, ATT&amp;CK</text>
+  <text class="s" x="500" y="264">trial ring before the queue</text>
+  <text class="s" x="500" y="280">Sigma import · correlations</text>
+  <text class="s" x="500" y="296">indicators (STIX 2.1)</text>
+  <text class="s" x="500" y="312">suppressions that expire</text>
+
+  <rect class="box" x="44" y="390" width="318" height="160" rx="10"/>
+  <text class="t" x="60" y="414">Decide</text>
+  <text class="s" x="60" y="436">one queue, ranked by risk</text>
+  <text class="s" x="60" y="452">AI analyst suggests — never decides;</text>
+  <text class="s" x="60" y="468">a re-ask without the attacker's text</text>
+  <text class="s" x="60" y="484">withholds a closure that changes</text>
+  <text class="s" x="60" y="500">people decide; every decision kept</text>
+
+  <rect class="box" x="376" y="390" width="328" height="160" rx="10"/>
+  <text class="t" x="392" y="414">Respond and expose</text>
+  <text class="s" x="392" y="436">cases with legal notification clocks</text>
+  <text class="s" x="392" y="452">playbooks · actions on other platforms</text>
+  <text class="s" x="392" y="468">approved by a second person</text>
+  <text class="s" x="392" y="484">vulnerabilities: KEV, EPSS, SSVC, VEX</text>
+  <text class="s" x="392" y="500">SBOMs, SARIF, estate and device risk</text>
+
+  <path class="arrow" d="M250 277H260"/>
+  <path class="arrow" d="M470 277H480"/>
+  <path class="arrow" d="M594 352V370H203V386"/>
+  <path class="arrow" d="M362 470H372"/>
+  <path class="arrow" d="M374 138V155"/>
+  <path class="arrow" d="M960 138V155"/>
+
+  <!-- Proving ground -->
+  <rect class="prove" x="744" y="158" width="432" height="412" rx="14"/>
+  <text class="h" x="764" y="186">The proving ground</text>
+  <text class="s" x="764" y="206">AI security work checked against evidence its author did not write</text>
+  <g>
+    <rect class="box" x="764" y="218" width="392" height="290" rx="10"/>
+    <text class="t" x="780" y="242">Detection proofs</text><text class="s" x="928" y="242">a rule against a labelled corpus</text>
+    <text class="t" x="780" y="267">Analyst proofs</text><text class="s" x="928" y="267">false closures, pass^k, hijacks</text>
+    <text class="t" x="780" y="292">Calibration</text><text class="s" x="928" y="292">the auto-close threshold, bounded</text>
+    <text class="t" x="780" y="317">Vendor verdicts</text><text class="s" x="928" y="317">another AI scored on people's calls</text>
+    <text class="t" x="780" y="342">Blind adjudication</text><text class="s" x="928" y="342">closures judged again, unseen</text>
+    <text class="t" x="780" y="367">Claim cards</text><text class="s" x="928" y="367">a vendor's claim, pre-registered</text>
+    <text class="t" x="780" y="392">Agent reconciliation</text><text class="s" x="928" y="392">an agent's account against telemetry</text>
+    <text class="t" x="780" y="417">Not affected (VEX)</text><text class="s" x="928" y="417">held to versions and the bill</text>
+    <text class="t" x="780" y="442">Cited evidence</text><text class="s" x="928" y="442">every citation re-run in the store</text>
+    <text class="t" x="780" y="467">Wind tunnel</text><text class="s" x="928" y="467">agent attacks replayed and mutated</text>
+    <text class="t" x="780" y="492">Twin · forge</text><text class="s" x="928" y="492">replay a case · export verified episodes</text>
+  </g>
+  <rect class="accent" x="764" y="516" width="392" height="44" rx="8"/>
+  <text class="w" x="780" y="534">proven · refuted · inconclusive, signed whichever it is</text>
+  <text class="w" x="780" y="551">in-toto · DSSE · Ed25519 + ML-DSA-65 (post-quantum)</text>
+  <path class="arrowp" d="M704 277H740"/>
+  <path class="arrowp" d="M704 470H740"/>
+
+  <!-- Trust -->
+  <rect class="trust" x="24" y="590" width="1152" height="228" rx="14"/>
+  <text class="h" x="44" y="618">What everything rests on</text>
+  <rect class="box" x="44" y="634" width="360" height="164" rx="10"/>
+  <text class="t" x="60" y="658">Who may do what</text>
+  <text class="s" x="60" y="680">one Owner nobody can remove</text>
+  <text class="s" x="60" y="696">viewer · analyst · responder · admin, and jobs</text>
+  <text class="s" x="60" y="712">a deny always wins; no custom roles</text>
+  <text class="s" x="60" y="728">agents propose, never approve or sign</text>
+  <text class="s" x="60" y="744">two people for privileged changes; alone, a</text>
+  <text class="s" x="60" y="760">reason, a delay and a fresh passkey</text>
+  <text class="s" x="60" y="776">trusted proof signers, added by two</text>
+
+  <rect class="box" x="420" y="634" width="360" height="164" rx="10"/>
+  <text class="t" x="436" y="658">Its own record</text>
+  <text class="s" x="436" y="680">append-only audit log: hash chain, Merkle tree</text>
+  <text class="s" x="436" y="696">tree heads signed with Ed25519 and ML-DSA-65</text>
+  <text class="s" x="436" y="712">heads anchored to Bitcoin (OpenTimestamps)</text>
+  <text class="s" x="436" y="728">written by its own account (logd)</text>
+  <text class="s" x="436" y="744">streamed to any SIEM as signed OCSF (RFC 9421)</text>
+  <text class="s" x="436" y="760">its own detections run over it</text>
+
+  <rect class="box" x="796" y="634" width="360" height="164" rx="10"/>
+  <text class="t" x="812" y="658">One binary</text>
+  <text class="s" x="812" y="680">Go, standard library only — no dependencies</text>
+  <text class="s" x="812" y="696">connector credentials sealed under a keyring</text>
+  <text class="s" x="812" y="712">every outbound call is of a declared kind</text>
+  <text class="s" x="812" y="728">personal data masked before any model call</text>
+  <text class="s" x="812" y="744">runs on a laptop, a server or a container</text>
+  <text class="s" x="812" y="760">any OpenAI-compatible model, or none</text>
+</svg>
