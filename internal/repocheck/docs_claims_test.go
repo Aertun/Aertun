@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Rashik Adhikari
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package repocheck
 
 import (
 	"os"
@@ -269,7 +269,7 @@ func TestNothingBranchesOnWhichLicenceTheOperatorHolds(t *testing.T) {
 		`commercialOnly|paidOnly|premiumOnly)`)
 
 	for _, name := range strings.Fields(string(out)) {
-		if name == "docs_claims_test.go" {
+		if name == "internal/repocheck/docs_claims_test.go" {
 			continue // the pattern above is in it
 		}
 		body := read(t, name)

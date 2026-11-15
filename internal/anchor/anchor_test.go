@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -276,7 +277,7 @@ func TestDescribeDoesNotCallPendingAnchored(t *testing.T) {
 // it against what a calendar actually sends, which is the thing that has to
 // work.
 func TestARealCalendarProofParses(t *testing.T) {
-	body, err := testdata()
+	body, err := os.ReadFile("testdata/calendar-response.bin")
 	if err != nil {
 		t.Skip("no fixture")
 	}
@@ -432,3 +433,9 @@ func TestForkNestingIsBoundedBeforeItReachesTenThousandFrames(t *testing.T) {
 		t.Errorf("refused, but not as excessive nesting: %v", err)
 	}
 }
+
+// testdata/calendar-response.bin is a genuine calendar response, captured
+// from alice.btc.calendar.opentimestamps.org. Hand-built proofs test the
+// parser against what the format permits; this tests it against what a
+// server actually sends, which is the thing that has to work and the thing
+// that changes without warning.

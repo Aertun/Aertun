@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Rashik Adhikari
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package repocheck
 
 import (
 	"go/parser"
@@ -95,13 +95,16 @@ func importGraph(t *testing.T) (imported map[string]bool, pkgs map[string]bool) 
 				return err
 			}
 			dir := filepath.ToSlash(filepath.Dir(path))
-			pkgs[dir] = true
 			// Test files are excluded on purpose. A package imported only by
 			// its own tests, or only by another package's tests, is exactly
 			// the state this test exists to find: covered and unreachable.
+			// And a package of nothing but tests — this one — is a test
+			// suite rather than code that could be unreachable, so it is not
+			// counted as a package at all.
 			if strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
+			pkgs[dir] = true
 			f, perr := parser.ParseFile(token.NewFileSet(), path, nil,
 				parser.ImportsOnly)
 			if perr != nil {

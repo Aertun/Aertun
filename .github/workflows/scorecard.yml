@@ -64,7 +64,7 @@ jobs:
       # The public half is committed twice, deliberately: at the root of
       # the `scorecards` branch (what a stranger downloads) and on main
       # under scorecards/public-key.json beside the genesis card (what
-      # scorecard_seed_test.go pins green in CI forever). Rotation is a
+      # internal/repocheck/scorecard_seed_test.go pins green in CI forever). Rotation is a
       # person's act: a new secret, then one open commit replacing the
       # committed public key and the seed pair together.
       - name: Unseal the signing key
