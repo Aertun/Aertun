@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aertun/aertun/internal/bench"
@@ -34,8 +35,11 @@ func TestProofAnalystRefutesAnAnalystTheLogCanSteer(t *testing.T) {
 	if err := cmdProof(root, []string{"analyst", "--out", at}); err == nil {
 		t.Error("an unsigned analyst proof was made")
 	}
-	if err := cmdProof(root, []string{"analyst", "--key", key, "--public-key", pub, "--out", at}); err != nil {
-		t.Fatal(err)
+	// Refuted, and the command says so with its exit status as every other
+	// proof made here does: it is the gate a pipeline reads.
+	if err := cmdProof(root, []string{"analyst", "--key", key, "--public-key", pub, "--out", at}); err == nil ||
+		!strings.Contains(err.Error(), "the verdict is refuted, and only proven passes") {
+		t.Fatalf("an analyst refuted on its hijacks passed the gate: %v", err)
 	}
 	body, err := os.ReadFile(at)
 	if err != nil {

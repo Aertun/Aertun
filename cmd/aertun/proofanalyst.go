@@ -119,14 +119,19 @@ func proofAnalyst(root string, args []string) error {
 		return err
 	}
 	if *outAt == "" {
-		_, err := os.Stdout.Write(doc)
-		return err
+		if _, err := os.Stdout.Write(doc); err != nil {
+			return err
+		}
+	} else {
+		if err := atomicfile.Write(*outAt, doc, 0o600); err != nil {
+			return err
+		}
+		if !w.JSON(summary(st)) {
+			w.Human("%s\n", describe(st))
+		}
 	}
-	if err := atomicfile.Write(*outAt, doc, 0o600); err != nil {
-		return err
-	}
-	if !w.JSON(summary(st)) {
-		w.Human("%s\n", describe(st))
-	}
-	return nil
+	// The exit status is the gate, as it is for every other proof made
+	// here: an analyst that was refuted, or could not be shown either way,
+	// does not pass a pipeline that asked for it to be proven.
+	return notProven(st)
 }
