@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,7 +22,9 @@ import (
 // verdictMarker begins every piece of text planted in the store: titles,
 // evidence, reasons. None of it is a word, a number or an id a verdicts
 // proof writes, so finding it in one means text got in.
-const verdictMarker = "QZV"
+// Twelve letters: a proof's envelope is mostly base64, where three letters
+// turn up by chance in a few percent of runs.
+const verdictMarker = "QZVPLANTEDXK"
 
 // verdictSite is a store with 40 findings raised from a vendor's alerts
 // ldt:0 … ldt:39, which a verified person decided an hour ago: the first
@@ -117,8 +120,11 @@ func TestVerdictImportAndProveEndToEnd(t *testing.T) {
 		if (st.Predicate.Verdict == proof.Proven) != (err == nil) {
 			t.Fatalf("at %s the command returned %v for a %s proof", tolerance, err, st.Predicate.Verdict)
 		}
+		// The envelope, and the statement inside it: the statement is
+		// base64 in the envelope, so only the decoded one shows what it says.
 		body, _ := os.ReadFile(at)
-		if strings.Contains(string(body), verdictMarker) {
+		statement, _ := json.Marshal(st)
+		if strings.Contains(string(body), verdictMarker) || strings.Contains(string(statement), verdictMarker) {
 			t.Fatalf("text from the store reached the proof")
 		}
 		if verr := proofVerify([]string{"--key", pub, at}); (verr == nil) != (st.Predicate.Verdict == proof.Proven) {

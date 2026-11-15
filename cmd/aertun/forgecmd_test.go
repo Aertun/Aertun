@@ -31,7 +31,7 @@ import (
 // forgeMarker begins every piece of text planted in the store below. It appears
 // in no word, key or name the forge writes, so finding it anywhere in an
 // export means text from the store got in.
-const forgeMarker = "ZQX"
+const forgeMarker = "ZQXPLANTEDQV" // twelve letters: no digest or signature holds these by chance
 
 // forgeSite is a store the analyst has been through, built so that every
 // field somebody else could have written carries its own forgeMarker: each
