@@ -367,7 +367,7 @@ presents. It may end up narrower. It never ends up wider.</p>
 <input type="hidden" name="code_challenge" value="{{.Challenge}}">
 <input type="hidden" name="code_challenge_method" value="S256">
 {{with .ResourceParam}}<input type="hidden" name="resource" value="{{.}}">{{end}}
-<p class="actions"><button type="submit" name="approve" value="yes">Allow</button>
+<p class="consent-actions"><button type="submit" name="approve" value="yes">Allow</button>
 <button type="submit" name="approve" value="no" class="btn-text">Refuse</button></p>
 </form>
 <p class="hint">Revoke it whenever you like: <code>aertun agent consents</code> lists
