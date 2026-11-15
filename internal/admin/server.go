@@ -316,7 +316,7 @@ func New(p *auth.Policy, ts *auth.TokenStore) (*Server, error) {
 		// operator's colour and is served only to the signed in, so without
 		// this the browser asks for /favicon.ico and is told 401.
 		"signedOutIcon": SignedOutIcon,
-		"pct": func(f float64) float64 { return f * 100 },
+		"pct":           func(f float64) float64 { return f * 100 },
 		// sentence capitalises the first letter, for a word stored in
 		// lower case and shown on its own: a severity, a state.
 		"sentence": func(v any) string {
