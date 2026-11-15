@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"time"
@@ -80,8 +81,10 @@ type sender struct {
 	// stops.
 	Newest time.Time
 	Oldest time.Time
-	// Quiet is how long since this source last sent anything.
-	Quiet time.Duration
+	// Quiet is how long since this source last sent anything, and QuietFor
+	// that length as the screen states it.
+	Quiet    time.Duration
+	QuietFor string
 	// Ahead is how many of its events claim a time after they arrived. A
 	// clock that is wrong is worth saying, and it is not the same fact as a
 	// source that has gone quiet.
@@ -140,14 +143,14 @@ func (s *Server) handleEventsScreen(w http.ResponseWriter, r *http.Request) {
 
 	// Arrival lateness, which is the number that decides whether a window
 	// closed on the clock would have missed anything.
-	data["Median"] = sp.Lateness(0.5)
-	data["P99"] = sp.Lateness(0.99)
-	data["Worst"] = sp.Lateness(1)
+	data["Median"] = span(sp.Lateness(0.5))
+	data["P99"] = span(sp.Lateness(0.99))
+	data["Worst"] = span(sp.Lateness(1))
 	// A window ending after the watermark is still waiting for events that
 	// have not arrived. Said in time rather than as a timestamp, because
 	// "forty minutes behind" is actionable and an ISO string is not.
-	if wm := sp.Watermark(); !wm.IsZero() {
-		data["Behind"] = now.Sub(wm)
+	if wm := sp.Watermark(); !wm.IsZero() && now.After(wm) {
+		data["Behind"] = span(now.Sub(wm))
 	}
 
 	want := s.Events.Recent
@@ -259,6 +262,7 @@ func walk(sp *spool.Spool, from time.Time, want int, now time.Time) (
 			// Stamped after this request began: it is still sending.
 			s.Quiet = 0
 		}
+		s.QuietFor = span(s.Quiet)
 		out = append(out, *s)
 	}
 	// Quietest first: the source that has stopped is the one worth seeing,
@@ -271,4 +275,22 @@ func walk(sp *spool.Spool, from time.Time, want int, now time.Time) (
 		return out[i].Source < out[j].Source
 	})
 	return recent, out, nil
+}
+
+// span is a length of time as this screen states one: to the second under an
+// hour, because a window is sized from it, and to the minute and then the
+// hour beyond, where a duration printed to the nanosecond is nine digits of
+// noise after the part somebody reads.
+func span(d time.Duration) string {
+	d = d.Round(time.Second)
+	sec := int64(d / time.Second)
+	switch {
+	case sec < 60:
+		return fmt.Sprintf("%d s", sec)
+	case sec < 3600:
+		return fmt.Sprintf("%d min %d s", sec/60, sec%60)
+	case sec < 48*3600:
+		return fmt.Sprintf("%d h %d min", sec/3600, sec%3600/60)
+	}
+	return fmt.Sprintf("%d days %d h", sec/86400, sec%86400/3600)
 }

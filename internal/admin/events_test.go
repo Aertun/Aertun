@@ -343,3 +343,19 @@ func TestAViewerDoesNotSeeTheEvents(t *testing.T) {
 		}
 	}
 }
+
+// A length of time on the events screen is stated in the units somebody
+// reads it in, never as a duration printed to the nanosecond.
+func TestALengthOfTimeIsStatedInWholeUnits(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		0:                                     "0 s",
+		4*time.Minute + 30896857526:           "4 min 31 s",
+		59*time.Second + 600*time.Millisecond: "1 min 0 s",
+		3*time.Hour + 4*time.Minute:           "3 h 4 min",
+		291*time.Hour + 16*time.Minute + 52664224852: "12 days 3 h",
+	} {
+		if got := span(d); got != want {
+			t.Errorf("%v is stated as %q, want %q", d, got, want)
+		}
+	}
+}

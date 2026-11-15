@@ -80,7 +80,7 @@ seeing and a list sorted by volume buries it under whatever is loudest.</p>
     <td>{{.Count}}</td>
     <td>{{.Failed}}</td>
     <td>{{if .Ahead}}{{plural .Ahead "event" "events"}} dated after they arrived{{else}}—{{end}}</td>
-    <td>{{.Quiet}} ago<div class="hint">{{.Newest.Format "2006-01-02 15:04"}}</div></td>
+    <td>{{.QuietFor}} ago<div class="hint">{{.Newest.Format "2006-01-02 15:04"}}</div></td>
   </tr>
   {{end}}
   </tbody>
