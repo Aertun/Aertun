@@ -206,7 +206,7 @@ evidence itself.
 | **Detect** | Rules written here or imported as Sigma, each with fixtures that must match and must not, and MITRE ATT&CK technique IDs. A new rule runs in a trial ring that records what it would raise until its record earns it the queue. Correlations across rules and platforms, suppressions that end, and indicators imported from STIX 2.1 bundles or plain lists. |
 | **Decide** | One queue of findings, ranked by risk, with every decision kept and replayable. An AI analyst writes a first pass as a suggestion a person agrees with or not; it has no way to record a decision itself. Hunting stacks any field of the stored events by rarity. |
 | **Respond** | Cases and incidents with the notification clocks each law starts (GDPR, NIS2, DORA, the Cyber Resilience Act, SEC, CIRCIA, HIPAA), playbooks, and actions on other platforms asked for by one person and approved by another. Automations that watch, ask, or act, within limits. |
-| **Expose** | Vulnerabilities ranked with CISA KEV and EPSS, decided with SSVC and published as OpenVEX; dependency scanning from CycloneDX and SPDX bills of materials against OSV; code-scanning results from SARIF; workforce, device and vendor risk; access reviews. |
+| **Expose** | Vulnerabilities ranked with CISA KEV and EPSS, decided with SSVC and published as OpenVEX; dependency scanning from CycloneDX and SPDX 2.x (JSON) bills of materials against OSV; code-scanning results from SARIF; workforce, device and vendor risk; access reviews. |
 
 <p align="center">
   <img src="docs/screens/findings.webp" alt="The findings queue, ranked by risk, each with why it ranks where it does" width="900">

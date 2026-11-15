@@ -247,10 +247,12 @@ func TestReadsABillAndItsGraph(t *testing.T) {
 	}
 }
 
-func TestRefusesWhatIsNotCycloneDX(t *testing.T) {
+func TestRefusesWhatIsNotABillItCanRead(t *testing.T) {
 	for _, c := range []struct{ name, src, says string }{
 		{"not json", "{", "not JSON"},
-		{"spdx", `{"bomFormat":"SPDX","specVersion":"1.6"}`, "CycloneDX"},
+		{"another format", `{"bomFormat":"SWID","specVersion":"1.6"}`, "CycloneDX"},
+		{"spdx 3", `{"@context":"https://spdx.org/rdf/3.0.1/spdx-context.jsonld","@graph":[]}`, "SPDX 2.2 and 2.3"},
+		{"spdx with nothing in it", `{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","packages":[]}`, "no packages"},
 		{"no spec version", `{"bomFormat":"CycloneDX"}`, "specVersion"},
 		{"empty", `{"bomFormat":"CycloneDX","specVersion":"1.6"}`,
 			"lists nothing"},
@@ -439,5 +441,69 @@ func TestAComponentWithNoVersionCannotBeMatched(t *testing.T) {
 	}
 	if !strings.Contains(rep.Why(), "no version") {
 		t.Fatalf("why = %q", rep.Why())
+	}
+}
+
+// bomWithGraphAsSPDX is bomWithGraph as an SPDX 2.3 JSON document, in the
+// shape GitHub's dependency graph exports: the described package, every
+// package with its purl, DEPENDS_ON for the edges — one written the other
+// way round, as DEPENDENCY_OF — and a relationship that is not a
+// dependency at all.
+const bomWithGraphAsSPDX = `{
+  "spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": "shop",
+  "documentDescribes": ["root"],
+  "packages": [
+    {"SPDXID": "root", "name": "shop", "versionInfo": "1.0.0"},
+    {"SPDXID": "srv", "name": "server", "versionInfo": "2.1.0",
+     "externalRefs": [{"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/acme/server@v2.1.0"}]},
+    {"SPDXID": "mw", "name": "middleware", "versionInfo": "0.4.0",
+     "externalRefs": [{"referenceCategory": "PACKAGE_MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/acme/mw@v0.4.0"}]},
+    {"SPDXID": "arc", "name": "archive", "versionInfo": "1.0.2",
+     "externalRefs": [{"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/acme/archive@v1.0.2"}]},
+    {"SPDXID": "direct", "name": "parser", "versionInfo": "0.9.0",
+     "externalRefs": [{"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/acme/parser@v0.9.0"}]},
+    {"SPDXID": "unknown", "name": "vendored", "versionInfo": "NOASSERTION"}
+  ],
+  "relationships": [
+    {"spdxElementId": "root", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "srv"},
+    {"spdxElementId": "root", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "direct"},
+    {"spdxElementId": "srv", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "mw"},
+    {"spdxElementId": "arc", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "mw"},
+    {"spdxElementId": "root", "relationshipType": "CONTAINS", "relatedSpdxElement": "unknown"}
+  ]
+}`
+
+// The same application written as SPDX is the same bill: its root, its
+// packages and their purls, and a graph that answers the same questions.
+func TestReadsAnSPDXBillAsTheSameBill(t *testing.T) {
+	b := mustBOM(t, bomWithGraphAsSPDX)
+	root, ok := b.Root()
+	if !ok || root.Name != "shop" {
+		t.Fatalf("the described package is not the root: %+v %v", root, ok)
+	}
+	byName := map[string]Part{}
+	for _, p := range b.Flat() {
+		byName[p.Name] = p
+	}
+	if len(byName) != 5 || byName["archive"].PURL != "pkg:golang/github.com/acme/archive@v1.0.2" ||
+		byName["middleware"].PURL == "" || byName["vendored"].Version != "" {
+		t.Fatalf("packages read as %+v", byName)
+	}
+	tree := b.Graph()
+	if !tree.Known() {
+		t.Fatal("the graph was not built")
+	}
+	if got := tree.Depth("direct"); got != 1 {
+		t.Fatalf("a direct dependency is at depth %d", got)
+	}
+	if got := tree.Depth("arc"); got != 3 {
+		t.Fatalf("the archive library is at depth %d: DEPENDENCY_OF was not read the right way round", got)
+	}
+	if bl, ok := tree.Blocker("arc"); !ok || bl.Name != "server" {
+		t.Fatalf("blocker = %+v, %v", bl, ok)
+	}
+	// Containing a file or a vendored copy is not depending on it.
+	if got := tree.Depth("unknown"); got > 0 {
+		t.Fatalf("a contained package was read as a dependency, at depth %d", got)
 	}
 }

@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-// BOM is a CycloneDX bill of materials.
+// BOM is a bill of materials: CycloneDX as it is written, or SPDX 2.x read
+// into the same shape (spdx.go).
 type BOM struct {
 	Format       string       `json:"bomFormat"`
 	SpecVersion  string       `json:"specVersion"`
@@ -50,18 +51,20 @@ type Dependency struct {
 	DependsOn []string `json:"dependsOn,omitempty"`
 }
 
-// ReadBOM parses a CycloneDX document.
+// ReadBOM parses a CycloneDX document, or an SPDX 2.x document in JSON.
 func ReadBOM(in []byte) (BOM, error) {
+	if _, spdx := isSPDX(in); spdx {
+		return readSPDX(in)
+	}
 	var b BOM
 	if err := json.Unmarshal(in, &b); err != nil {
-		return BOM{}, fmt.Errorf("this is not JSON: %w", err)
+		return BOM{}, fmt.Errorf("this is not JSON — a bill is read as CycloneDX JSON or "+
+			"SPDX 2.x JSON, and SPDX's tag-value form is neither: %w", err)
 	}
 	if !strings.EqualFold(b.Format, "CycloneDX") {
 		return BOM{}, fmt.Errorf(
-			"this says bomFormat %q. Only CycloneDX is read here; SPDX is "+
-				"a different document with a different graph and "+
-				"pretending otherwise would produce a dependency tree "+
-				"nobody drew", b.Format)
+			"this says bomFormat %q. A bill is read as CycloneDX or as SPDX "+
+				"2.x JSON, and this is neither", b.Format)
 	}
 	if strings.TrimSpace(b.SpecVersion) == "" {
 		return BOM{}, fmt.Errorf("this has no specVersion")

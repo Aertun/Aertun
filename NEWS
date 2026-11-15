@@ -4,6 +4,14 @@ Aertun NEWS
 Unreleased
 ==========
 
+* Bills of materials in SPDX 2.2 and 2.3 JSON are read as CycloneDX ones
+  are (`vuln import --bom`, `sca scan --bom`): the package the document
+  describes is the root, each package's purl is what advisories match, and
+  DEPENDS_ON and DEPENDENCY_OF are the graph.  This is the form GitHub's
+  dependency graph, Syft and Trivy export.  The 0.1.0 README said SPDX was
+  read before it was; now it is.  SPDX 3 and the tag-value form are
+  refused by name.
+
 * The feed that receives a signed audit stream is the kind `stream`
   (`aertun inbound add stream NAME --keys FILE`): it takes what
   `aertun siem stream` sends, from another Aertun deployment or any program
