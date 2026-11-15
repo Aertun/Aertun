@@ -257,11 +257,11 @@ func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
 			case x.Leaf() && x.IsOutside():
 				outsideEvidence = append(outsideEvidence, fact{Text: label + ": " + x.Text(), Outside: true})
 			case x.Leaf():
-				nums = append(nums, number{label, x.Text()})
+				nums = append(nums, number{label, figure(x)})
 			case x.Get("k") != nil:
 				val := x.Get("k").Text() + " of " + x.Get("n").Text()
 				if lo := x.Get("lower"); lo != nil {
-					val += ", between " + lo.Text() + " and " + x.Get("upper").Text()
+					val += ", between " + figure(lo) + " and " + figure(x.Get("upper"))
 				}
 				nums = append(nums, number{label, val})
 			}
@@ -269,6 +269,23 @@ func (s *Server) handleProof(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Numbers"], data["OutsideEvidence"] = nums, outsideEvidence
 	s.render(w, r, "proof.html", data)
+}
+
+// figure is a value as the screen shows it: a fraction to the four places
+// the checks above it are written to, without the zeros that follow, and
+// anything else as it is. The proof and the agent interface carry the
+// number whole; sixteen digits of a bound on a screen are noise beside the
+// same bound two lines up.
+func figure(a *ops.Answer) string {
+	f, ok := a.Value().(float64)
+	if !ok {
+		return a.Text()
+	}
+	out := strconv.FormatFloat(f, 'f', 4, 64)
+	if strings.Contains(out, ".") {
+		out = strings.TrimRight(strings.TrimRight(out, "0"), ".")
+	}
+	return out
 }
 
 // MaxKeptUpload bounds one file handed in through the form.

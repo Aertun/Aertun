@@ -132,6 +132,14 @@ func TestTheProofsScreenShowsWhatTheOperationLabelled(t *testing.T) {
 		if strings.Contains(page, "<b>bold</b>") {
 			t.Errorf("proof %s shows a rule's name unescaped", m[1])
 		}
+		// A bound is shown to the four places its check is written to, not
+		// to the sixteen a float prints with.
+		if long := regexp.MustCompile(`\d\.\d{6,}`).FindString(page); long != "" {
+			t.Errorf("proof %s shows %s, a fraction nobody reads to that length", m[1], long)
+		}
+		if strings.Contains(page, "false closures") && !regexp.MustCompile(`0 of 300, between 0 and 0\.\d{1,4}<`).MatchString(page) {
+			t.Errorf("proof %s does not show its bound to four places:\n%s", m[1], page)
+		}
 	}
 }
 
