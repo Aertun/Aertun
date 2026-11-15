@@ -91,7 +91,7 @@ var destinations = []destination{
 	// called, was refused and proposed, from the sidecar and GenAI
 	// telemetry. Triage rather than view because, like Events and Hunt, it
 	// reads raw telemetry — which names people's activity, pseudonymised.
-	{"agents", "Agents", "/security/agents", "Investigation", "mcp", auth.ActTriage},
+	{"agents", "Agents", "/security/agents", "Investigation", "agents", auth.ActTriage},
 	// Beside Agents, under its address: where the machines that run agents
 	// talked to, from the recorder's own auditd tail. The same triage gate
 	// as the board it sits under, because it reads the same raw telemetry —
@@ -166,6 +166,7 @@ var docSections = map[string]bool{
 	"approvals": true, "audit": true, "proofs": true, "automations": true, "cases": true, "connectors": true,
 	"detections": true, "events": true, "findings": true, "intelligence": true, "passkeys": true,
 	"people": true, "settings": true, "sso": true, "start": true, "vulnerabilities": true, "workforce": true,
+	"agents": true,
 
 	// Guides no screen owns, because they explain a concept or a surface
 	// rather than a destination. Named individually so that one quietly
