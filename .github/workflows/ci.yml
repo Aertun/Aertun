@@ -6,7 +6,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # main is what is released; develop is where work lands; release-*
+    # carries a released line's patches.
+    branches: [main, develop, "release-*"]
   pull_request:
   workflow_dispatch:
 
