@@ -92,15 +92,15 @@ func forgeSite(t *testing.T) forgeFixture {
 		switch {
 		case strings.Contains(user, forgeMarker+"-title-1"):
 			return `{"answers":{"verdict":{"value":"real","confidence":0.95,` +
-				`"why":"ZQX-why-1: the title says so"}}}`
+				`"why":"` + forgeMarker + `-why-1: the title says so"}}}`
 		case strings.Contains(user, forgeMarker+"-title-2"):
-			return `{"answers":{"verdict":{"value":"ZQX-value-2","confidence":0.99,` +
-				`"why":"ZQX-why-2"}}}`
+			return `{"answers":{"verdict":{"value":"` + forgeMarker + `-value-2","confidence":0.99,` +
+				`"why":"` + forgeMarker + `-why-2"}}}`
 		case strings.Contains(user, forgeMarker+"-title-3"):
 			return `{"answers":{"verdict":{"value":"benign","confidence":0.3,` +
-				`"why":"ZQX-why-3"}}}`
+				`"why":"` + forgeMarker + `-why-3"}}}`
 		case strings.Contains(user, forgeMarker+"-title-4"):
-			return "ZQX-why-4: I will not answer in JSON"
+			return forgeMarker + "-why-4: I will not answer in JSON"
 		}
 		// The counterfactual re-ask, with the text taken out of the question.
 		return suggests("real", 0.95)

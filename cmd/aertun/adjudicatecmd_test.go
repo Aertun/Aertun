@@ -92,7 +92,7 @@ func TestABlindReviewEndToEnd(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(shown, `"title":{"value":"QZV-title`) || !strings.Contains(shown, `"attacker_writable":true`) {
+	if !strings.Contains(shown, `"title":{"value":"`+verdictMarker+`-title`) || !strings.Contains(shown, `"attacker_writable":true`) {
 		t.Errorf("the item shown is not the finding as raised, labelled: %s", shown)
 	}
 
