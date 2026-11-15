@@ -594,6 +594,9 @@ func cmdServe(root string, args []string) error {
 	// so the loopback default is opened as localhost.
 	if host, port, err := net.SplitHostPort(*addr); err == nil && (host == "127.0.0.1" || host == "::1") {
 		fmt.Printf("  %sopen it as http://localhost:%s: passkeys need a name, not an address%s\n", dim, port, reset)
+	} else if err == nil && openedAs(host) == "localhost" && host != "localhost" && cfg.Raw("admin.base_url") == "" {
+		fmt.Printf("  %son every interface: open it as http://localhost:%s on this machine; reached "+
+			"from anywhere else, set admin.base_url to the address people use%s\n", dim, port, reset)
 	}
 	// People sign in with a passkey, two factors at once; somebody without
 	// one is given a link that adds it. A token alone is one factor and

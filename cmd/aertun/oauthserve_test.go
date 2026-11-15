@@ -31,6 +31,13 @@ func TestTheOAuthOriginFollowsTheOperatorNotTheListener(t *testing.T) {
 		want     string
 	}{
 		{"laptop", "", false, "localhost:8080", "http://localhost:8080"},
+		// A container listens on every interface; the address names no
+		// host, and a browser on the machine opens it as localhost.
+		{"every interface", "", false, "0.0.0.0:8080", "http://localhost:8080"},
+		{"every interface, IPv6", "", false, "[::]:8080", "http://localhost:8080"},
+		{"no host", "", false, ":8080", "http://localhost:8080"},
+		{"every interface, named origin", "https://aertun.example.com", false, "0.0.0.0:8080",
+			"https://aertun.example.com"},
 		{"behind proxy", "", true, "127.0.0.1:8080", "https://127.0.0.1:8080"},
 		{"named origin", "https://aertun.example.com", false, "127.0.0.1:8080",
 			"https://aertun.example.com"},
@@ -143,5 +150,26 @@ func TestOneOriginIsNamedEverywhereBehindAProxy(t *testing.T) {
 	srv.Handler().ServeHTTP(rec, form)
 	if body := rec.Body.String(); !strings.Contains(body, base+"/enrol/") || strings.Contains(body, "127.0.0.1:8080/enrol/") {
 		t.Errorf("the enrolment link does not name the public origin: %d %s", rec.Code, body)
+	}
+}
+
+// A page the browser serves from localhost may post the consent form to a
+// console listening on every interface, and a page from another host may
+// not until the operator names it.
+func TestTheConsoleOnEveryInterfaceAcceptsItsOwnLocalPages(t *testing.T) {
+	cfg := config.New()
+	got := mcpOrigins(cfg, "0.0.0.0:8080")
+	for _, ok := range []string{"http://localhost:8080", "http://127.0.0.1:8080"} {
+		if !got[ok] {
+			t.Errorf("%s is refused: %v", ok, got)
+		}
+	}
+	for _, no := range []string{"http://0.0.0.0:8080", "http://10.0.0.5:8080", "http://evil.example:8080"} {
+		if got[no] {
+			t.Errorf("%s is accepted: %v", no, got)
+		}
+	}
+	if o := mcpOrigins(cfg, "10.0.0.5:8080"); o["http://localhost:8080"] {
+		t.Errorf("a console on one interface accepts localhost pages: %v", o)
 	}
 }

@@ -426,3 +426,31 @@ func TestExchangeOnBehalfOfRefusesWhatTheStoreRefuses(t *testing.T) {
 		t.Errorf("%d %s", rec.Code, rec.Body)
 	}
 }
+
+// A console listening on every interface, as the container does, names
+// itself as a browser on that machine opens it: the issuer, the protected
+// resource and the resource document all say localhost, never 0.0.0.0.
+func TestAContainerConsoleNamesItselfAsItIsOpened(t *testing.T) {
+	root := caveatSite(t)
+	pol, _ := loadPolicy(root)
+	toks, _ := loadTokens(root)
+	srv, err := admin.New(pol, toks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	cfg := config.New()
+	mountMCP(mux, root, cfg, "0.0.0.0:8080")
+	mountOAuthAS(mux, root, cfg, "0.0.0.0:8080", srv)
+	for path, key := range map[string]string{oauthas.MetadataPath: "issuer", wellKnownMCP: "resource"} {
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		var doc map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+			t.Fatalf("%s: %v %s", path, err, w.Body)
+		}
+		if v, _ := doc[key].(string); !strings.HasPrefix(v, "http://localhost:8080") {
+			t.Errorf("%s names %s %q", path, key, v)
+		}
+	}
+}

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"path/filepath"
 
@@ -44,7 +45,24 @@ func publicOrigin(cfg *config.Config, addr string) string {
 	if cfg.Bool("admin.behind_tls_proxy") {
 		scheme = "https"
 	}
+	if host, port, err := net.SplitHostPort(addr); err == nil {
+		return scheme + "://" + net.JoinHostPort(openedAs(host), port)
+	}
 	return scheme + "://" + addr
+}
+
+// openedAs is the host a person opens the console at for the host it
+// listens on. An address bound to every interface — 0.0.0.0, ::, or none,
+// as a container listens — names no host of its own, and a browser on this
+// machine opens it as localhost; naming the bind address instead gave an
+// issuer and an origin no client could use, and refused the consent form
+// the browser posted from localhost. Reached from anywhere else, the
+// operator names the origin with admin.base_url, which wins over this.
+func openedAs(host string) string {
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		return "localhost"
+	}
+	return host
 }
 
 // consentsPath is the consent register, beside the registry it is consulted
@@ -75,8 +93,8 @@ func mountOAuthAS(mux *http.ServeMux, root string, cfg *config.Config, addr stri
 		Resource: origin + "/mcp",
 		// The person reading the consent page is in the console: it draws
 		// the console's wordmark, from the console's own template.
-		Brand: srv.Lockup(),
-		Icon:  admin.SignedOutIcon(),
+		Brand:    srv.Lockup(),
+		Icon:     admin.SignedOutIcon(),
 		Consents: consentStore(root),
 		Agents:   agentStore(root),
 		// The person approving is the person signed in to the console: the

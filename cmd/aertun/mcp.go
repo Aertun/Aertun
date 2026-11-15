@@ -352,11 +352,13 @@ func mcpOrigins(cfg *config.Config, addr string) map[string]bool {
 	if err != nil {
 		return nil
 	}
-	names := []string{host}
-	// The console is opened as localhost when it listens on a bare address
-	// (serve says so on startup), so the loopback names all name this
-	// server, and a page served from any of them is one of ours.
-	if host == "127.0.0.1" || host == "localhost" || host == "::1" {
+	names := []string{openedAs(host)}
+	// The console is opened as localhost when it listens on a loopback or
+	// an unspecified address (serve says so on startup), so the loopback
+	// names all name this server, and a page served from any of them is
+	// one of ours. An address on another interface is not: a page from it
+	// is ours only once admin.base_url says so.
+	if h := openedAs(host); h == "127.0.0.1" || h == "localhost" || h == "::1" {
 		names = append(names, "127.0.0.1", "localhost", "::1")
 	}
 	scheme := "http"
