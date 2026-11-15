@@ -49,7 +49,7 @@ func TestTheTypefaceTravelsWithItsLicenceAndNotUnderGooglesName(t *testing.T) {
 		t.Fatalf("the font answered %d as %q", w.Code, w.Header().Get("Content-Type"))
 	}
 	css := get(t, srv, "/style.css", token).Body.String()
-	if !strings.Contains(css, `font-family: "aertun UI"`) ||
+	if !strings.Contains(css, `font-family: "Aertun UI"`) ||
 		strings.Contains(css, `font-family: "Google Sans`) {
 		t.Error("the stylesheet does not use the face under its own name")
 	}
