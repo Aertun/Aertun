@@ -315,9 +315,7 @@ func New(p *auth.Policy, ts *auth.TokenStore) (*Server, error) {
 		// pages somebody sees before signing in: /icon.svg carries the
 		// operator's colour and is served only to the signed in, so without
 		// this the browser asks for /favicon.ico and is told 401.
-		"signedOutIcon": func() template.URL {
-			return template.URL("data:image/svg+xml," + url.PathEscape(MarkSVG(MarkFirstColour)))
-		},
+		"signedOutIcon": SignedOutIcon,
 		"pct": func(f float64) float64 { return f * 100 },
 		// sentence capitalises the first letter, for a word stored in
 		// lower case and shown on its own: a severity, a state.

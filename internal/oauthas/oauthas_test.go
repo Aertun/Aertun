@@ -533,3 +533,39 @@ func TestTheConsentRegisterRefusesWhatItCannotHonour(t *testing.T) {
 		}
 	}
 }
+
+// The pages a person reads here are the console's pages: its card, its
+// stylesheet, its wordmark, and the landmarks and viewport every console
+// page has. The consent page once had none of it, not even the logo.
+func TestTheConsentPageIsDrawnAsTheConsoleDrawsItsPages(t *testing.T) {
+	r := newRig(t, "aertun_read", "aertun_find")
+	r.srv.Brand = `<span class="lockup">MARK</span>`
+	r.srv.Icon = "data:image/svg+xml,icon"
+	q, _ := r.ask("observe")
+	ask := r.get(t, AuthorizePath+"?"+q.Encode())
+	refused := r.get(t, AuthorizePath+"?client_id=nobody")
+	for name, w := range map[string]*httptest.ResponseRecorder{"the consent page": ask, "a refusal": refused} {
+		body := w.Body.String()
+		for _, want := range []string{`<span class="lockup">MARK</span>`, `<link rel="stylesheet" href="/style.css">`,
+			`name="viewport"`, `<main id="main"`, `class="signin-panel"`, `<html lang="en">`,
+			`href="data:image/svg&#43;xml,icon"`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s lacks %s:\n%s", name, want, body)
+			}
+		}
+		if ct := w.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+			t.Errorf("%s is served as %q", name, ct)
+		}
+	}
+	if !strings.Contains(ask.Body.String(), `<button type="submit" name="approve" value="yes">Allow</button>`) {
+		t.Errorf("the consent page has no Allow:\n%s", ask.Body.String())
+	}
+	if !strings.Contains(refused.Body.String(), `role="alert"`) {
+		t.Errorf("a refusal is not announced:\n%s", refused.Body.String())
+	}
+	// Without a brand the page still stands, and draws no empty logo.
+	r.srv.Brand = ""
+	if body := r.get(t, AuthorizePath+"?"+q.Encode()).Body.String(); strings.Contains(body, `class="brand"`) {
+		t.Errorf("an empty brand drew a logo's frame:\n%s", body)
+	}
+}

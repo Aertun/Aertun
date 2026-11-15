@@ -73,6 +73,10 @@ func mountOAuthAS(mux *http.ServeMux, root string, cfg *config.Config, addr stri
 	as := &oauthas.Server{
 		Issuer:   origin,
 		Resource: origin + "/mcp",
+		// The person reading the consent page is in the console: it draws
+		// the console's wordmark, from the console's own template.
+		Brand: srv.Lockup(),
+		Icon:  admin.SignedOutIcon(),
 		Consents: consentStore(root),
 		Agents:   agentStore(root),
 		// The person approving is the person signed in to the console: the

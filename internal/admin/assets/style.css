@@ -1514,6 +1514,12 @@ body.nav-hidden > .sidenav { display: none; }
   .signin { grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
             gap: 3rem; align-items: start; }
 }
+/* One panel and nothing beside it — adding a passkey, confirming one, an
+   agent's consent: one column, centred, rather than a form pushed to the
+   left of an empty second column. */
+.signin.signin-solo { grid-template-columns: minmax(0, 1fr); max-width: 30rem; }
+.signin-panel .actions { display: grid; gap: .5rem; margin: 1.25rem 0; }
+.signin-panel .actions button { width: 100%; }
 .signin-panel {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);

@@ -123,3 +123,18 @@ func TestTheCurrentScreenHasTheFilledIcon(t *testing.T) {
 		t.Error("a screen that is not current is drawn filled")
 	}
 }
+
+// The wordmark another package draws — the agent consent page — is the
+// console's own: the mark as the A, the rest of the name, one label.
+func TestTheLockupLentToOtherPagesIsTheConsolesWordmark(t *testing.T) {
+	srv, _ := setup(t)
+	got := string(srv.Lockup())
+	for _, want := range []string{`class="lockup"`, `aria-label="Aertun"`, MarkFirst, MarkSecond, ">ertun<"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the lockup lacks %.40s:\n%s", want, got)
+		}
+	}
+	if !strings.HasPrefix(string(SignedOutIcon()), "data:image/svg+xml,") {
+		t.Errorf("the signed-out icon is %.60s", SignedOutIcon())
+	}
+}

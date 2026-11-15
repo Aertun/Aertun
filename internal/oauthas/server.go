@@ -90,6 +90,12 @@ type Server struct {
 	// affected.
 	SameOrigin func(origin string) bool
 
+	// Brand and Icon are the console's wordmark and its signed-out icon:
+	// the pages a person reads here are the console's pages, served by
+	// another package, and look like them. Empty draws the page without.
+	Brand template.HTML
+	Icon  template.URL
+
 	// Now is the clock, overridable in tests.
 	Now func() time.Time
 
@@ -319,18 +325,39 @@ func (s *Server) check(q url.Values) (a ask, why string, ok bool) {
 	return a, "", true
 }
 
-var consentTmpl = template.Must(template.New("consent").Parse(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>aertun — agent consent</title></head>
-<body>
+// page is the frame every page a person reads here is drawn in: the sign-in
+// card the console draws, with its wordmark and its stylesheet, because the
+// person approving an agent is standing in the console and should be able to
+// tell. The console's security headers apply: this server is mounted on its
+// mux, and the stylesheet and the icon are the same origin's.
+var page = template.Must(template.New("page").Parse(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} — Aertun</title>
+<link rel="stylesheet" href="/style.css">
+{{with .Icon}}<link rel="icon" href="{{.}}" type="image/svg+xml">{{end}}
+</head>
+<body class="signin-page">
+<main id="main" class="signin signin-solo">
+<section class="signin-panel">
+{{with .Brand}}<p class="brand">{{.}}</p>{{end}}
+{{template "body" .}}
+</section>
+</main>
+</body>
+</html>`))
+
+var consentTmpl = template.Must(template.Must(page.Clone()).New("body").Parse(`
 <h1>Agent {{.Agent}}, acting for you</h1>
 <p>The agent <strong>{{.Agent}}</strong>, owned by {{.Owner}}, asks to {{.Reach}}
-at {{.Resource}}, for up to {{.Hours}} hours. You are {{.Person}}.</p>
-<p>What you allow here is one of the three bounds on what the agent gets: this
-consent, what the registry allows the agent, and whatever credential the agent
+at <code>{{.Resource}}</code>, for up to {{.Hours}} hours. You are signed in as
+<strong>{{.Person}}</strong>.</p>
+<p class="help">What you allow here is one of three bounds on what the agent
+gets: this consent, what the registry allows the agent, and the credential it
 presents. It may end up narrower. It never ends up wider.</p>
-<p>Reviewing and revoking: <code>aertun agent consents</code> lists what exists;
-<code>aertun agent consents revoke ID</code> ends one, and every token minted
-under it dies with it.</p>
 <form method="post" action="{{.Action}}">
 <input type="hidden" name="response_type" value="code">
 <input type="hidden" name="client_id" value="{{.ClientID}}">
@@ -340,10 +367,16 @@ under it dies with it.</p>
 <input type="hidden" name="code_challenge" value="{{.Challenge}}">
 <input type="hidden" name="code_challenge_method" value="S256">
 {{with .ResourceParam}}<input type="hidden" name="resource" value="{{.}}">{{end}}
-<p><button name="approve" value="yes">Allow</button>
-<button name="approve" value="no">Refuse</button></p>
+<p class="actions"><button type="submit" name="approve" value="yes">Allow</button>
+<button type="submit" name="approve" value="no" class="btn-text">Refuse</button></p>
 </form>
-</body></html>`))
+<p class="hint">Revoke it whenever you like: <code>aertun agent consents</code> lists
+what exists, and <code>aertun agent consents revoke ID</code> ends one, with every
+token minted under it.</p>`))
+
+var refusalTmpl = template.Must(template.Must(page.Clone()).New("body").Parse(`
+<h1>Refused</h1>
+<p class="notice bad" role="alert">{{.Why}}</p>`))
 
 func (s *Server) serveAuthorize(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -358,7 +391,7 @@ func (s *Server) serveAuthorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := r.ParseForm(); err != nil {
-			refusePage(w, http.StatusBadRequest, "the consent answer is a form")
+			s.refusePage(w, http.StatusBadRequest, "the consent answer is a form")
 			return
 		}
 		s.answerAsk(w, r, r.PostForm)
@@ -380,29 +413,31 @@ func reach(b Bundle) string {
 func (s *Server) showAsk(w http.ResponseWriter, r *http.Request, q url.Values) {
 	a, why, ok := s.check(q)
 	if !ok {
-		refusePage(w, http.StatusBadRequest, why)
+		s.refusePage(w, http.StatusBadRequest, why)
 		return
 	}
 	if s.Identity == nil {
-		refusePage(w, http.StatusServiceUnavailable, "this server cannot establish who is signed in, so it cannot ask anybody anything")
+		s.refusePage(w, http.StatusServiceUnavailable, "this server cannot establish who is signed in, so it cannot ask anybody anything")
 		return
 	}
 	person, signedIn := s.Identity(r)
 	if !signedIn {
-		refusePage(w, http.StatusForbidden,
+		s.refusePage(w, http.StatusForbidden,
 			"nobody is signed in to the console in this browser. Sign in — a passkey, two factors — and the agent's ask will be here")
 		return
 	}
 	bundle, _ := BundleFor(a.scope)
 	if !s.holds(person, a.scope) {
-		refusePage(w, http.StatusForbidden,
+		s.refusePage(w, http.StatusForbidden,
 			"you do not hold what this asks for. The "+a.scope+" bundle needs "+string(bundle.Action)+
 				" on the security area, and the policy does not grant that to "+person+
 				". A consent delegates what a person holds; it does not create it.")
 		return
 	}
 	entry, _, _ := s.Agents.Get(a.client)
-	_ = consentTmpl.Execute(w, map[string]any{
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = consentTmpl.ExecuteTemplate(w, "page", map[string]any{
+		"Title": "Agent consent", "Brand": s.Brand, "Icon": s.Icon,
 		"Agent": a.client, "Owner": entry.Owner, "Person": person,
 		"Reach": reach(bundle), "Resource": s.Resource,
 		"Hours":  int(MaxConsentTTL / time.Hour),
@@ -419,16 +454,16 @@ func (s *Server) showAsk(w http.ResponseWriter, r *http.Request, q url.Values) {
 func (s *Server) answerAsk(w http.ResponseWriter, r *http.Request, f url.Values) {
 	a, why, ok := s.check(f)
 	if !ok {
-		refusePage(w, http.StatusBadRequest, why)
+		s.refusePage(w, http.StatusBadRequest, why)
 		return
 	}
 	if s.Identity == nil {
-		refusePage(w, http.StatusServiceUnavailable, "this server cannot establish who is signed in, so nobody has answered anything")
+		s.refusePage(w, http.StatusServiceUnavailable, "this server cannot establish who is signed in, so nobody has answered anything")
 		return
 	}
 	person, signedIn := s.Identity(r)
 	if !signedIn {
-		refusePage(w, http.StatusForbidden, "the session that was asked is gone; start again from the agent")
+		s.refusePage(w, http.StatusForbidden, "the session that was asked is gone; start again from the agent")
 		return
 	}
 	if f.Get("approve") != "yes" {
@@ -442,20 +477,20 @@ func (s *Server) answerAsk(w http.ResponseWriter, r *http.Request, f url.Values)
 		// Re-checked at the answer, not only at the showing: a grant
 		// removed while the screen sat open must not be delegated by a
 		// click that pre-dates its removal.
-		refusePage(w, http.StatusForbidden,
+		s.refusePage(w, http.StatusForbidden,
 			"you no longer hold what this asks for; the consent is not recorded")
 		return
 	}
 	id, err := NewID()
 	if err != nil {
-		refusePage(w, http.StatusInternalServerError, err.Error())
+		s.refusePage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	now := s.now()
 	if err := s.Consents.Record(Consent{
 		ID: id, Agent: a.client, Scope: a.scope, Principal: person,
 	}, now); err != nil {
-		refusePage(w, http.StatusInternalServerError, "the consent could not be recorded: "+err.Error())
+		s.refusePage(w, http.StatusInternalServerError, "the consent could not be recorded: "+err.Error())
 		return
 	}
 	s.audit("consent.grant", "/agents/"+a.client, map[string]string{
@@ -698,10 +733,9 @@ func redirectError(w http.ResponseWriter, r *http.Request, redirect, kind, why, 
 // authorization endpoint's failures that cannot be sent to a redirect (an
 // unvalidated redirect, a person who is not signed in) are pages, because
 // the only reader they have is the person holding the browser.
-func refusePage(w http.ResponseWriter, status int, why string) {
+func (s *Server) refusePage(w http.ResponseWriter, status int, why string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write([]byte("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
-		"<title>aertun — refused</title></head><body><h1>Refused</h1><p>" +
-		template.HTMLEscapeString(why) + "</p></body></html>"))
+	_ = refusalTmpl.ExecuteTemplate(w, "page", map[string]any{
+		"Title": "Refused", "Brand": s.Brand, "Icon": s.Icon, "Why": why})
 }

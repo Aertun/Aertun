@@ -3,6 +3,12 @@
 
 package admin
 
+import (
+	"html/template"
+	"net/url"
+	"strings"
+)
+
 // The mark.
 //
 // # What it is
@@ -62,4 +68,23 @@ func MarkSVG(colour string) string {
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">` +
 		`<path fill="` + colour + `" d="` + MarkFirst + `"/>` +
 		`<path fill="` + MarkSecondColour + `" d="` + MarkSecond + `"/></svg>`
+}
+
+// Lockup is the wordmark as the console draws it — the mark as the A of the
+// name — for a page served beside the console by another package: the agent
+// consent page. One definition, in layout.html, rather than a second copy of
+// the paths that would drift from it.
+func (s *Server) Lockup() template.HTML {
+	var b strings.Builder
+	if err := s.tpl.ExecuteTemplate(&b, "lockup", map[string]any{
+		"MarkFirst": MarkFirst, "MarkSecond": MarkSecond}); err != nil {
+		return ""
+	}
+	return template.HTML(b.String()) // #nosec G203 -- our own template, executed with our own constants
+}
+
+// SignedOutIcon is the mark as a data URL, for a page that may be read by
+// somebody whose session cannot fetch /icon.svg.
+func SignedOutIcon() template.URL {
+	return template.URL("data:image/svg+xml," + url.PathEscape(MarkSVG(MarkFirstColour)))
 }
