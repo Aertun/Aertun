@@ -29,7 +29,7 @@ import (
 // that only exist here — that a challenge issued to one session cannot
 // register a key on another, and that somebody can only remove their own.
 
-const testHost = "cms.example"
+const testHost = "aertun.example"
 
 type fakeAuthenticator struct {
 	key   *ecdsa.PrivateKey

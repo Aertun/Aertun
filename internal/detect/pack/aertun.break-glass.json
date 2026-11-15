@@ -4,7 +4,8 @@
   "why": "recovery bypasses the normal way in; it should be rare and expected",
   "blind": "access recovered by editing files on the machine directly",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 4,
   "when": {

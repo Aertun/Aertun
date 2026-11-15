@@ -4,7 +4,8 @@
   "why": "moving the log is how a trail is cut in two",
   "blind": "a log copied away and the original left in place",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 4,
   "when": {

@@ -17,7 +17,7 @@ import (
 
 // A record becomes the event the rules read: the action, its outcome, the
 // kind of actor and the details a rule needs, and not the free text.
-func TestAQuilzoRecordIsWhatTheRulesRead(t *testing.T) {
+func TestAStreamRecordIsWhatTheRulesRead(t *testing.T) {
 	lines := []string{
 		`{"class_uid":6003,"activity_id":3,"activity_name":"dual.approved","time":1792921835099,"status":"success",` +
 			`"api":{"operation":"dual.approved"},"actor":{"user":{"name":"p_1a2b","type":"User"}},"resources":[{"uid":"/"}],` +
@@ -25,11 +25,11 @@ func TestAQuilzoRecordIsWhatTheRulesRead(t *testing.T) {
 		`{"class_uid":3002,"activity_id":1,"activity_name":"auth.failures","time":1792921835100,"status":"denied",` +
 			`"actor":{"user":{"name":"p_9","type":"Service"}},"resources":[{"uid":"/"}],"unmapped":{"detail_failures":"6"}}`,
 		`{"class_uid":6003,"activity_id":2,"activity_name":"mcp.call","time":1792921835101,"status":"failure",` +
-			`"api":{"operation":"publish"},"actor":{"user":{"name":"app:qzc_1","type":"AI"},"app_name":"qzc_1"},` +
-			`"resources":[{"uid":"/mcp"}],"unmapped":{"detail_tool":"quilzo_publish"}}`,
+			`"api":{"operation":"publish"},"actor":{"user":{"name":"app:agent_1","type":"AI"},"app_name":"agent_1"},` +
+			`"resources":[{"uid":"/mcp"}],"unmapped":{"detail_tool":"aertun_read"}}`,
 	}
 	at := time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC)
-	evs, err := StreamEvents(strings.Join(lines, "\n")+"\n", at)
+	evs, err := StreamEvents(strings.Join(lines, "\n")+"\n", "site-b", at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestAQuilzoRecordIsWhatTheRulesRead(t *testing.T) {
 	}
 	alone := evs[0]
 	if alone.Source != StreamSource || alone.Class != telemetry.ClassAPIActivity ||
-		alone.Disposition != telemetry.DispositionAllowed || alone.Actor.Issuer != "quilzo" ||
+		alone.Disposition != telemetry.DispositionAllowed || alone.Actor.Issuer != "site-b" ||
 		alone.Actor.Value != "p_1a2b" || !alone.Received.Equal(at) {
 		t.Errorf("%+v", alone)
 	}
@@ -54,12 +54,12 @@ func TestAQuilzoRecordIsWhatTheRulesRead(t *testing.T) {
 		t.Errorf("%+v", f)
 	}
 	if m := evs[2]; m.Disposition != telemetry.DispositionFailed || m.Raw["kind"] != "ai" ||
-		m.Raw["operation"] != "publish" || m.Raw["model"] != "qzc_1" || m.Raw["tool"] != "quilzo_publish" {
+		m.Raw["operation"] != "publish" || m.Raw["model"] != "agent_1" || m.Raw["tool"] != "aertun_read" {
 		t.Errorf("%+v", m)
 	}
 	// A verified batch with a line that is not a record is the sender's bug
 	// and is said, not skipped.
-	if _, err := StreamEvents(lines[0]+"\nnot json\n", at); err == nil {
+	if _, err := StreamEvents(lines[0]+"\nnot json\n", "site-b", at); err == nil {
 		t.Error("a line that is not a record was skipped quietly")
 	}
 }
@@ -67,7 +67,7 @@ func TestAQuilzoRecordIsWhatTheRulesRead(t *testing.T) {
 func TestStreamKeysAreCheckedWhenPinned(t *testing.T) {
 	pub, _, _ := ed25519.GenerateKey(rand.Reader)
 	head, _, _ := ed25519.GenerateKey(rand.Reader)
-	good := StreamKeys{KeyID: "quilzo-stream-0123", Alg: "ed25519",
+	good := StreamKeys{KeyID: "aertun-stream-0123", Alg: "ed25519",
 		PublicKey:   base64.StdEncoding.EncodeToString(pub),
 		HeadEd25519: base64.StdEncoding.EncodeToString(head),
 		HeadMLDSA:   base64.StdEncoding.EncodeToString([]byte("an ML-DSA key is checked when the verifier is built"))}
@@ -81,9 +81,10 @@ func TestStreamKeysAreCheckedWhenPinned(t *testing.T) {
 		"a key id to break a header with": func(k *StreamKeys) {
 			k.KeyID = `x";alg="none`
 		},
-		"a short key":        func(k *StreamKeys) { k.PublicKey = "AAAA" },
-		"no head key":        func(k *StreamKeys) { k.HeadEd25519 = "" },
-		"no ML-DSA head key": func(k *StreamKeys) { k.HeadMLDSA = "" },
+		"a short key":                      func(k *StreamKeys) { k.PublicKey = "AAAA" },
+		"no head key":                      func(k *StreamKeys) { k.HeadEd25519 = "" },
+		"no ML-DSA head key":               func(k *StreamKeys) { k.HeadMLDSA = "" },
+		"a head context to break out with": func(k *StreamKeys) { k.HeadContext = "a\nb" },
 	} {
 		k := good
 		change(&k)

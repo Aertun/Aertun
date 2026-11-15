@@ -24,16 +24,17 @@ import (
 	"github.com/aertun/aertun/internal/telemetry"
 )
 
-// Quilzo's audit log, received.
+// A signed audit stream, received.
 //
-// A feed of kind quilzo is the receiving end of Quilzo's siem.stream.url.
-// Quilzo pushes; nothing here reaches into Quilzo. A batch is taken only
+// A feed of kind stream is the receiving end of a sender's siem.stream.url:
+// another Aertun deployment, or any program that sends the same format.
+// The sender pushes; nothing here reaches into it. A batch is taken only
 // when it is signed by the stream key the feed pinned, follows the last
 // record held exactly, and its leaves rebuild a tree head signed by the
 // head keys the feed pinned. Then the records go into the event store as
-// quilzo/audit, the rules read them at once, and the answer tells Quilzo
-// how far it has got: 200 with what is held, or 409 with what is held when
-// a batch does not follow, so the sender starts again from there.
+// stream/audit, and the answer tells the sender how far it has got: 200
+// with what is held, or 409 with what is held when a batch does not follow,
+// so the sender starts again from there.
 //
 // The leaves taken are kept beside the feed, one per line, so the chain
 // survives a restart: a receiver that forgot them would take a batch that
@@ -42,24 +43,24 @@ import (
 
 // streamFeedHelp is what `aertun inbound help` says about this kind.
 const streamFeedHelp = `
-  Quilzo's audit log, as Quilzo writes it
-    quilzo siem stream key --json > quilzo-keys.json        (in Quilzo)
-    aertun inbound add quilzo quilzo --keys quilzo-keys.json
-    quilzo config set siem.stream.url https://YOUR-ADMIN/feeds/quilzo
+  Another deployment's audit log, as it is written
+    aertun siem stream key --json > site-b-keys.json        (on the sender)
+    aertun inbound add stream site-b --keys site-b-keys.json
+    aertun config set siem.stream.url https://YOUR-ADMIN/feeds/site-b   (on the sender)
     Each batch is taken only when it is signed by the stream key, follows
     the last record held exactly, and rebuilds the signed tree head. The
-    records are stored as quilzo/audit, where the quilzo.* rules read them.
+    records are stored as stream/audit, the actors named by the feed.
 `
 
 // streamFeedLabel is what the Feeds screen calls the kind.
-const streamFeedLabel = "Quilzo audit log"
+const streamFeedLabel = "Signed audit stream"
 
-// streamRotateHelp is the answer to rotating one: its keys are Quilzo's.
-const streamRotateHelp = "an audit stream's keys are Quilzo's: rotate them there, then " +
-	"`aertun inbound remove NAME` and add the feed again with the new `quilzo siem stream key --json`"
+// streamRotateHelp is the answer to rotating one: its keys are the sender's.
+const streamRotateHelp = "an audit stream's keys are the sender's: rotate them there, then " +
+	"`aertun inbound remove NAME` and add the feed again with the sender's new `aertun siem stream key --json`"
 
 // streamFeedUsage is its line in the usage.
-const streamFeedUsage = "add quilzo NAME --keys FILE | "
+const streamFeedUsage = "add stream NAME --keys FILE | "
 
 // streamBodyLimit is the largest batch taken: five hundred records of OCSF
 // with their envelope and leaves come to about a megabyte and a half.
@@ -125,14 +126,18 @@ func streamReceiver(root string, f inbound.Feed) (*auditstream.Receiver, error) 
 	if err != nil {
 		return nil, err
 	}
-	heads, err := audit.NewHeadVerifierIn(inbound.StreamHeadContext, headEd, headML)
+	context := f.Stream.HeadContext
+	if context == "" {
+		context = audit.HeadContext
+	}
+	heads, err := audit.NewHeadVerifierIn(context, headEd, headML)
 	if err != nil {
 		return nil, err
 	}
 	rc := &auditstream.Receiver{
 		Keys:  []httpsig.PublicKey{{ID: f.Stream.KeyID, Alg: httpsig.Ed25519, Ed: pub}},
 		Heads: heads,
-		// The address Quilzo was given, which is the one it signs.
+		// The address the sender was given, which is the one it signs.
 		Origin: strings.TrimSuffix(mustConfig(root).Raw("admin.base_url"), "/"),
 	}
 	leaves, err := readStreamLeaves(streamLeavesPath(root, f.Name))
@@ -274,7 +279,7 @@ func (s *inboundServer) auditStream(w http.ResponseWriter, r *http.Request, f in
 	// From here the receiver holds the batch in memory. Anything that stops
 	// it being kept drops that, so the next batch is checked against what
 	// is on disk and the sender, told nothing was taken, sends it again.
-	events, err := inbound.StreamEvents(b.OCSF, now)
+	events, err := inbound.StreamEvents(b.OCSF, f.Name, now)
 	if err != nil {
 		h.rc = nil
 		s.refused(f.Name, err.Error())
@@ -297,8 +302,8 @@ func (s *inboundServer) auditStream(w http.ResponseWriter, r *http.Request, f in
 // streamFeed fills in a new feed of this kind from the keys file.
 func streamFeed(root string, f *inbound.Feed, opts map[string]string) ([]string, error) {
 	if opts["keys"] == "" {
-		return nil, errors.New("this feed checks Quilzo's batches against its published keys: " +
-			"--keys FILE, where FILE is what `quilzo siem stream key --json` writes")
+		return nil, errors.New("this feed checks the sender's batches against its published keys: " +
+			"--keys FILE, where FILE is what `aertun siem stream key --json` writes on the sender")
 	}
 	b, err := os.ReadFile(opts["keys"])
 	if err != nil {
@@ -311,6 +316,6 @@ func streamFeed(root string, f *inbound.Feed, opts map[string]string) ([]string,
 	f.Kind, f.Stream = inbound.AuditStream, k
 	return []string{
 		"batches are checked against " + k.KeyID + ", tree heads against " + k.HeadKeyID,
-		"in Quilzo: quilzo config set siem.stream.url " + feedURL(root, f.Name),
+		"on the sender: aertun config set siem.stream.url " + feedURL(root, f.Name),
 	}, nil
 }

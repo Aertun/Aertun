@@ -4,7 +4,8 @@
   "why": "administrator is the role that can change every other control",
   "blind": "a role granted outside aertun, on the machine it runs on",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 3,
   "when": {

@@ -1,7 +1,7 @@
 # Recording Keycloak responses
 
 The files beside this directory are SAML responses from a real Keycloak,
-answering requests Quilzo made. `keycloak_test.go` checks them on every test
+answering requests Aertun made. `keycloak_test.go` checks them on every test
 run; this is how to record them again. Docker, Node with `playwright-core`
 and a Chromium are needed; nothing here runs during a build.
 

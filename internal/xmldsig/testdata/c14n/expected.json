@@ -3,7 +3,7 @@
   "file": "01-saml-prefixed.xml",
   "path": [],
   "inclusive": [],
-  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
+  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
  },
  {
   "file": "01-saml-prefixed.xml",
@@ -11,7 +11,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" Destination=\"https://quilzo.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
+  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" Destination=\"https://aertun.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
  },
  {
   "file": "01-saml-prefixed.xml",
@@ -19,7 +19,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
+  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
  },
  {
   "file": "01-saml-prefixed.xml",
@@ -29,7 +29,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" Destination=\"https://quilzo.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
+  "c14n": "<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" Destination=\"https://aertun.example/saml/okta/acs\" ID=\"id1\" InResponseTo=\"_req1\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n  <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n  <saml2p:Status><saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></saml2p:StatusCode></saml2p:Status>\n  <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id2\" IssueInstant=\"2026-10-03T12:00:00.000Z\" Version=\"2.0\">\n    <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\">http://www.okta.com/exk1</saml2:Issuer>\n    <saml2:Subject><saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">hana.sato@northwind.example</saml2:NameID></saml2:Subject>\n    <saml2:AttributeStatement>\n      <saml2:Attribute Name=\"groups\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified\">\n        <saml2:AttributeValue xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"xs:string\">Security &amp; Risk</saml2:AttributeValue>\n      </saml2:Attribute>\n    </saml2:AttributeStatement>\n  </saml2:Assertion>\n</saml2p:Response>"
  },
  {
   "file": "01-saml-prefixed.xml",
@@ -479,7 +479,7 @@
   "file": "02-entra-default.xml",
   "path": [],
   "inclusive": [],
-  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
+  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
  },
  {
   "file": "02-entra-default.xml",
@@ -487,7 +487,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
+  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
  },
  {
   "file": "02-entra-default.xml",
@@ -495,7 +495,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
+  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
  },
  {
   "file": "02-entra-default.xml",
@@ -505,7 +505,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://quilzo.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
+  "c14n": "<samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"https://aertun.example/saml/entra/acs\" ID=\"_r1\" InResponseTo=\"_req2\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/9b1c0d2e/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"></samlp:StatusCode></samlp:Status><Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion></samlp:Response>"
  },
  {
   "file": "02-entra-default.xml",
@@ -637,7 +637,7 @@
    2
   ],
   "inclusive": [],
-  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
+  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
  },
  {
   "file": "02-entra-default.xml",
@@ -647,7 +647,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
+  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
  },
  {
   "file": "02-entra-default.xml",
@@ -657,7 +657,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
+  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
  },
  {
   "file": "02-entra-default.xml",
@@ -669,7 +669,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
+  "c14n": "<Assertion xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"_a1\" IssueInstant=\"2026-10-03T12:00:00.123Z\" Version=\"2.0\"><Issuer>https://sts.windows.net/9b1c0d2e/</Issuer><Subject><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/claims/multipleauthn</AttributeValue></Attribute></AttributeStatement></Assertion>"
  },
  {
   "file": "02-entra-default.xml",
@@ -722,7 +722,7 @@
    1
   ],
   "inclusive": [],
-  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
+  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
  },
  {
   "file": "02-entra-default.xml",
@@ -733,7 +733,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
+  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
  },
  {
   "file": "02-entra-default.xml",
@@ -744,7 +744,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
+  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
  },
  {
   "file": "02-entra-default.xml",
@@ -757,7 +757,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
+  "c14n": "<Subject xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">sam.rivera@northwind.example</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation></Subject>"
  },
  {
   "file": "02-entra-default.xml",
@@ -815,7 +815,7 @@
    1
   ],
   "inclusive": [],
-  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
+  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
  },
  {
   "file": "02-entra-default.xml",
@@ -827,7 +827,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
+  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
  },
  {
   "file": "02-entra-default.xml",
@@ -839,7 +839,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
+  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
  },
  {
   "file": "02-entra-default.xml",
@@ -853,7 +853,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
+  "c14n": "<SubjectConfirmation xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData></SubjectConfirmation>"
  },
  {
   "file": "02-entra-default.xml",
@@ -864,7 +864,7 @@
    0
   ],
   "inclusive": [],
-  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData>"
+  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData>"
  },
  {
   "file": "02-entra-default.xml",
@@ -877,7 +877,7 @@
   "inclusive": [
    "xs"
   ],
-  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData>"
+  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData>"
  },
  {
   "file": "02-entra-default.xml",
@@ -890,7 +890,7 @@
   "inclusive": [
    "#default"
   ],
-  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData>"
+  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData>"
  },
  {
   "file": "02-entra-default.xml",
@@ -905,7 +905,7 @@
    "xsi",
    "p"
   ],
-  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://quilzo.example/saml/entra/acs\"></SubjectConfirmationData>"
+  "c14n": "<SubjectConfirmationData xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\" InResponseTo=\"_req2\" NotOnOrAfter=\"2026-10-03T12:05:00.123Z\" Recipient=\"https://aertun.example/saml/entra/acs\"></SubjectConfirmationData>"
  },
  {
   "file": "02-entra-default.xml",

@@ -19,7 +19,7 @@ import (
 // callback address of somebody else's sign-in, opened in another browser,
 // signs nobody in there.
 func TestAnOIDCSignInFinishesOnlyWhereItStarted(t *testing.T) {
-	o := &OIDC{RedirectURI: "https://cms.example/auth/callback"}
+	o := &OIDC{RedirectURI: "https://aertun.example/auth/callback"}
 	req, err := oidc.NewRequest(o.RedirectURI)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestAnOIDCSignInFinishesOnlyWhereItStarted(t *testing.T) {
 // Starting a sign-in sets the cookie it is bound to, and keeps only the
 // cookie's hash; the server names the cookie by whether TLS is in use.
 func TestStartingAnOIDCSignInSetsItsCookie(t *testing.T) {
-	o := &OIDC{RedirectURI: "https://cms.example/auth/callback", ClientID: "cms",
+	o := &OIDC{RedirectURI: "https://aertun.example/auth/callback", ClientID: "aertun",
 		Provider: &oidc.Provider{Discovery: oidc.Discovery{AuthorizationEndpoint: "https://idp.example/authorize"}}}
 	w := httptest.NewRecorder()
 	o.start(w, httptest.NewRequest(http.MethodGet, "/signin/oidc", nil), "aertun_oidc", 8*time.Hour)
@@ -76,10 +76,10 @@ func TestStartingAnOIDCSignInSetsItsCookie(t *testing.T) {
 	}
 
 	srv, _ := setup(t)
-	if got := srv.oidcCookie(httptest.NewRequest(http.MethodGet, "http://cms.example/", nil)); got != "aertun_oidc" {
+	if got := srv.oidcCookie(httptest.NewRequest(http.MethodGet, "http://aertun.example/", nil)); got != "aertun_oidc" {
 		t.Errorf("without TLS: %q", got)
 	}
-	r := httptest.NewRequest(http.MethodGet, "https://cms.example/", nil)
+	r := httptest.NewRequest(http.MethodGet, "https://aertun.example/", nil)
 	if got := srv.oidcCookie(r); got != "__Host-aertun_oidc" {
 		t.Errorf("with TLS: %q", got)
 	}

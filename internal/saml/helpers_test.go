@@ -87,8 +87,8 @@ func fixtureProvider(t testing.TB, idp string) *Provider {
 		EntityID:        issuers[idp],
 		SSOURL:          "https://idp.example/sso",
 		Keys:            []crypto.PublicKey{certKey(t, "rsa"), certKey(t, "ec")},
-		ServiceEntityID: "https://quilzo.example/saml/" + idp,
-		ACS:             "https://quilzo.example/saml/" + idp + "/acs",
+		ServiceEntityID: "https://aertun.example/saml/" + idp,
+		ACS:             "https://aertun.example/saml/" + idp + "/acs",
 	}
 }
 
@@ -207,8 +207,8 @@ type shape struct {
 
 const (
 	tIdP = "https://idp.northwind.example"
-	tSP  = "https://quilzo.example/saml/test"
-	tACS = "https://quilzo.example/saml/test/acs"
+	tSP  = "https://aertun.example/saml/test"
+	tACS = "https://aertun.example/saml/test/acs"
 	tReq = "_00112233445566778899aabbccddeeff"
 )
 

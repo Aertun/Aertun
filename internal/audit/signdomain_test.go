@@ -76,7 +76,7 @@ func TestAHeadVerifiesOnlyInTheContextItWasSignedIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	edPub, mlPub := s.Verifier().PublicKeys()
-	other, err := NewHeadVerifierIn("quilzo/audit-head/v1", edPub, mlPub)
+	other, err := NewHeadVerifierIn("other/audit-head/v1", edPub, mlPub)
 	if err != nil {
 		t.Fatal(err)
 	}

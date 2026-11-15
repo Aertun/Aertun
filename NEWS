@@ -1,6 +1,22 @@
 Aertun NEWS
 ***********
 
+Unreleased
+==========
+
+* The feed that receives a signed audit stream is the kind `stream`
+  (`aertun inbound add stream NAME --keys FILE`): it takes what
+  `aertun siem stream` sends, from another Aertun deployment or any program
+  that sends the same format, and stores it as stream/audit with each actor
+  named by the feed.  The published keys may name the context the sender
+  signs its tree heads in (`head_context`), and `aertun siem stream key
+  --json` now states its own.  Six of the rules over Aertun's own audit
+  log — an administrator granted or given a token, the audit log moved,
+  emergency recovery, a privileged change made alone, sign-in failures —
+  read a stream too, so one deployment raises them about another.  A feed
+  added under the kind's earlier name must be removed and added again, and
+  the rules that read only that sender's records are gone.
+
 Version 0.1.0
 =============
 
@@ -54,8 +70,8 @@ The evidence
 * Collecting: ten connectors with sealed credentials, twenty log sources
   mapped to one event shape, scheduled collection, files, and feeds other
   systems push to (SSF and CAEP security events, Okta event hooks, signed
-  webhooks, GenAI agent telemetry over OTLP, Quilzo's audit log).  Every
-  event is kept append-only before anything reads it.
+  webhooks, GenAI agent telemetry over OTLP, another deployment's signed
+  audit stream).  Every event is kept append-only before anything reads it.
 
 * Detecting: rules with fixtures, imported Sigma, trial and live rings,
   suppressions that end, correlations, and indicators of compromise.  The

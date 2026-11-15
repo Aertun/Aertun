@@ -439,7 +439,7 @@ func TestAnUnverifiedEmailIsRefusedByDefault(t *testing.T) {
 // A state parameter must be single-use, or a callback URL in somebody's history
 // is a replay.
 func TestAStateIsConsumedExactlyOnce(t *testing.T) {
-	o := &OIDC{RedirectURI: "https://cms.example/auth/callback"}
+	o := &OIDC{RedirectURI: "https://aertun.example/auth/callback"}
 	req, err := oidc.NewRequest(o.RedirectURI)
 	if err != nil {
 		t.Fatal(err)

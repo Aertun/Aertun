@@ -17,34 +17,34 @@ import (
 	"github.com/aertun/aertun/internal/telemetry"
 )
 
-// Quilzo's audit log, pushed as it is written.
+// A signed audit stream, pushed as it is written.
 //
-// Quilzo keeps what defends it and hands its audit log to whoever watches,
-// with siem.stream.url: batches of OCSF records, each with the chain
-// envelope, every record's Merkle leaf and a tree head signed with Ed25519
-// and ML-DSA, the request signed as an HTTP message (RFC 9421). A feed of
-// this kind pins the keys Quilzo publishes for that (`quilzo siem stream
-// key --json`), takes a batch only when internal/auditstream's Receiver
-// says it follows the last one exactly and rebuilds the signed head, and
-// stores each record as an event under its own source, quilzo/audit, where
-// the quilzo.* rules read it.
+// The format is the one `aertun siem stream` sends, and any program may send
+// it: batches of OCSF records, each with the chain envelope, every record's
+// Merkle leaf and a tree head signed with Ed25519 and ML-DSA, the request
+// signed as an HTTP message (RFC 9421). Another Aertun deployment is the
+// first such sender, which is how one deployment watches another's audit
+// log. A feed of this kind pins the keys the sender publishes (`aertun siem
+// stream key --json`), takes a batch only when internal/auditstream's
+// Receiver says it follows the last one exactly and rebuilds the signed
+// head, and stores each record as an event under stream/audit, the actor
+// named by the feed.
 //
 // What is copied is what the record says and nothing more: the action, its
 // outcome and resource, the kind of actor and the few details a rule needs.
-// The principal is the pseudonym Quilzo sends unless it was told to reveal
-// people, and is stored as it came.
+// The principal is the pseudonym the sender sends unless it was told to
+// reveal people, and is stored as it came.
 
-// AuditStream is the kind of feed that receives Quilzo's audit log.
-const AuditStream = "quilzo"
+// AuditStream is the kind of feed that receives a signed audit stream.
+const AuditStream = "stream"
 
 // StreamSource is the source its records are stored under.
-const StreamSource = "quilzo/audit"
-
-// StreamHeadContext is the context Quilzo signs its audit tree heads in.
-const StreamHeadContext = "quilzo/audit-head/v1"
+const StreamSource = "stream/audit"
 
 // StreamKeys are the keys a sender publishes for its receiver, as
-// `quilzo siem stream key --json` writes them.
+// `aertun siem stream key --json` writes them. HeadContext is the context
+// the sender signs its tree heads in; empty means this program's own
+// (audit.HeadContext), and another program names its own.
 type StreamKeys struct {
 	KeyID       string `json:"key_id"`
 	Alg         string `json:"alg"`
@@ -52,6 +52,7 @@ type StreamKeys struct {
 	HeadKeyID   string `json:"head_key_id"`
 	HeadEd25519 string `json:"head_ed25519"`
 	HeadMLDSA   string `json:"head_mldsa"`
+	HeadContext string `json:"head_context,omitempty"`
 }
 
 // ParseStreamKeys reads and checks published stream keys.
@@ -59,7 +60,7 @@ func ParseStreamKeys(b []byte) (*StreamKeys, error) {
 	var k StreamKeys
 	dec := json.NewDecoder(bytes.NewReader(b))
 	if err := dec.Decode(&k); err != nil {
-		return nil, fmt.Errorf("these are not the keys `quilzo siem stream key --json` writes: %w", err)
+		return nil, fmt.Errorf("these are not the keys `aertun siem stream key --json` writes: %w", err)
 	}
 	if _, _, _, err := k.Decode(); err != nil {
 		return nil, err
@@ -85,10 +86,13 @@ func (k StreamKeys) Decode() (batch ed25519.PublicKey, headEd, headML []byte, er
 	if headML, err = base64.StdEncoding.DecodeString(k.HeadMLDSA); err != nil || len(headML) == 0 {
 		return nil, nil, nil, errors.New("head_mldsa is not an ML-DSA public key in base64")
 	}
+	if len(k.HeadContext) > 100 || strings.ContainsAny(k.HeadContext, "\" \t\r\n") {
+		return nil, nil, nil, errors.New("head_context is not a usable context name")
+	}
 	return ed25519.PublicKey(pub), headEd, headML, nil
 }
 
-// streamDetail are the details a rule about Quilzo may read. The rest are
+// streamDetail are the details a rule about the sender may read. The rest are
 // free text somebody typed, or not needed. "kind" is the kind of a request
 // for a second administrator, kept as request_kind so it does not overwrite
 // the kind of actor.
@@ -99,16 +103,18 @@ var streamDetail = map[string]string{
 	"agent": "agent", "autonomy": "autonomy", "tool": "tool", "operation": "operation",
 }
 
-// StreamEvents maps a batch's OCSF records into events, in order. A line
+// StreamEvents maps a batch's OCSF records into events, in order, each
+// actor named under the issuer given: the feed's name, so two senders'
+// people are never the same person by accident. A line
 // that is not a record is an error: the batch was verified, so a line that
 // does not parse is the sender's bug and not something to skip quietly.
-func StreamEvents(ocsf string, received time.Time) ([]telemetry.Event, error) {
+func StreamEvents(ocsf, issuer string, received time.Time) ([]telemetry.Event, error) {
 	var out []telemetry.Event
 	for n, line := range strings.Split(ocsf, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		e, err := streamEvent([]byte(line), received)
+		e, err := streamEvent([]byte(line), issuer, received)
 		if err != nil {
 			return nil, fmt.Errorf("record %d: %w", n+1, err)
 		}
@@ -139,7 +145,7 @@ type streamRecord struct {
 	Unmapped map[string]any `json:"unmapped"`
 }
 
-func streamEvent(line []byte, received time.Time) (telemetry.Event, error) {
+func streamEvent(line []byte, issuer string, received time.Time) (telemetry.Event, error) {
 	var r streamRecord
 	if err := json.Unmarshal(line, &r); err != nil {
 		return telemetry.Event{}, err
@@ -197,7 +203,7 @@ func streamEvent(line []byte, received time.Time) (telemetry.Event, error) {
 		Time: time.UnixMilli(r.Time).UTC(), Received: received,
 		Class: class, Activity: activity, Disposition: disposition,
 		Source: StreamSource, Message: r.ActivityName,
-		Actor: telemetry.ID{Issuer: "quilzo", Value: r.Actor.User.Name},
+		Actor: telemetry.ID{Issuer: issuer, Value: r.Actor.User.Name},
 		Raw:   raw,
 	}, nil
 }

@@ -90,7 +90,7 @@ Collecting what happens
   aertun collect status | auto 15m|off     what each source did last, and the schedule
   aertun source list | add MAPPING.json --sample RECORDS.json | check --source S RECORDS.json
   aertun telemetry check [FILE] | fields [FILE]   can a source's events be used, and what a rule may name
-  aertun inbound list | add okta|webhook|ssf|quilzo NAME | connect NAME | verify NAME | status NAME
+  aertun inbound list | add okta|webhook|ssf|stream NAME | connect NAME | verify NAME | status NAME
   aertun inbound rotate NAME | on NAME | off NAME | remove NAME | help
   aertun spool add [FILE] | stats | verify | retain [--apply] | hold NAME --why W | lift NAME
   aertun identity list | link ISSUER:VALUE PERSON@… | unlink ISSUER:VALUE
