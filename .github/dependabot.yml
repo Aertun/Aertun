@@ -6,6 +6,7 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop   # main is what is released; updates land with the work
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -25,6 +26,7 @@ updates:
   # moving tag, so this is what notices when the pin should move.
   - package-ecosystem: docker
     directory: /
+    target-branch: develop   # main is what is released; updates land with the work
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
