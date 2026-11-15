@@ -1,68 +1,104 @@
-aertun NEWS
+Aertun NEWS
 ***********
 
-Unreleased
-==========
+Version 0.1.0
+=============
 
-The program has its name at last: aertun — aer, the tunnel the wind runs
-through, and it runs: one name for the organisation, the repository, the
-module, the binary and the manual. Renamed throughout, on the pattern the
-earlier renames set; the research record keeps the names it was written
-under and says so where it starts.
+The first release of Aertun, the proving ground for AI security work: it
+holds what AI defenders produce to evidence the AI did not write, says
+proven, refuted or inconclusive, and signs that, in one binary with no
+dependencies.
 
-The first version of aertun: security operations for the systems an
-organisation runs, in one binary with no dependencies.
+The proving ground
+------------------
 
-* Collecting: connectors that read other tools with sealed credentials,
-  scheduled collection, files, and feeds that other systems push to (SSF and
-  CAEP security events, and signed webhooks).
-  Every event is mapped to one shape and kept append-only before anything
-  reads it.
+* A proof is an in-toto statement in a DSSE envelope, signed with Ed25519
+  and ML-DSA-65 whatever its verdict.  `aertun proof verify` exits non-zero
+  on anything but proven, and so does every command that makes one, which
+  makes each a gate.  scripts/verifyproof/verify.py checks both signatures
+  with the Python cryptography package and the openssl command, and shares
+  no code with this program.
 
-* Quilzo's audit log, as Quilzo writes it: `aertun inbound add quilzo NAME
-  --keys FILE` pins the keys `quilzo siem stream key --json` publishes, and
-  Quilzo's siem.stream.url points at the feed.  A batch is taken only when
-  it is signed by that key, follows the last record held exactly, and its
-  leaves rebuild the tree head Quilzo signed; the chain held survives a
-  restart, and a batch that skips, repeats or changes a record is refused
-  with how far the feed has got, so Quilzo sends again from there.  The
-  records are stored as quilzo/audit and read at once by twelve quilzo.*
-  rules: an administrator granted, an administrator's token, a privileged
-  change made alone, the audit log moved, emergency recovery, guessing and
-  lockouts, a decoy touched, the shield asking for a case, a high or
-  critical posture check failing, a high-risk sign-in, and a sign-in its
-  person says was not them.  Behind a proxy, admin.base_url is the address
-  checked, because it is the one Quilzo signs.
+* Nine kinds of proof: a detection rule against a labelled corpus (`proof
+  detection`); the AI analyst on the shipped corpus, asked several times
+  with instructions planted in the text a log carries (`proof analyst`);
+  the analyst's threshold, fitted on what verified people ruled (`analyst
+  calibrate`); another vendor's AI verdicts against people's decisions
+  (`verdict prove`); the same on a random sample judged blind (`adjudicate
+  prove`); a vendor's claim registered before its data arrived (`claim
+  test`); an agent's own account against the calls and connections seen
+  (`agent reconcile`); a VEX document's not_affected statements against the
+  bill of materials, advisories and reachability (`vuln prove-vex`); and
+  every citation in an AI's investigation run again against the event
+  store (`proof evidence`).
+
+* Kept proofs are listed on the console's Proofs screen, by `aertun proof
+  list` and by the agent interface, verified again on every read.  A proof
+  counts as the store's own only when its key is a trusted signer, which
+  takes two administrators (`aertun proof signers | trust | untrust`).
+
+* The wind tunnel replays scripted attacks on AI agents through a recorded
+  telemetry stream and scores whether your own Sigma rules caught them
+  (`aertun windtunnel run --sigma DIR`), with respellings of each session
+  (`--mutate N`).  Scored against the shipped pack it is self-graded and
+  says so.
+
+* The context twin (`aertun twin record`, `aertun mcp --twin FILE`) answers
+  an agent from one recorded file, the same bytes every time; the forge
+  (`aertun forge export`) writes what the analyst saw and answered and how
+  a person ruled as signed episodes.
+
+The evidence
+------------
+
+* Collecting: ten connectors with sealed credentials, twenty log sources
+  mapped to one event shape, scheduled collection, files, and feeds other
+  systems push to (SSF and CAEP security events, Okta event hooks, signed
+  webhooks, GenAI agent telemetry over OTLP, Quilzo's audit log).  Every
+  event is kept append-only before anything reads it.
 
 * Detecting: rules with fixtures, imported Sigma, trial and live rings,
-  suppressions that end, correlations across rules and platforms, and
-  indicators of compromise.
+  suppressions that end, correlations, and indicators of compromise.  The
+  Sigma reader agrees with PyYAML on every file in the SigmaHQ repository,
+  and 3,076 of its 3,164 core rules compile; the rest are refused for a
+  construct named as not implemented.
 
 * Deciding: one queue of findings ranked by risk, with every decision kept;
-  an AI analyst that writes proposals and records no decision itself.
+  an AI analyst that suggests and records no decision itself; hunting
+  through the stored events.
 
-* Responding: cases with the clocks the law sets, playbooks, acts on other
-  platforms approved by a second person, automations that watch, ask or act,
-  and breach notices.
+* Responding: cases with the clocks the law sets (GDPR, NIS2, DORA, the
+  Cyber Resilience Act, SEC, CIRCIA, HIPAA), playbooks, acts on other
+  platforms approved by a second person, automations, and breach notices.
 
 * Exposure: vulnerabilities decided with SSVC and published as VEX,
-  dependency and code-scanning results, workforce and device risk, reminders,
-  vendor risk and access reviews.
+  dependency and code-scanning results, workforce, device and vendor risk,
+  and access reviews.
 
-* Roles for a security team: viewer, analyst, responder and admin, and the
-  jobs engineer, vuln-manager and auditor; the approve, tune and assess
-  permissions can be granted alone.  An act on another platform is approved
-  by somebody other than whoever asked, and whoever wrote an automation rule
-  does not approve the runs it holds.
+People, agents and the record
+-----------------------------
 
-* Signing in: passkeys, OpenID Connect and SAML; two factors for everybody;
-  lockout by place; sessions that end after an hour unused and fifteen
-  minutes for administrators; privileged changes that take two
-  administrators.
+* One Owner, whom nobody can remove; the roles viewer, analyst, responder
+  and admin, and the jobs engineer, vuln-manager and auditor; no custom
+  roles.  `aertun auth invite` grants a role and prints the enrolment link.
 
-* Its own record: an append-only audit log with a hash chain, a Merkle tree,
-  signed tree heads (Ed25519 and ML-DSA), OpenTimestamps anchoring, and a
-  stream to any SIEM that reads OCSF.
+* Privileged changes take two administrators.  An only administrator's
+  request needs a reason, waits an hour (a day to move the audit log), and
+  is then approved with a passkey sign-in made in the last five minutes.
 
-* Three surfaces that agree: the console, the command line, and an MCP
-  interface that reads and proposes.
+* Signing in: passkeys, OpenID Connect and SAML 2.0, with SCIM
+  provisioning; two factors for everybody; lockout by place; sessions that
+  end after an hour unused and fifteen minutes for administrators.
+
+* Agents are registered before they act, hold credentials that can be
+  bound to one run, propose and never approve, sign or keep, and each has
+  a kill switch on the console and the command line.  The agent interface
+  (MCP) is twelve operations behind three tools.
+
+* Its own record: an append-only audit log with a hash chain, a Merkle
+  tree, tree heads signed with Ed25519 and ML-DSA-65, OpenTimestamps
+  anchoring, inclusion proofs, SP 800-53 evidence packs, and a stream to
+  any SIEM that reads OCSF.
+
+* Three faces that agree: the console, the command line and the agent
+  interface, from one set of declared operations.

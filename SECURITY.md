@@ -47,8 +47,9 @@ is false is a vulnerability even without a working exploit:
 - **Nobody acts alone where two are required.** Any way an act on another
   platform is approved by whoever asked for it; a run an automation held is
   approved by whoever wrote the rule; or somebody is made an administrator,
-  an administrator's token is issued, a setting is weakened or the audit log
-  is moved on one administrator's word while another exists; or the only
+  an administrator's token is issued, a proof signer is trusted, a setting is
+  weakened or the audit log is moved on one administrator's word while
+  another exists; or the only
   administrator's own request is approved without its reason, before its
   delay, or without a passkey sign-in from the last five minutes.
 - **The Owner cannot be removed.** Any way another administrator, single
@@ -95,7 +96,12 @@ is false is a vulnerability even without a working exploit:
 
 ## Supported versions
 
-No release is published yet. Report against `main`, where fixes land.
+| Version | Security fixes |
+|---|---|
+| 0.1.x | yes |
+| `main` | yes: fixes land here first |
+
+Report against the latest 0.1 release or against `main`.
 
 ## Our own claims, tested
 
