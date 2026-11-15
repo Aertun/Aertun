@@ -202,7 +202,7 @@ func oidcConfigure(root string, args []string) error {
 	if *issuer == "" || *clientID == "" || *redirect == "" {
 		return fmt.Errorf(
 			"usage: aertun oidc configure --issuer https://idp.example \\\n" +
-				"    --client-id ... --redirect-uri https://cms.example/auth/callback")
+				"    --client-id ... --redirect-uri https://aertun.example/auth/callback")
 	}
 	if _, err := fetch.ValidateURL(*issuer); err != nil {
 		return fmt.Errorf("the issuer URL is not usable: %w", err)
