@@ -661,6 +661,12 @@ fieldset {
 fieldset legend { font: var(--label-lg); font-weight: 700; padding: 0 0.4rem; }
 fieldset p { margin: 0.25rem 0; }
 fieldset label { display: inline; font-weight: 600; }
+/* A set of choices, one to a line. Each label is a row of its control and
+   its words, so words that run to a second line stay beside the control
+   and not under it; and the set is wide enough that they seldom do. */
+fieldset.choices { max-width: 44rem; }
+fieldset.choices label { display: flex; align-items: flex-start; }
+fieldset.choices input[type=radio] { flex: none; }
 
 /* -- notices and chips ----------------------------------------------------- */
 

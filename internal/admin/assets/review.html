@@ -18,7 +18,7 @@
 <h2>Your judgement</h2>
 <form method="post" action="/proving/adjudication/judge">
   <input type="hidden" name="sample" value="{{$.Sample}}"><input type="hidden" name="item" value="{{.N}}">
-  <fieldset><legend>This was</legend>
+  <fieldset class="choices"><legend>This was</legend>
     <p><label><input type="radio" name="judgement" value="real" required> real: it needed acting on</label></p>
     <p><label><input type="radio" name="judgement" value="false-positive"> a false positive: the rule fired on something it should not have</label></p>
     <p><label><input type="radio" name="judgement" value="benign"> benign: it happened, and was fine</label></p>
