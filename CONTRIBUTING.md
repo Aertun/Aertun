@@ -41,13 +41,14 @@ administrator exists.
 
 ## Branches
 
-Releases are in use, so `main` only ever holds what was released.
+Releases are in use, so `main` holds what was released and no code that was
+not.
 
 | Branch | Holds | Changes reach it by |
 |---|---|---|
 | `develop` | the next release, as it is built | pull requests, or a maintainer's push once CI is green |
 | `release-0.1` | 0.1.x: fixes for what is released, nothing new | a pull request with the fix, cherry-picked from `develop` |
-| `main` | the latest release, exactly as tagged | a pull request from `develop` or a release branch when a version is cut, then the tag |
+| `main` | the latest release, as tagged, and fixes to its documentation | a pull request from `develop` or a release branch when a version is cut, then the tag; a documentation or repository-settings fix by its own pull request |
 
 Start from `develop` and open your pull request against it. A fix for a
 released version goes to `develop` first and is then proposed to the release
