@@ -46,13 +46,21 @@ icons, public data sets) are credited in [NOTICE](NOTICE).
 
 ## Quickstart
 
-```bash
-git clone https://github.com/aertun/aertun aertun && cd aertun
-go build -o aertun ./cmd/aertun      # Go 1.27 or later, nothing to fetch
+Download the binary for your platform from the
+[latest release](https://github.com/aertun/aertun/releases/latest), check it,
+and run it — there is nothing else to install:
 
-./aertun init --owner you@example.com   # a store, its Owner, and the link that adds your passkey
-./aertun serve                          # the console, on http://localhost:8080
+```bash
+curl -LO https://github.com/aertun/aertun/releases/download/v0.1.0/aertun-linux-amd64
+curl -LO https://github.com/aertun/aertun/releases/download/v0.1.0/SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS && chmod +x aertun-linux-amd64
+
+./aertun-linux-amd64 init --owner you@example.com   # a store, its Owner, and the link that adds your passkey
+./aertun-linux-amd64 serve                          # the console, on http://localhost:8080
 ```
+
+Other platforms, the container image and building from source are under
+[Install](#install).
 
 Open the link `init` printed and add a passkey, and you are signed in as the
 store's Owner. There is no default password and no default account, and
@@ -194,7 +202,7 @@ evidence itself.
 
 | | |
 |---|---|
-| **Collect** | Ten connectors that read other tools with sealed credentials, twenty log sources mapped to one event shape, scheduled collection, files, and feeds other systems push to: an identity provider's security events (SSF, CAEP, RISC), Okta event hooks, signed webhooks, GenAI agent telemetry over OTLP, and Quilzo's audit log. Every event is kept, append-only, before anything reads it. |
+| **Collect** | Ten connectors that read other tools with sealed credentials, twenty log sources mapped to one event shape, scheduled collection, files, and feeds other systems push to: an identity provider's security events (SSF, CAEP, RISC), Okta event hooks, signed webhooks, GenAI agent telemetry over OTLP, and another deployment's signed audit stream. Every event is kept, append-only, before anything reads it. |
 | **Detect** | Rules written here or imported as Sigma, each with fixtures that must match and must not, and MITRE ATT&CK technique IDs. A new rule runs in a trial ring that records what it would raise until its record earns it the queue. Correlations across rules and platforms, suppressions that end, and indicators imported from STIX 2.1 bundles or plain lists. |
 | **Decide** | One queue of findings, ranked by risk, with every decision kept and replayable. An AI analyst writes a first pass as a suggestion a person agrees with or not; it has no way to record a decision itself. Hunting stacks any field of the stored events by rarity. |
 | **Respond** | Cases and incidents with the notification clocks each law starts (GDPR, NIS2, DORA, the Cyber Resilience Act, SEC, CIRCIA, HIPAA), playbooks, and actions on other platforms asked for by one person and approved by another. Automations that watch, ask, or act, within limits. |
@@ -398,21 +406,46 @@ SAML 2.0, SCIM 2.0 and WebAuthn passkeys.
 
 ## Install
 
-From source, as above, or with `make install`, which installs `aertun` and
-`aertun-collector`. Each release publishes static binaries for Linux, macOS
-and Windows on amd64 and arm64 with checksums and build provenance, and a
-container image, `ghcr.io/aertun/aertun`: the binary alone on
-`gcr.io/distroless/static-debian12:nonroot`, with no shell. See
-[INSTALL](INSTALL).
+**Download a release.** Each release has one static binary for each of Linux,
+macOS and Windows on amd64 and arm64, a `SHA256SUMS` file, and a build
+provenance attestation for every binary. Pick the file for your platform —
+`aertun-linux-amd64`, `aertun-linux-arm64`, `aertun-darwin-arm64`,
+`aertun-darwin-amd64`, `aertun-windows-amd64.exe` or
+`aertun-windows-arm64.exe` — then check it before you run it:
 
 ```bash
-docker build -t aertun .
-docker run --rm -v aertun:/srv aertun --root /srv/store init --owner you@example.com
-docker run -p 8080:8080 -v aertun:/srv aertun
+VERSION=0.1.0 FILE=aertun-linux-amd64
+curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/$FILE"
+curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS            # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
+gh attestation verify "$FILE" --repo aertun/aertun   # built by this repository's release workflow, from the tag
+sudo install -m 0755 "$FILE" /usr/local/bin/aertun
+```
+
+On Windows, compare `Get-FileHash aertun-windows-amd64.exe` in PowerShell with
+the line for it in `SHA256SUMS`. The checksum proves the file is the one
+listed; the attestation proves which workflow, commit and tag built it.
+
+**Run the container.** `ghcr.io/aertun/aertun` is the binary alone on
+`gcr.io/distroless/static-debian12:nonroot`, with no shell, tagged with the
+version without its `v` (`0.1.0`, `0.1`, `latest`) for amd64 and arm64:
+
+```bash
+docker run --rm -v aertun:/srv ghcr.io/aertun/aertun:0.1.0 --root /srv/store init --owner you@example.com
+docker run -p 8080:8080 -v aertun:/srv ghcr.io/aertun/aertun:0.1.0
+```
+
+**Build from source.** Go 1.27 or later and nothing else — `go.mod` has no
+dependencies to fetch:
+
+```bash
+git clone https://github.com/aertun/aertun && cd aertun
+go build -o aertun ./cmd/aertun        # or: make && sudo make install
 ```
 
 Behind a reverse proxy, set `admin.behind_tls_proxy` and `admin.base_url`;
-[deploy/](deploy/) has a systemd unit and a Caddy configuration.
+[deploy/](deploy/) has a systemd unit and a Caddy configuration, and
+[INSTALL](INSTALL) has the rest.
 
 ## Licence
 
