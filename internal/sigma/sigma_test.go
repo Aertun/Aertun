@@ -5,6 +5,7 @@ package sigma
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -697,6 +698,115 @@ func TestEverythingIsAString(t *testing.T) {
 	} {
 		if got := docs[0][k]; got != want {
 			t.Errorf("%s = %#v, want the string %q", k, got, want)
+		}
+	}
+}
+
+// The forms the public Sigma repository is written in are read as what they
+// say. A third of its core rules were refused as malformed for three of
+// them: a description written as a block scalar, a list level with its key
+// rather than under it, and a value carried on to the next line.
+func TestTheFormsThePublicRulesUseAreRead(t *testing.T) {
+	indented, err := Parse([]byte(`
+title: one
+description: Detects a thing. Read with care.
+detection:
+    selection:
+        CommandLine|contains:
+            - '| bash '
+            - '| sh '
+        Image|endswith: '/curl'
+    condition: selection and not filter
+falsepositives:
+    - Administrators. They should be filtered out.
+level: high
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	level, err := Parse([]byte(`
+title: one
+description: |
+    Detects a thing.
+    Read with care.
+detection:
+    selection:
+        CommandLine|contains:
+        - '| bash '
+        - '| sh '
+        Image|endswith: '/curl'
+    condition:
+        selection
+        and not filter
+falsepositives:
+    - Administrators.
+      They should be filtered out.
+level: high
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := indented[0], level[0]
+	if b["description"] != "Detects a thing.\nRead with care." {
+		t.Errorf("a block scalar read as %q", b["description"])
+	}
+	b["description"] = a["description"]
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("the same rule written two ways read as two rules:\n%v\n%v", a, b)
+	}
+
+	// A value carried on from beside its key reads the same as one written
+	// wholly under it.
+	carried, err := Parse([]byte("condition: (selection and not filter)\n           or other\n"))
+	if err != nil || carried[0]["condition"] != "(selection and not filter) or other" {
+		t.Errorf("a value carried on to the next line read as %q: %v", carried[0]["condition"], err)
+	}
+
+	// A list item's first key is on the dash line and the rest are under
+	// it, level with it, whatever hangs off them.
+	maps, err := Parse([]byte("detection:\n    selection:\n      - Image|endswith: '\\dsquery.exe'\n        CommandLine|contains|all:\n            - '-filter'\n            - 'trustedDomain'\n      - OriginalFileName: 'dsquery.exe'\n    condition: selection\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel := maps[0]["detection"].(map[string]any)["selection"].([]any)
+	if first := sel[0].(map[string]any); len(sel) != 2 || first["Image|endswith"] != `\dsquery.exe` ||
+		len(first["CommandLine|contains|all"].([]any)) != 2 {
+		t.Errorf("a list of maps read as %v", sel)
+	}
+
+	// What a rule matches is what was written, not what was written after
+	// it: a quote mark inside plain text does not hide the comment that
+	// follows, and a character named by its code point is that character.
+	odd, err := Parse([]byte("a: (?i)\\.exe[\\\"\\']?\\s+\\d{2,10} # wsass.exe \"a path\" pid\nb:\n    - value=\"(get-location).path # where it is from\n    - \"\\u0430\" # a look-alike\nc: 'it''s # not a comment' # this is\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b2 := odd[0]["b"].([]any)
+	if odd[0]["a"] != `(?i)\.exe[\"\']?\s+\d{2,10}` || b2[0] != `value="(get-location).path` ||
+		b2[1] != "\u0430" || odd[0]["c"] != "it's # not a comment" {
+		t.Errorf("read as a=%q b=%q c=%q", odd[0]["a"], b2, odd[0]["c"])
+	}
+
+	// A block scalar's body is prose as it was written: a comment sign and
+	// three dashes inside it are text, not a comment and the next document.
+	docs, err := Parse([]byte("title: x\ndescription: >-\n    one # not a comment\n    ---\n    two\nlevel: low\n"))
+	if err != nil || len(docs) != 1 {
+		t.Fatalf("%d document(s): %v", len(docs), err)
+	}
+	if got := docs[0]["description"]; got != "one # not a comment --- two" || docs[0]["level"] != "low" {
+		t.Errorf("a folded block read as %q, level %q", got, docs[0]["level"])
+	}
+
+	// And what means two things is still refused, by line.
+	for name, src := range map[string]string{
+		"a value with a mapping under it":         "title: x\nlogsource: windows\n    product: y\n",
+		"a value with a list under it":            "title: x\ntags: one\n    - two\n",
+		"a quoted value carried on":               "title: 'x'\n    and more\n",
+		"a list with no key":                      "title: x\n- stray\n",
+		"a block scalar's header that is not one": "title: x\ndescription: |nonsense\n    body\n",
+	} {
+		if _, err := Parse([]byte(src)); err == nil {
+			t.Errorf("%s: accepted", name)
 		}
 	}
 }
