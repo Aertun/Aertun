@@ -144,6 +144,7 @@ The estate and its people
   aertun workforce coverage | propose | people | gaps [FILE] | link A B --because W
   aertun remind preview | enable | disable | send
   aertun vendor list | show ID | reconcile | review ID
+  aertun vendor check-breach FILE --key F [--margin 30d] [--out F]   a vendor's breach disclosure held against your own events: indicators seen outside its window, or inside it when it said you were not affected, signed
   aertun access open ID [FILE] --scope S | items ID | decide ID ACCOUNT VERDICT | close ID [FILE] | list
 
 People, sign-in and changes

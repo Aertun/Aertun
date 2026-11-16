@@ -42,11 +42,12 @@ var proofKinds = map[string]string{
 	proof.PredicateEvidence:       "evidence",
 	proof.PredicateRevocation:     "revocation",
 	proof.PredicateClock:          "clock",
+	proof.PredicateBreachScope:    "breach-scope",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation", "clock"}
+	"not-affected", "evidence", "revocation", "clock", "breach-scope"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -326,6 +327,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
 				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
 				With("refused", ops.Ours(v.Refused)).With("sources", sources))
+		case p.BreachScope != nil:
+			v := p.BreachScope
+			indicators := ops.ListOf(v.Indicators, func(b proof.BreachIndicator) *ops.Answer {
+				return ops.Object().With("type", ops.Ours(b.Type)).With("value", ops.Outside(b.Value)).
+					With("before", ops.Ours(b.Before)).With("during", ops.Ours(b.During)).
+					With("after", ops.Ours(b.After))
+			})
+			row.With("evidence", ops.Object().With("vendor", ops.Ours(v.Vendor)).
+				With("reference", ops.Outside(v.Reference)).With("since", ops.Ours(v.Since)).
+				With("until", ops.Ours(v.Until)).With("margin_seconds", ops.Ours(v.Margin)).
+				With("told", ops.Ours(v.Told)).With("held_before", ops.Ours(v.HeldBefore)).
+				With("held_during", ops.Ours(v.HeldDuring)).With("held_after", ops.Ours(v.HeldAfter)).
+				With("events", ops.Ours(v.Events)).With("indicators", indicators))
 		case p.Clock != nil:
 			v := p.Clock
 			duties := ops.ListOf(v.Duties, func(d proof.ClockDuty) *ops.Answer {

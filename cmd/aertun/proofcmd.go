@@ -244,6 +244,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["revocation"] = st.Predicate.Revocation
 	case st.Predicate.Clock != nil:
 		out["clock"] = st.Predicate.Clock
+	case st.Predicate.BreachScope != nil:
+		out["breach_scope"] = st.Predicate.BreachScope
 	}
 	return out
 }
@@ -318,6 +320,11 @@ func describe(st *proof.Statement) string {
 		}
 		fmt.Fprintf(&b, "  evidence: %s at audit entry %d (%s); %d obligation(s)", v.Trigger, v.Entry,
 			anchored, len(v.Duties))
+	}
+	if v := p.BreachScope; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d indicator(s) from %s %s; %d event(s) read; the store holds "+
+			"the margin before %v, the window %v, the margin after %v", len(v.Indicators), v.Vendor,
+			v.Reference, v.Events, v.HeldBefore, v.HeldDuring, v.HeldAfter)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

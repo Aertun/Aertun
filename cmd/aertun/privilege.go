@@ -177,6 +177,11 @@ var commandNeeds = map[string]need{
 	"vendor list":      {action: auth.ActView},
 	"vendor show":      {action: auth.ActView},
 	"vendor reconcile": {action: auth.ActView},
+	// Holding a vendor's breach disclosure against the event store signs
+	// what came of it in the organisation's name: the command asks for tune
+	// itself before it reads anything, as the other proofs signed from the
+	// store do.
+	"vendor check-breach": {action: auth.ActView},
 
 	// Deciding a vulnerability does not apply is a statement the
 	// organisation stands behind and is appended to the audit chain rather

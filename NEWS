@@ -4,6 +4,16 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun vendor check-breach FILE` holds a vendor's disclosure of its own
+  breach — its window, the indicators it published and what it told you —
+  against your own events, and signs a breach-scope proof.  An indicator
+  seen before or after the window refutes the window; one seen inside it
+  refutes "not affected"; each is named with how many events carried it.
+  Proven needs the store to hold the whole of the window and a margin
+  either side (30 days by default), so not finding an indicator means it
+  was not there.  The disclosure's title is never read.  The predicate is
+  https://aertun.github.io/proof/breach-scope/v1.
+
 * `aertun incident prove ID --trigger aware` signs when an incident's clock
   started and whether what it started was done in time.  The decision's
   time and every discharge's are taken from the verified audit log, and

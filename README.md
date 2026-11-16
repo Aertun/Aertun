@@ -110,6 +110,7 @@ Ed25519 and ML-DSA-65.
 | **Cited evidence** | every claim in an AI's investigation report is true | the event store, with each citation run again | `aertun proof evidence` |
 | **Revocation** | after an agent was killed, or an identity revoked in another system, nothing acted as it | this program's signed log, the agent's own telemetry, and every collected source that had seen it act — each shown to have kept delivering events | `aertun proof revocation` |
 | **Clock** | an incident's awareness, major or material decision was made when its record says, and every reporting deadline it started was met | the signed audit log, the log's Bitcoin anchors, and the deadlines of the regimes the incident is under | `aertun incident prove` |
+| **Breach scope** | a supplier's disclosure of its own breach holds: no indicator outside the window it gave, and none inside it when it said you were not affected | your own event store, searched in the window and a margin either side, with whether the store holds each period whole | `aertun vendor check-breach` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:
