@@ -118,6 +118,7 @@ Cases and response
   aertun incident declare --title T --grade sev2 [--finding ID]   open one, under the regimes set
   aertun incident list | show ID | decide ID aware --because "…" | discharge|waive ID "REGIME" --because "…"
   aertun incident note|assign|link|watch|reopen|close ID …   the rest of the record
+  aertun incident prove ID --trigger aware --key F [--out F]   when the clock started, held against the signed log and its Bitcoin anchors, and whether what it started was done in time, signed
   aertun incident playbooks [show ID | check FILE] | propose|approve|withdraw ID PLAYBOOK
   aertun incident step ID PLAYBOOK STEP done|skip|undo --because "…"
   aertun incident act ID ACTION ISSUER:VALUE --because "…" | act-approve ID N

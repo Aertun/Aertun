@@ -41,11 +41,12 @@ var proofKinds = map[string]string{
 	proof.PredicateTriage:         "triage",
 	proof.PredicateEvidence:       "evidence",
 	proof.PredicateRevocation:     "revocation",
+	proof.PredicateClock:          "clock",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation"}
+	"not-affected", "evidence", "revocation", "clock"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -60,7 +61,7 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
-		st.Predicate.Revocation != nil {
+		st.Predicate.Revocation != nil || st.Predicate.Clock != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -325,6 +326,24 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
 				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
 				With("refused", ops.Ours(v.Refused)).With("sources", sources))
+		case p.Clock != nil:
+			v := p.Clock
+			duties := ops.ListOf(v.Duties, func(d proof.ClockDuty) *ops.Answer {
+				return ops.Object().With("regime", ops.Ours(d.Regime)).With("due", ops.Ours(d.Due)).
+					With("done", ops.Ours(d.Done)).With("waived", ops.Ours(d.Waived)).
+					With("moved", ops.Ours(d.Moved)).With("outcome", ops.Ours(d.Outcome))
+			})
+			evidence := ops.Object().With("incident", ops.Ours(v.Incident)).
+				With("trigger", ops.Ours(v.Trigger)).With("entry", ops.Ours(v.Entry)).
+				With("decided", ops.Ours(v.Decided)).With("recorded", ops.Ours(v.Recorded)).
+				With("verified", ops.Ours(v.Verified)).With("linked", ops.Ours(v.Linked)).
+				With("lead_seconds", ops.Ours(v.Lead)).With("broken_anchors", ops.Ours(len(v.Broken))).
+				With("duties", duties)
+			if a := v.Anchor; a != nil {
+				evidence.With("anchor", ops.Object().With("size", ops.Ours(a.Size)).
+					With("block", ops.Ours(int(a.Block))).With("calendar", ops.Ours(a.Calendar)))
+			}
+			row.With("evidence", evidence)
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

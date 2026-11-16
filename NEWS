@@ -4,6 +4,16 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun incident prove ID --trigger aware` signs when an incident's clock
+  started and whether what it started was done in time.  The decision's
+  time and every discharge's are taken from the verified audit log, and
+  the incident's own record is held against them: a clock moved in it
+  afterwards refutes, and so does an anchored log head the log no longer
+  matches, an obligation discharged late or one past due.  Proven needs a
+  verified person's decision under a log head anchored in Bitcoin and every
+  obligation discharged or ruled out; until then it is inconclusive and says
+  why.  The predicate is https://aertun.github.io/proof/clock/v1.
+
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's
   own verified audit log, the agent's own telemetry and any identity the
