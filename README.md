@@ -435,6 +435,13 @@ docker run --rm -v aertun:/srv ghcr.io/aertun/aertun:0.1.0 --root /srv/store ini
 docker run -p 8080:8080 -v aertun:/srv ghcr.io/aertun/aertun:0.1.0
 ```
 
+The image is attested like the binaries, by the release workflow from the
+tag:
+
+```bash
+gh attestation verify oci://ghcr.io/aertun/aertun:0.1.0 --repo aertun/aertun
+```
+
 **Build from source.** Go 1.27 or later and nothing else — `go.mod` has no
 dependencies to fetch:
 
