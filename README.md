@@ -109,6 +109,7 @@ Ed25519 and ML-DSA-65.
 | **Not affected** | a VEX document's `not_affected` statements hold | the asset's bill of materials, advisories and reachability analysis | `aertun vuln prove-vex` |
 | **Cited evidence** | every claim in an AI's investigation report is true | the event store, with each citation run again | `aertun proof evidence` |
 | **Revocation** | after an agent was killed, or an identity revoked in another system, nothing acted as it | this program's signed log, the agent's own telemetry, and every collected source that had seen it act — each shown to have kept delivering events | `aertun proof revocation` |
+| **VEX record** | over a period, an issuer's `not_affected` statements were contradicted at most this often | the not-affected proofs kept here about that issuer, each verified again as it is read; uncheckable statements counted and never in the rate | `aertun vuln vex-record` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:

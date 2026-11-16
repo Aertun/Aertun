@@ -274,7 +274,11 @@ var commandNeeds = map[string]need{
 	// Holding a VEX document to the evidence signs a measurement in the
 	// organisation's name: the command asks for tune itself.
 	"vuln prove-vex": {action: auth.ActAssess},
-	"vuln assets":    {action: auth.ActView},
+	// An issuer's track record reads the proofs kept here and signs what they
+	// came to in the organisation's name: the command asks for tune itself,
+	// as prove-vex does, because a row here may only narrow its parent.
+	"vuln vex-record": {action: auth.ActAssess},
+	"vuln assets":     {action: auth.ActView},
 
 	// Storing a credential for another company's system is the heaviest
 	// thing here, and running a connector is an ordinary write. Reading a

@@ -41,11 +41,12 @@ var proofKinds = map[string]string{
 	proof.PredicateTriage:         "triage",
 	proof.PredicateEvidence:       "evidence",
 	proof.PredicateRevocation:     "revocation",
+	proof.PredicateVEXRecord:      "vex-record",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation"}
+	"not-affected", "evidence", "revocation", "vex-record"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -60,7 +61,7 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
-		st.Predicate.Revocation != nil {
+		st.Predicate.Revocation != nil || st.Predicate.VEXRecord != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -325,6 +326,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
 				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
 				With("refused", ops.Ours(v.Refused)).With("sources", sources))
+		case p.VEXRecord != nil:
+			v := p.VEXRecord
+			row.With("evidence", ops.Object().With("source", ops.Ours(v.Source)).
+				With("since", ops.Ours(v.Since)).With("until", ops.Ours(v.Until)).
+				With("tolerance", ops.Ours(v.Tolerance)).With("read", ops.Ours(v.Read)).
+				With("left_out", ops.Ours(v.LeftOut)).With("superseded", ops.Ours(v.Superseded)).
+				With("used", ops.Ours(v.Used)).With("signed_by_trusted", ops.Ours(v.Trusted)).
+				With("signed_by_untrusted", ops.Ours(v.Untrusted)).With("assets", ops.Ours(v.Assets)).
+				With("statements", ops.Ours(v.Statements)).With("not_affected", ops.Ours(v.NotAffected)).
+				With("supported", ops.Ours(v.Supported)).With("contradicted", ops.Ours(v.Contradicted)).
+				With("uncheckable", ops.Ours(v.Uncheckable)).
+				With("contradicting_proofs", ops.Ours(v.ContradictingProofs)).
+				With("contradicted_share", boundAnswer(v.Share)))
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

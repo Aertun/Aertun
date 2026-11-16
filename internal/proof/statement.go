@@ -146,6 +146,9 @@ type Predicate struct {
 	// Revocation is set on a revocation proof: what acted as something
 	// after it was revoked, and which sources were watching.
 	Revocation *RevocationEvidence `json:"revocation,omitempty"`
+	// VEXRecord is set on a VEX record: one issuer's not_affected
+	// statements scored over the not-affected proofs kept about it.
+	VEXRecord *VEXRecordEvidence `json:"vex_record,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -268,7 +271,8 @@ func (s *Statement) validateEvidence() error {
 	kinds := 0
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
-		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil} {
+		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil,
+		p.VEXRecord != nil} {
 		if set {
 			kinds++
 		}
@@ -324,6 +328,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a revocation proof carries revocation evidence and no other")
 		}
 		return p.Revocation.validate(s)
+	case PredicateVEXRecord:
+		if p.VEXRecord == nil || kinds != 1 {
+			return fmt.Errorf("a VEX record carries the issuer's counts and no other evidence")
+		}
+		return p.VEXRecord.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

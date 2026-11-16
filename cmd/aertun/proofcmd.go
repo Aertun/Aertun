@@ -242,6 +242,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["citations"] = st.Predicate.Citations
 	case st.Predicate.Revocation != nil:
 		out["revocation"] = st.Predicate.Revocation
+	case st.Predicate.VEXRecord != nil:
+		out["vex_record"] = st.Predicate.VEXRecord
 	}
 	return out
 }
@@ -308,6 +310,13 @@ func describe(st *proof.Statement) string {
 	if v := p.Revocation; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d use(s) after the grace and %d refused attempt(s) across %d "+
 			"source(s); watched as %s", v.Uses, v.Refused, len(v.Sources), strings.Join(v.Identities, ", "))
+	}
+	if v := p.VEXRecord; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d of %d checked statement(s) contradicted, between %.4f and %.4f, "+
+			"against %g; %d uncheckable; %d proof(s) used about %d asset(s), %d by trusted signers; "+
+			"%d superseded, %d left out unverified",
+			v.Share.K, v.Share.N, v.Share.Lower, v.Share.Upper, v.Tolerance, v.Uncheckable, v.Used,
+			v.Assets, v.Trusted, v.Superseded, v.LeftOut)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

@@ -81,6 +81,11 @@ type Entry struct {
 	// Signer is the name of the trusted signer whose key signed it, worked
 	// out when it is read; empty when this store does not trust that key.
 	Signer string `json:"signer,omitempty"`
+	// Digest is the sha256 of the statement as it was signed, of which ID is
+	// the first 24 characters: what a proof made from kept proofs names each
+	// one by. Empty when it does not verify, since then the bytes are not
+	// the ones anybody signed.
+	Digest string `json:"sha256,omitempty"`
 }
 
 var idShape = regexp.MustCompile(`^[0-9a-f]{24}$`)
@@ -94,12 +99,21 @@ func Dir(root string) string { return filepath.Join(root, "proofs") }
 // idOf names a proof by the statement it signs, so the same statement handed
 // in twice, or signed again, is one proof kept once.
 func idOf(env *proof.Envelope) (string, error) {
+	d, err := digestOf(env)
+	if err != nil {
+		return "", err
+	}
+	return d[:24], nil
+}
+
+// digestOf is the sha256 of the statement an envelope carries, as signed.
+func digestOf(env *proof.Envelope) (string, error) {
 	payload, err := base64.StdEncoding.DecodeString(env.Payload)
 	if err != nil {
 		return "", fmt.Errorf("the envelope's payload is not base64")
 	}
 	sum := sha256.Sum256(payload)
-	return hex.EncodeToString(sum[:12]), nil
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // ErrAlreadyKept is a proof the store already holds.
@@ -218,7 +232,8 @@ func read(id string, body []byte) Entry {
 		return e
 	}
 	e.KeyID, e.KeptAt, e.KeptBy, e.Origin = k.KeyID, k.KeptAt, k.KeptBy, k.Origin
-	if want, err := idOf(&k.Envelope); err != nil || want != id {
+	digest, err := digestOf(&k.Envelope)
+	if err != nil || digest[:24] != id {
 		e.Broken = "the file holds a different proof from the one its name says"
 		return e
 	}
@@ -232,7 +247,7 @@ func read(id string, body []byte) Entry {
 		e.Broken = "it no longer verifies against the key it was kept with"
 		return e
 	}
-	e.Statement = st
+	e.Statement, e.Digest = st, digest
 	return e
 }
 

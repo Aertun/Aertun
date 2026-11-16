@@ -4,6 +4,21 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun vuln vex-record --source NAME --since DATE --tolerance R` signs a
+  VEX issuer's track record from the not-affected proofs kept here about
+  it.  Each kept proof is verified again as it is read; one that no longer
+  verifies is counted and never used, and the record says how many proofs
+  it read, left out, and found signed by a key this store trusts or not.
+  The same document about the same asset proved again counts once, from
+  its latest proof.  The rate is contradicted statements over those
+  supported or contradicted, with exact one-sided bounds; uncheckable ones
+  are counted and never in it.  It is refuted when the lower bound is over
+  the tolerance, naming the contradicting proofs by their ids in the store;
+  proven when the upper bound is at or under it on at least 30 checked
+  statements; inconclusive otherwise.  Reversals are not counted, because a
+  not-affected proof does not name the statements it supported.  The
+  predicate is https://aertun.github.io/proof/vex-record/v1.
+
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's
   own verified audit log, the agent's own telemetry and any identity the

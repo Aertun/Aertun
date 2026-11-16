@@ -73,6 +73,7 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun claim register NAME --source S --metric M --direction at-least|at-most --threshold R [--window-days 30] | list | test NAME --key F   a vendor's claim, pre-registered and tested once its window closes
   aertun agent reconcile NAME --since DATE --key F   an agent's own account held against what was seen, signed
   aertun vuln prove-vex FILE --source NAME --where ASSET --key F   another party's "not affected" statements held to the evidence, signed
+  aertun vuln vex-record --source NAME --since DATE [--until DATE] --tolerance R --key F [--out F]   that party's track record over the not-affected proofs kept here, each verified again as it is read, signed
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
   aertun windtunnel run --score reference | list-scenarios | preflight | scorecard | diff OLD NEW | verify   the shipped pack, self-graded; signed only in CI; diff is the CI gate
   aertun bench run [--stub] [--out F] [--k N] | report FILE   the labelled corpus, and how the analyst scored on it
