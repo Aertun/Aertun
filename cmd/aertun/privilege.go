@@ -233,6 +233,11 @@ var commandNeeds = map[string]need{
 	// tune itself before it reads anything, as the other proofs signed from
 	// the store do, because a row here may only narrow its parent.
 	"proof evidence": {action: auth.ActView},
+	// A revocation proof reads the audit log and the event store and signs
+	// what they showed after a revocation in the organisation's name: it
+	// asks for tune itself before it reads anything, as the other proofs
+	// signed from the store do.
+	"proof revocation": {action: auth.ActView},
 	// A recorded case is the security queue and its evidence copied out of
 	// the store into a file, which is what listing the queue on the command
 	// line takes (`finding`); each part of it is gated again, operation by

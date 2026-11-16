@@ -40,11 +40,12 @@ var proofKinds = map[string]string{
 	proof.PredicateNotAffected:    "not-affected",
 	proof.PredicateTriage:         "triage",
 	proof.PredicateEvidence:       "evidence",
+	proof.PredicateRevocation:     "revocation",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence"}
+	"not-affected", "evidence", "revocation"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -58,7 +59,8 @@ func proofKind(st *proof.Statement) string {
 func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
-		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil {
+		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
+		st.Predicate.Revocation != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -307,6 +309,22 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("unreceived", ops.Ours(v.Unreceived)).With("connections", ops.Ours(v.Connects)).
 				With("unexplained", ops.Ours(v.Unexplained)).
 				With("shared_skipped", ops.Ours(v.SharedSkipped)))
+		case p.Revocation != nil:
+			v := p.Revocation
+			sources := ops.ListOf(v.Sources, func(s proof.RevocationSource) *ops.Answer {
+				return ops.Object().With("source", ops.Ours(s.Source)).
+					With("seen_before", ops.Ours(s.Before)).With("uses", ops.Ours(s.Uses)).
+					With("refused", ops.Ours(s.Refused)).With("quiet_stretches", ops.Ours(s.Quiet)).
+					With("complete", ops.Ours(s.Complete)).With("own_account", ops.Ours(s.Account))
+			})
+			identities := ops.ListOf(v.Identities, func(s string) *ops.Answer { return ops.Ours(s) })
+			row.With("evidence", ops.Object().With("kind", ops.Ours(v.Kind)).
+				With("name", ops.Ours(v.Name)).With("identities", identities).
+				With("revoked", ops.Ours(v.Revoked)).With("revoked_entry", ops.Ours(v.RevokedEntry)).
+				With("grace_seconds", ops.Ours(v.Grace)).With("until", ops.Ours(v.Until)).
+				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
+				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
+				With("refused", ops.Ours(v.Refused)).With("sources", sources))
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }
