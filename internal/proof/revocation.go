@@ -134,25 +134,43 @@ func (s RevocationSource) covers() bool  { return s.watched() && (s.Complete || 
 
 // RevocationEvidence is what a revocation proof rests on.
 type RevocationEvidence struct {
+	// Kind is agent, for one disabled with the kill switch, or identity,
+	// for one revoked in another system.
 	Kind string `json:"kind"`
 	// Name is the revoked agent, or the identity revoked.
 	Name string `json:"name"`
 	// Identities are every issuer:value it was matched on.
 	Identities []string `json:"identities"`
-	Revoked    string   `json:"revoked"`
+	// Revoked is when it was revoked, RFC 3339 to the nanosecond the
+	// revocation was recorded at.
+	Revoked string `json:"revoked"`
 	// RevokedEntry is the audit entry that recorded the revocation, when
 	// this program made it.
-	RevokedEntry int    `json:"revoked_entry,omitempty"`
-	Grace        int    `json:"grace_seconds"`
-	Until        string `json:"until"`
-	Lookback     int    `json:"lookback_seconds"`
-	Stretch      int    `json:"stretch_seconds"`
+	RevokedEntry int `json:"revoked_entry,omitempty"`
+	// Grace is how long after the revocation nothing is counted.
+	Grace int `json:"grace_seconds"`
+	// Until is the end of the period, not included.
+	Until string `json:"until"`
+	// Lookback is how far before the revocation a source's having seen it
+	// act counts.
+	Lookback int `json:"lookback_seconds"`
+	// Stretch is how long a source may go without delivering an event and
+	// still count as listening.
+	Stretch int `json:"stretch_seconds"`
 	// Stretches is how many stretches the period was divided into.
-	Stretches int                `json:"stretches"`
-	Sources   []RevocationSource `json:"sources"`
-	Uses      int                `json:"uses"`
-	Refused   int                `json:"refused"`
-	MinPeriod int                `json:"min_period_seconds"`
+	Stretches int `json:"stretches"`
+	// Sources are the sources that saw it, before or after, and this
+	// program's own log for an agent.
+	Sources []RevocationSource `json:"sources"`
+	// Uses is how many acts there were after the grace.
+	Uses int `json:"uses"`
+	// Refused is how many attempts after the grace the sources say they
+	// refused or failed: the revocation holding while somebody still holds
+	// the credential.
+	Refused int `json:"refused"`
+	// MinPeriod is the shortest period after the grace a proven verdict may
+	// cover.
+	MinPeriod int `json:"min_period_seconds"`
 }
 
 // RevocationUse is one act after the grace, named by source, identity and
