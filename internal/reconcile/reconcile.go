@@ -51,9 +51,6 @@ import (
 // same set, so a tool this package matches is one a proof may name.
 var Tools = proof.InterfaceTools
 
-// MaxListed is how many unexplained items of each kind a result names.
-const MaxListed = 50
-
 // Span is one tool call the agent reported.
 type Span struct {
 	At   time.Time

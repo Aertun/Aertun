@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,8 +56,6 @@ const unusableAction = "analyst.model-unusable"
 // modelUnusable is abstainWord's word for the endpoint, rather than the
 // finding, being why there is no suggestion.
 const modelUnusable = "the model could not be used"
-
-func agentsDir(root string) string { return filepath.Join(root, "agents") }
 
 // analystModel is the model a triage asks, behind the privacy guard:
 // personal data reaches it only when it is on this organisation's network,

@@ -60,19 +60,6 @@ func (s *Server) securityCan(w http.ResponseWriter, r *http.Request, act auth.Ac
 	return p, true
 }
 
-// areaAdmin admits an administrator of an area: of the whole console, which
-// covers every area, or of that area alone.
-func (s *Server) areaAdmin(w http.ResponseWriter, r *http.Request, area string) (principal, bool) {
-	p, ok := s.requireAuth(w, r)
-	if !ok {
-		return principal{}, false
-	}
-	if !s.can(w, r, p, auth.ActGrant, area) {
-		return principal{}, false
-	}
-	return p, true
-}
-
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {

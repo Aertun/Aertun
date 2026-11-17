@@ -1,32 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Rashik Adhikari
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpsig signs and verifies HTTP requests under RFC 9421.
+// Package httpsig signs and verifies HTTP requests under RFC 9421, with
+// Ed25519.
 //
-// # Why this is its own package
+// # What uses it
 //
-// It was written once for Web Bot Auth, which is RFC 9421 applied to crawler
-// traffic, and the fediverse needs the same thing for a different reason:
-// Mastodon has verified RFC 9421 signatures since 4.5 and emits them since
-// 4.7, so an ActivityPub inbox has to check exactly this and a delivery has to
-// produce exactly this.
-//
-// Two consumers of one wire format is where a shared implementation belongs.
-// The alternative — a verifier in each — is two things to keep true, and a
-// signature checker that drifts is one that starts accepting what it should
-// refuse without anybody noticing.
+// One deployment's audit stream signs every batch it sends, and another's
+// receiver checks it (internal/auditstream). The sender and the receiver are
+// both this program, so there is one wire format and one algorithm: nothing
+// here reads an older draft of the standard or a key of another kind, because
+// a format nobody sends is only something to get wrong.
 //
 // # What is here and what is not
 //
-// The signature base, the header parsing, signing and verification, over
-// Ed25519 and RSA. Both algorithms because the two consumers need different
-// ones: Web Bot Auth is Ed25519, and most of the fediverse is still RSA
-// because that is what the older draft used and what the installed base has.
-//
-// Not here: who a key belongs to, whether that identity may do anything, or
-// where a key came from. Those are decisions, they differ per consumer, and a
-// package that made them would be making them for a caller that had not been
-// asked.
+// The signature base, the header parsing, signing and verification, and the
+// body digest a signature covers. Not here: who a key belongs to, or whether
+// that identity may do anything. Those are the caller's decisions.
 //
 // # The rule that makes verification mean anything
 //
@@ -40,12 +30,8 @@ package httpsig
 import (
 	"crypto"
 	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
@@ -57,13 +43,8 @@ import (
 // Algorithm names the signing algorithm, using RFC 9421's own registry names.
 type Algorithm string
 
-const (
-	// Ed25519 is what Web Bot Auth uses and what Mastodon 4.7 verifies.
-	Ed25519 Algorithm = "ed25519"
-	// RSAPKCS1SHA256 is what most of the fediverse still signs with, because
-	// it is what the pre-RFC draft specified.
-	RSAPKCS1SHA256 Algorithm = "rsa-v1_5-sha256"
-)
+// Ed25519 is the one algorithm signed with and checked.
+const Ed25519 Algorithm = "ed25519"
 
 // DefaultMaxAge bounds how old a signature may be.
 //
@@ -79,12 +60,11 @@ type PublicKey struct {
 	// signature: an attacker who could choose the algorithm could choose a
 	// weaker one, and "the signature said so" is not a reason to believe it.
 	Alg Algorithm
-	// Ed and RSA hold whichever one Alg names.
-	Ed  ed25519.PublicKey
-	RSA *rsa.PublicKey
+	// Ed is the key.
+	Ed ed25519.PublicKey
 }
 
-// errNoKeys is the same refusal for both signature formats.
+// errNoKeys is a signed request with nothing to check it against.
 var errNoKeys = fmt.Errorf(
 	"a request is signed and no keys are configured, so it cannot be " +
 		"checked. An unverifiable signature is not an identity")
@@ -134,18 +114,9 @@ func VerifyAt(r *http.Request, origin string, keys []PublicKey,
 	if input == "" && sig == "" {
 		return nil, nil
 	}
-	// Which format this is, decided the way the ecosystem decides it:
-	// Signature-Input present means RFC 9421, absent means draft-cavage.
-	//
-	// Almost every fediverse server sends the draft. Refusing it as "half a
-	// signature" -- which this did -- made a federation inbox that could not
-	// receive, and said so in terms the sender could do nothing with.
-	if input == "" && looksLikeCavage(sig) {
-		if len(keys) == 0 {
-			return nil, errNoKeys
-		}
-		return verifyCavage(r, "", keys, maxAge, now)
-	}
+	// Both headers, or it is not an RFC 9421 signature. A Signature with
+	// no Signature-Input is how the draft before the standard was written,
+	// which nothing that sends here uses and nothing here reads.
 	if input == "" || sig == "" {
 		return nil, fmt.Errorf(
 			"this request carries one half of a signature. Signature-Input " +
@@ -234,16 +205,6 @@ func verifyWith(key PublicKey, base, sig []byte) error {
 				"the signature does not verify against the key it names")
 		}
 		return nil
-	case RSAPKCS1SHA256:
-		if key.RSA == nil {
-			return fmt.Errorf("key %q declares RSA and carries no RSA key", key.ID)
-		}
-		sum := sha256.Sum256(base)
-		if err := rsa.VerifyPKCS1v15(key.RSA, crypto.SHA256, sum[:], sig); err != nil {
-			return fmt.Errorf(
-				"the signature does not verify against the key it names")
-		}
-		return nil
 	}
 	return fmt.Errorf("key %q declares algorithm %q, which is not supported",
 		key.ID, key.Alg)
@@ -282,48 +243,19 @@ func Sign(r *http.Request, keyID string, alg Algorithm, key crypto.Signer,
 }
 
 // signWith produces a signature over bytes with the named algorithm.
-//
-// One implementation, shared by the RFC 9421 path and the draft-cavage one.
-// Two would be two places for the algorithms to drift apart, and the wire
-// formats differ only in how the bytes are framed, never in how they are made.
 func signWith(alg Algorithm, key crypto.Signer, base []byte) ([]byte, error) {
-	switch alg {
-	case Ed25519:
-		priv, ok := key.(ed25519.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("ed25519 was named and the key is %T", key)
-		}
-		return ed25519.Sign(priv, base), nil
-	case RSAPKCS1SHA256:
-		sum := sha256.Sum256(base)
-		sig, err := key.Sign(rand.Reader, sum[:], crypto.SHA256)
-		if err != nil {
-			return nil, fmt.Errorf("cannot sign: %w", err)
-		}
-		return sig, nil
+	if alg != Ed25519 {
+		return nil, fmt.Errorf("algorithm %q is not supported", alg)
 	}
-	return nil, fmt.Errorf("algorithm %q is not supported", alg)
+	priv, ok := key.(ed25519.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("ed25519 was named and the key is %T", key)
+	}
+	return ed25519.Sign(priv, base), nil
 }
 
 func encodeSignature(sig []byte) string {
 	return base64.StdEncoding.EncodeToString(sig)
-}
-
-// decodeSignature reads base64, tolerating the unpadded form some senders use.
-func decodeSignature(s string) ([]byte, error) {
-	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
-		return b, nil
-	}
-	b, err := base64.RawStdEncoding.DecodeString(s)
-	if err != nil {
-		return nil, fmt.Errorf("the signature is not base64: %w", err)
-	}
-	return b, nil
-}
-
-// parseUnix reads a created or expires parameter.
-func parseUnix(s string) (int64, error) {
-	return strconv.ParseInt(strings.TrimSpace(s), 10, 64)
 }
 
 // targetURI rebuilds the absolute request URI.
@@ -370,8 +302,8 @@ func Base(r *http.Request, components, input string) (string, []string, error) {
 // request-target, which for an ordinary request is origin-form: a handler sees
 // "/inbox", not "https://us.example/inbox". Rebuilding the target URI from
 // that produces "/inbox" and a base that matches nothing the sender signed, so
-// every signature covering @target-uri fails -- which is precisely the shape
-// Mastodon's RFC 9421 implementation requires and sends.
+// every signature covering @target-uri fails -- and @target-uri is what the
+// audit stream signs.
 //
 // The origin comes from configuration rather than from the request. r.TLS is
 // nil behind a TLS-terminating proxy, so deriving the scheme from it says
@@ -481,61 +413,8 @@ func parseSignature(header, label string) ([]byte, error) {
 	return nil, fmt.Errorf("the Signature header has no entry labelled %q", label)
 }
 
-// ParsePEM reads a PEM-encoded public key.
-//
-// # Why the algorithm is inferred here and nowhere else
-//
-// Everywhere else in this package the algorithm comes from the configured key
-// and never from the message, because letting a sender choose how their
-// signature is checked is the confusion bug every signature format has had.
-//
-// A PEM block is different: it is the key material itself, not a claim about
-// it. What the bytes decode to *is* what the key is, and there is nothing for
-// a sender to choose — an RSA key cannot be verified as Ed25519 whatever
-// anybody says. So inferring the algorithm from the parsed key is reading the
-// key, not trusting the message.
-//
-// This exists for ActivityPub, where a remote server publishes its key in its
-// actor document and PEM is what the protocol carries.
-func ParsePEM(id, pemText string) (PublicKey, error) {
-	block, _ := pem.Decode([]byte(strings.TrimSpace(pemText)))
-	if block == nil {
-		return PublicKey{}, fmt.Errorf("this is not a PEM block")
-	}
-
-	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		// PKCS#1, which older implementations publish for RSA.
-		if rsaKey, rerr := x509.ParsePKCS1PublicKey(block.Bytes); rerr == nil {
-			return PublicKey{ID: id, Alg: RSAPKCS1SHA256, RSA: rsaKey}, nil
-		}
-		return PublicKey{}, fmt.Errorf("this key cannot be parsed: %w", err)
-	}
-
-	switch key := parsed.(type) {
-	case *rsa.PublicKey:
-		// Below this, factoring is within reach of somebody who wants the
-		// content badly enough, and accepting one would be accepting a
-		// signature that proves less than it appears to.
-		if key.N.BitLen() < 2048 {
-			return PublicKey{}, fmt.Errorf(
-				"this RSA key is %d bits and the minimum is 2048",
-				key.N.BitLen())
-		}
-		return PublicKey{ID: id, Alg: RSAPKCS1SHA256, RSA: key}, nil
-	case ed25519.PublicKey:
-		return PublicKey{ID: id, Alg: Ed25519, Ed: key}, nil
-	}
-	return PublicKey{}, fmt.Errorf(
-		"this key is a %T, and only RSA and Ed25519 are supported", parsed)
-}
-
 // ContentDigest is the header name RFC 9421 uses to cover a request body.
 const ContentDigest = "Content-Digest"
-
-// LegacyDigest is what the pre-RFC draft used, and what older fediverse
-// servers still send.
-const LegacyDigest = "Digest"
 
 // SetContentDigest computes and sets the body digest on an outbound request.
 //
@@ -545,18 +424,10 @@ const LegacyDigest = "Digest"
 // what was signed, so it must be set before Sign and named in the components.
 func SetContentDigest(r *http.Request, body []byte) {
 	sum := sha256.Sum256(body)
-	encoded := base64.StdEncoding.EncodeToString(sum[:])
-	// The structured-fields form the RFC specifies.
-	r.Header.Set(ContentDigest, "sha-256=:"+encoded+":")
-	// And the older spelling, because a receiver may check either and sending
-	// both costs one short header.
-	r.Header.Set(LegacyDigest, "SHA-256="+encoded)
+	r.Header.Set(ContentDigest, "sha-256=:"+base64.StdEncoding.EncodeToString(sum[:])+":")
 }
 
-// CheckContentDigest verifies a request's digest header against its body.
-//
-// Both spellings are accepted, because the fediverse is mid-migration and a
-// server sending only the older one is not doing anything wrong.
+// CheckContentDigest verifies a request's Content-Digest against its body.
 //
 // A request with no digest at all is an error rather than a pass. This is
 // called where the body must be covered, and "there was nothing to check" is
@@ -565,139 +436,44 @@ func CheckContentDigest(r *http.Request, body []byte) error {
 	sum := sha256.Sum256(body)
 	want := base64.StdEncoding.EncodeToString(sum[:])
 
-	if raw := strings.TrimSpace(r.Header.Get(ContentDigest)); raw != "" {
-		// sha-256=:base64:  — possibly among several algorithms.
-		for _, part := range strings.Split(raw, ",") {
-			name, value, ok := strings.Cut(strings.TrimSpace(part), "=")
-			if !ok || !strings.EqualFold(strings.TrimSpace(name), "sha-256") {
-				continue
-			}
-			got := strings.Trim(strings.TrimSpace(value), ":")
-			if got == want {
-				return nil
-			}
-			return fmt.Errorf(
-				"the Content-Digest does not match the body that arrived")
-		}
+	raw := strings.TrimSpace(r.Header.Get(ContentDigest))
+	if raw == "" {
 		return fmt.Errorf(
-			"the Content-Digest names no sha-256 value this server can check")
+			"this request carries no body digest, so the signature covers the " +
+				"envelope and not the letter: a signature made for one body " +
+				"would be accepted on another")
 	}
-
-	if raw := strings.TrimSpace(r.Header.Get(LegacyDigest)); raw != "" {
-		for _, part := range strings.Split(raw, ",") {
-			name, value, ok := strings.Cut(strings.TrimSpace(part), "=")
-			if !ok || !strings.EqualFold(strings.TrimSpace(name), "sha-256") {
-				continue
-			}
-			// The legacy header is not structured-fields, so the value is bare
-			// base64 which itself contains "=" padding — Cut on the first "="
-			// only, and the rest is the value.
-			if strings.TrimSpace(value) == want {
-				return nil
-			}
-			return fmt.Errorf("the Digest does not match the body that arrived")
+	// sha-256=:base64:  — possibly among several algorithms.
+	for _, part := range strings.Split(raw, ",") {
+		name, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(name), "sha-256") {
+			continue
 		}
-		return fmt.Errorf(
-			"the Digest names no SHA-256 value this server can check")
+		if strings.Trim(strings.TrimSpace(value), ":") == want {
+			return nil
+		}
+		return fmt.Errorf("the Content-Digest does not match the body that arrived")
 	}
-
-	return fmt.Errorf(
-		"this request carries no body digest, so the signature covers the " +
-			"envelope and not the letter: a signature made for one body " +
-			"would be accepted on another")
+	return fmt.Errorf("the Content-Digest names no sha-256 value this server can check")
 }
 
-// CheckSignedDigest verifies the body against every digest header the
-// signature covered, and refuses a signature that covered none.
+// CheckSignedDigest verifies the body against the Content-Digest the
+// signature covered, and refuses a signature that did not cover one.
 //
-// CheckContentDigest alone checks whichever header is there, Content-Digest
-// first, signed or not. A sender that signed only the older Digest could
-// then have its body replaced by anybody on the way who added a
-// Content-Digest of their own for the new body: the signed header was never
-// read and the unsigned one matched. Only what was signed counts.
+// CheckContentDigest alone checks the header whether or not it was signed. A
+// sender whose signature did not cover it could then have its body replaced
+// by anybody on the way who wrote a Content-Digest of their own for the new
+// body: the header matches and nobody signed it. Only what was signed
+// counts.
 func CheckSignedDigest(r *http.Request, body []byte, s *Signed) error {
 	if s == nil {
 		return errors.New("there is no signature to check the body against")
 	}
-	checked := false
-	for _, name := range []string{ContentDigest, LegacyDigest} {
-		if !s.Covers(strings.ToLower(name)) {
-			continue
-		}
-		checked = true
-		raw := strings.TrimSpace(r.Header.Get(name))
-		if raw == "" {
-			return fmt.Errorf("the signature covers %s and the request has none", name)
-		}
-		one := r.Clone(r.Context())
-		one.Header = http.Header{}
-		one.Header.Set(name, raw)
-		if err := CheckContentDigest(one, body); err != nil {
-			return err
-		}
-	}
-	if !checked {
+	if !s.Covers(strings.ToLower(ContentDigest)) {
 		return errors.New("this signature does not cover a body digest, so it says nothing about the body")
 	}
-	return nil
-}
-
-// CoversBody reports whether a verified signature included a body digest.
-//
-// CoversRequest reports whether the signature binds the request it arrived on.
-//
-// # Why a caller has to ask
-//
-// A signature that covers only a body digest says "this actor produced these
-// bytes" and nothing about where they were being sent. So the same bytes and
-// the same signature can be replayed to any other server that accepts the same
-// kind of message, and it verifies there too: the receiver of a legitimate
-// delivery can forward it verbatim to somebody else's inbox and it arrives as
-// an instruction from the original sender.
-//
-// Binding the method, the authority and the path makes the signature specific
-// to one destination. @target-uri is accepted in place of authority and path
-// because it contains both, which is what Mastodon signs.
-//
-// Found by signing a Follow over content-digest alone and posting it to an
-// inbox that required the digest and nothing else. It answered 202.
-// CoversDestination reports whether the signature binds the request to where
-// it was sent, which is the weakest binding worth accepting.
-//
-// This is the Web Bot Auth requirement rather than the fediverse one: an agent
-// MUST cover at least one of @authority or @target-uri, and Cloudflare's own
-// crawlers sign ("@authority" "signature-agent") and nothing else. Requiring
-// @method there would reject every real signer, so the two gates are separate
-// and each says which ecosystem it is for.
-//
-// What this still stops is the replay that matters: a signature captured in
-// flight cannot be aimed at another host. What it does not stop is a replay at
-// a different path on the same host inside the age window, which is the
-// trade-off the spec itself makes -- its answer is expires and nonce, not the
-// request line.
-func (s Signed) CoversDestination() bool {
-	return s.Covers("@authority") || s.Covers("@target-uri")
-}
-
-// CoversRequest reports whether the signature binds both the method and the
-// destination. Stricter than CoversDestination, and matched to what Mastodon's
-// RFC 9421 implementation requires of an inbox delivery: @method and
-// @target-uri, so the signature matches the request actually made.
-func (s Signed) CoversRequest() bool {
-	if !s.Covers("@method") {
-		return false
+	if strings.TrimSpace(r.Header.Get(ContentDigest)) == "" {
+		return fmt.Errorf("the signature covers %s and the request has none", ContentDigest)
 	}
-	if s.Covers("@target-uri") {
-		return true
-	}
-	return s.Covers("@authority") && s.Covers("@path")
-}
-
-// The two halves are separate and both are required. A digest that matches but
-// was not signed is a digest an attacker computed for their own body; a
-// signature that covers a digest header which is absent proves nothing about
-// bytes nobody hashed.
-func (s Signed) CoversBody() bool {
-	return s.Covers(strings.ToLower(ContentDigest)) ||
-		s.Covers(strings.ToLower(LegacyDigest))
+	return CheckContentDigest(r, body)
 }

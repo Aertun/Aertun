@@ -288,71 +288,6 @@ func For(purpose string) *Client {
 	return c
 }
 
-// GetWithToken is Get with a bearer credential attached.
-//
-// Separate from Get rather than a field on Client, because a credential that
-// lives on the client is one that gets sent to whatever the next call happens
-// to be pointed at — and this client follows redirects. Passing it per call
-// keeps "which host receives this token" a decision at the call site.
-//
-// The redirect handling in Get revalidates every hop against the same address
-// rules, so a peer cannot redirect a credentialed fetch onto the metadata
-// endpoint. Go's own client drops the Authorization header across hosts.
-func (c *Client) GetWithToken(ctx context.Context, raw, token string) (*Result, error) {
-	return c.get(ctx, raw, func(req *http.Request) {
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-		req.Header.Set("Accept", "application/json")
-	})
-}
-
-// GetAccepting fetches a URL asking for a particular content type.
-//
-// Present because a protocol can serve two different documents at one address
-// and choose between them on Accept — which is exactly what ActivityPub does:
-// the same URL is a web page for a person and an actor document for a server,
-// and a fetch that does not ask gets the page. That failure is quiet and
-// confusing, because the request succeeds and the body is simply the wrong
-// thing.
-//
-// The same address rules apply as every other fetch; only the header differs.
-func (c *Client) GetAccepting(ctx context.Context, raw, accept string) (*Result, error) {
-	return c.get(ctx, raw, func(req *http.Request) {
-		if accept != "" {
-			req.Header.Set("Accept", accept)
-		}
-	})
-}
-
-// GetSigned fetches a URL with a caller-supplied signature.
-//
-// For protocols where reading a public document requires proving who is
-// asking. ActivityPub's authorized fetch is the case: a large part of the
-// fediverse answers an unsigned request for an actor with 401, so the request
-// made to verify somebody else's signature has to carry one of its own.
-//
-// The signing function runs after the request is built and before it is sent,
-// so it signs exactly what will go on the wire. The same address rules apply
-// as every other fetch.
-func (c *Client) GetSigned(ctx context.Context, raw, accept string,
-	sign func(*http.Request) error) (*Result, error) {
-
-	var signErr error
-	res, err := c.get(ctx, raw, func(req *http.Request) {
-		if accept != "" {
-			req.Header.Set("Accept", accept)
-		}
-		if sign != nil {
-			signErr = sign(req)
-		}
-	})
-	if signErr != nil {
-		return nil, fmt.Errorf("cannot sign the request: %w", signErr)
-	}
-	return res, err
-}
-
 // ValidateURL checks a URL before anything is dialled.
 //
 // This is the cheap first pass, and it is deliberately *not* the security
@@ -806,44 +741,4 @@ func (c *Client) PostSigned(ctx context.Context, raw string, body []byte,
 
 	return &Result{URL: raw, FinalURL: u.String(), Status: resp.StatusCode,
 		ContentType: resp.Header.Get("Content-Type")}, nil
-}
-
-// DoChecked sends an already-built request through the same address-checked,
-// no-redirect transport every other outbound call uses, and reports the status.
-//
-// # Why a request-accepting primitive exists at all
-//
-// The signed-POST helpers here build the request themselves, which is right
-// for a webhook whose body and headers are all this package knows. Federation
-// delivery is different: the request is signed by the caller, because the
-// signature must cover a Content-Digest the caller computed, and re-building
-// the request here would either drop that signature or re-sign a body this
-// package would have to be handed anyway. So the caller signs, and this runs
-// the finished request — through the same dialer, so the one connect-time
-// address check is not bypassed by the one caller that builds its own request.
-//
-// Redirects are refused for the same reason PostSigned refuses them: a
-// redirect would replay a signed body at an address the signature never named.
-func (c *Client) DoChecked(req *http.Request) (int, error) {
-	lim := c.Limits.withDefaults()
-	if _, err := c.validateURL(req.URL.String()); err != nil {
-		return 0, err
-	}
-	client, err := c.httpClient(lim)
-	if err != nil {
-		return 0, err
-	}
-	client.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", c.UserAgent)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, unwrapDialError(err)
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
-	return resp.StatusCode, nil
 }

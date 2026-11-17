@@ -272,16 +272,3 @@ func SessionTTL(a *Assertion, def time.Duration, now time.Time) time.Duration {
 	}
 	return def
 }
-
-// Expiring are the trusted certificates that end within the window, for a
-// warning before a provider's key change becomes an outage.
-func (c *Config) Expiring(now time.Time, window time.Duration) []*x509.Certificate {
-	certs, _ := c.Certificates()
-	var out []*x509.Certificate
-	for _, cert := range certs {
-		if cert.NotAfter.Before(now.Add(window)) {
-			out = append(out, cert)
-		}
-	}
-	return out
-}

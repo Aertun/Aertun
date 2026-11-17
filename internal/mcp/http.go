@@ -97,9 +97,6 @@ type ScopeError struct {
 
 func (e *ScopeError) Error() string { return e.Reason }
 
-// ErrNoCredential is a request that presented no token.
-var ErrNoCredential = errors.New("no bearer token")
-
 // Endpoint serves the agent interface over HTTP.
 type Endpoint struct {
 	// Metadata is the URL of this resource's OAuth protected resource

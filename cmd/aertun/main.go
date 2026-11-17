@@ -221,20 +221,10 @@ func main() {
 	// A tiny hand-rolled global flag pass, so `--root` and `--token` work
 	// before the subcommand as well as after it.
 	//
-	// --token is here because it was read globally and removed nowhere. The
-	// authorisation check picked it out of the raw arguments, then handed the
-	// same arguments to the subcommand's own flag set — which rejected an
-	// undeclared flag. Seven of eighty-one flag sets declared it, so `publish
-	// --token X` worked and `add --token X` exited 1 with "flag provided but
-	// not defined: -token".
-	//
-	// The command that mattered most was the one printing the advice. Every
-	// refusal in this program ends "Present one with --token,
-	// ~/.aertun/token, or AERTUN_TOKEN", and for `aertun add` on a store with
-	// access control the first of those three could not be done at all.
-	//
-	// Stripping it here makes the sentence true everywhere, and the seven
-	// local declarations are gone rather than left to shadow it.
+	// --token is taken here, once, rather than declared by each command's
+	// own flag set: every refusal in this program ends "Present one with
+	// --token, ~/.aertun/token, or AERTUN_TOKEN", and that sentence is true
+	// only if no command can reject the flag as one it never declared.
 	var rest []string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--root" && i+1 < len(args) {
@@ -267,11 +257,11 @@ func main() {
 	// The network boundary, applied once for every command before any of them
 	// runs.
 	//
-	// Here rather than in the two servers, because an isolated deployment is
-	// not only a running site: `import`, `fediverse`, `auditlog anchor` and
-	// the chat bots all reach the network from the command line, and a
-	// boundary that only the server honoured would be one somebody steps over
-	// by running a command.
+	// Here rather than in the server, because an isolated deployment is not
+	// only a running console: `collect run`, `connect run`, `auditlog
+	// anchor` and `chain posture` all reach the network from the command
+	// line, and a boundary that only the server honoured would be one
+	// somebody steps over by running a command.
 	//
 	// A mode that cannot be read leaves the default. Refusing to run because
 	// a config file is unreadable would make an unrelated fault look like a
@@ -466,44 +456,6 @@ func main() {
 		}
 		os.Exit(out.ExitFailure)
 	}
-}
-
-// splitFlags separates the flags, and the values they consume, from the
-// positional arguments.
-//
-// Pulled out of reorder because the privilege gate needs the positional
-// arguments too: it has to know which page a command is about before the
-// command has parsed anything, so that a grant or a deny scoped to part of the
-// site is enforced here as well as in the browser.
-//
-// One function rather than two readings of the same arguments. A second copy
-// of "which flags take a value" would drift, and a drifted copy reads as a
-// page name the word the command reads as a flag value — which authorises one
-// resource and acts on another, and a check on the wrong resource is not a
-// check.
-func splitFlags(args []string, valued map[string]bool) (flags, positional []string) {
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			positional = append(positional, args[i+1:]...)
-			break
-		}
-		if !strings.HasPrefix(a, "-") || a == "-" {
-			positional = append(positional, a)
-			continue
-		}
-		flags = append(flags, a)
-		name := strings.TrimLeft(a, "-")
-		if n, _, hasEq := strings.Cut(name, "="); hasEq {
-			_ = n
-			continue // --flag=value carries its own value
-		}
-		if valued[name] && i+1 < len(args) {
-			flags = append(flags, args[i+1])
-			i++
-		}
-	}
-	return flags, positional
 }
 
 // cmdInit makes the store: a directory private to this account, with the

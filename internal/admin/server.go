@@ -655,34 +655,6 @@ func (s *Server) allows(p principal, act auth.Action, resource string) bool {
 // package's source and fails when a handler reads a page name and authorises
 // "/", because this is a convention and the convention is what did not hold.
 
-// canAnywhere is the gate for a screen that lists things it has not named yet.
-//
-// It asks whether the caller may do this anywhere at all, and the screen then
-// asks the per-page question for every row it is about to show. Weak on
-// purpose: it decides whether the screen opens, not what is on it.
-func (s *Server) canAnywhere(w http.ResponseWriter, r *http.Request,
-	p principal, act auth.Action) bool {
-
-	if s.Policy == nil {
-		return s.can(w, r, p, act, "/")
-	}
-	// The credential's own limits still apply. Its role cap and its read-only
-	// and type dimensions are site-wide by nature — a read-only token is
-	// read-only everywhere — so they are asked here in full. Only its path
-	// dimension is asked about itself rather than about "/", because a token
-	// scoped to /blog failing to cover "/" is the same wrong question this
-	// function exists to stop asking.
-	within := strings.TrimSpace(p.Scope)
-	if within == "" {
-		within = "/"
-	}
-	if s.Policy.Anywhere(p.Name, act) &&
-		auth.CheckCredential(p.Role, p.Scope, p.Limits, act, within) == nil {
-		return true
-	}
-	return s.can(w, r, p, act, "/")
-}
-
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
 	data map[string]any) {
 
