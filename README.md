@@ -109,6 +109,7 @@ Ed25519 and ML-DSA-65.
 | **Not affected** | a VEX document's `not_affected` statements hold | the asset's bill of materials, advisories and reachability analysis | `aertun vuln prove-vex` |
 | **Cited evidence** | every claim in an AI's investigation report is true | the event store, with each citation run again | `aertun proof evidence` |
 | **Revocation** | after an agent was killed, or an identity revoked in another system, nothing acted as it | this program's signed log, the agent's own telemetry, and every collected source that had seen it act — each shown to have kept delivering events | `aertun proof revocation` |
+| **Sealed alert** | this alert existed by then — a monitor saw it first | the audit log, verified, holding the alert's digest in a batch it sealed (`aertun alert seal`), under a log head anchored in Bitcoin through OpenTimestamps | `aertun proof sealed` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:
@@ -359,7 +360,7 @@ Chrome with a WebAuthn virtual authenticator:
 | **HTTP and MCP** | 30 checks: sign-in and two factors, cross-site requests, rate limiting, security headers, cookies, OAuth metadata with PKCE, the agent interface's authorisation, refusals and proof verification. |
 | **OpenID Connect** | 13 checks against Keycloak 26 over HTTPS: sign-in with PKCE; one factor is asked for a passkey; an address outside the domain, a forged callback, a provider at a private address without `--reach`, and a certificate from an unknown authority are each refused. |
 | **SAML 2.0** | 7 checks against Keycloak 26: a signed assertion signs in, one factor is asked for a passkey, an address outside the domain is refused. |
-| **Test suite** | Ninety-six packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
+| **Test suite** | Ninety-seven packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
 
 **Speed** — four CPUs of an Intel Core i5-1235U laptop under WSL2, Go
 1.27.4: the median of three runs of `go test -bench . -count 3` over

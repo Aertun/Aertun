@@ -231,6 +231,19 @@ var coverage = map[string]surfaces{
 	// Claim cards: pre-registered tests of vendors' claims.
 	"claim": {GUI: "/proving/claims", MCP: []string{"list_claims"}},
 
+	// Sealed alerts: a monitor's alerts committed to the audit log by
+	// digest, for proof sealed to show when each existed.
+	"alert": {
+		Why: "sealing reads a monitor's export at a terminal or in the pipeline that " +
+			"receives it, and a batch is one audit entry, which the Logs screen shows; " +
+			"what a seal is for is the sealed-alert proof, read on the Proofs screen " +
+			"like every other",
+		NoMCP: "a seal is a claim made in this organisation's name that these alerts " +
+			"existed now, and an agent sealing them would be the party whose alerts are " +
+			"in question choosing what the record says was seen first — the claim this " +
+			"exists to keep honest",
+	},
+
 	// Closures judged again blind, on a sample committed first.
 	"adjudicate": {GUI: "/proving/adjudication",
 		NoMCP: "judging a closure blind is a person's judgement by design, and an " +

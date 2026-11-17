@@ -42,7 +42,7 @@ import (
 // interface run: they read and add to the proofs kept in the store.
 func cmdProof(root string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, verify, list, show, keep, signers, trust or untrust")
+		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust")
 	}
 	switch args[0] {
 	case "detection":
@@ -53,6 +53,8 @@ func cmdProof(root string, args []string) error {
 		return proofEvidence(root, args[1:])
 	case "revocation":
 		return proofRevocation(root, args[1:])
+	case "sealed":
+		return proofSealed(root, args[1:])
 	case "verify":
 		return proofVerify(args[1:])
 	case "list":
@@ -74,7 +76,7 @@ func cmdProof(root string, args []string) error {
 	case "untrust":
 		return proofUntrust(root, args[1:])
 	default:
-		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, verify, list, show, keep, signers, trust or untrust", args[0])
+		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust", args[0])
 	}
 }
 
@@ -242,6 +244,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["citations"] = st.Predicate.Citations
 	case st.Predicate.Revocation != nil:
 		out["revocation"] = st.Predicate.Revocation
+	case st.Predicate.Sealed != nil:
+		out["sealed"] = st.Predicate.Sealed
 	}
 	return out
 }
@@ -308,6 +312,9 @@ func describe(st *proof.Statement) string {
 	if v := p.Revocation; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d use(s) after the grace and %d refused attempt(s) across %d "+
 			"source(s); watched as %s", v.Uses, v.Refused, len(v.Sources), strings.Join(v.Identities, ", "))
+	}
+	if v := p.Sealed; v != nil {
+		b.WriteString(describeSealed(v))
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

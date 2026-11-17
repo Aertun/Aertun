@@ -238,6 +238,21 @@ var commandNeeds = map[string]need{
 	// asks for tune itself before it reads anything, as the other proofs
 	// signed from the store do.
 	"proof revocation": {action: auth.ActView},
+	// A sealed-alert proof reads the audit log whole, the batches kept
+	// beside it and the anchors sent from it, and signs when an alert
+	// existed in the organisation's name: it asks for tune itself before it
+	// reads anything, as the other proofs signed from the store do.
+	"proof sealed": {action: auth.ActView},
+	// Sealing alerts is evidence brought into the security area — the
+	// weight of importing another vendor's verdicts or intelligence, so an
+	// analyst's: it decides nothing about anybody and changes no control,
+	// and what it writes is one audit entry and a file of digests, whatever
+	// the batch held. Not tune, which signing a proof takes: a seal claims
+	// only that these digests were handed in now, and the proof made later
+	// is what speaks for the organisation. Listing what was sealed rides at
+	// the same rung, because `--list` is a flag and this table reads one
+	// word deep — over-guarded rather than under-.
+	"alert": {action: auth.ActTriage},
 	// A recorded case is the security queue and its evidence copied out of
 	// the store into a file, which is what listing the queue on the command
 	// line takes (`finding`); each part of it is gated again, operation by
@@ -704,6 +719,7 @@ var commandAreas = map[string]string{
 	"windtunnel": auth.AreaSecurity, "proof": auth.AreaSecurity, "verdict": auth.AreaSecurity,
 	"twin":  auth.AreaSecurity,
 	"forge": auth.AreaSecurity, "forge verify": auth.AreaLog,
+	"alert": auth.AreaSecurity,
 }
 
 // commandArea is the area a command works in, if it works in one.
