@@ -242,6 +242,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["citations"] = st.Predicate.Citations
 	case st.Predicate.Revocation != nil:
 		out["revocation"] = st.Predicate.Revocation
+	case st.Predicate.ChainPosture != nil:
+		out["chain_posture"] = st.Predicate.ChainPosture
 	}
 	return out
 }
@@ -308,6 +310,10 @@ func describe(st *proof.Statement) string {
 	if v := p.Revocation; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d use(s) after the grace and %d refused attempt(s) across %d "+
 			"source(s); watched as %s", v.Uses, v.Refused, len(v.Sources), strings.Join(v.Identities, ", "))
+	}
+	if v := p.ChainPosture; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d setting(s) on chain %d at block %d: %d held, %d regressed, "+
+			"%d unread", len(v.Settings), v.ChainID, v.Block, v.Held, v.Regressed, v.Unread)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

@@ -238,6 +238,12 @@ var commandNeeds = map[string]need{
 	// asks for tune itself before it reads anything, as the other proofs
 	// signed from the store do.
 	"proof revocation": {action: auth.ActView},
+	// A chain-posture proof reads a chain's state from an endpoint the
+	// operator names and signs what it found in the organisation's name:
+	// tune, as the other proofs signed in that name ask for, and asked for
+	// again by the command before it reads anything. A strict parent, so a
+	// subcommand added beside it arrives guarded.
+	"chain": {action: auth.ActTune},
 	// A recorded case is the security queue and its evidence copied out of
 	// the store into a file, which is what listing the queue on the command
 	// line takes (`finding`); each part of it is gated again, operation by
@@ -702,6 +708,7 @@ var commandAreas = map[string]string{
 	"siem": auth.AreaLog, "automate": auth.AreaSecurity, "inbound": auth.AreaSecurity,
 	"auditlog": auth.AreaLog, "compliance": auth.AreaLog, "bench": auth.AreaSecurity,
 	"windtunnel": auth.AreaSecurity, "proof": auth.AreaSecurity, "verdict": auth.AreaSecurity,
+	"chain": auth.AreaSecurity,
 	"twin":  auth.AreaSecurity,
 	"forge": auth.AreaSecurity, "forge verify": auth.AreaLog,
 }

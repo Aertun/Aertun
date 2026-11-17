@@ -4,6 +4,23 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun chain posture FILE --rpc URL` signs whether a protocol's
+  on-chain posture is what it declares.  The posture file names the chain
+  and, for each Safe multisig, the least threshold and number of owners;
+  for each OpenZeppelin TimelockController, the least delay; for each
+  EIP-1967 proxy, its admin and optionally its implementation.  Every
+  setting is read at one block (the latest finalized unless `--block`
+  names one), each read naming the block by its hash.  A setting weaker
+  than declared refutes it, by contract, setting, declared and found; it
+  is proven only when every setting was read and holds, and otherwise
+  inconclusive, saying which could not be read and why.  The endpoint is
+  reached over HTTPS through the new network purpose `chain`, a node
+  inside the organisation only when `--reach` declares its range, and its
+  URL is never written down.  The predicate is
+  https://aertun.github.io/proof/chain-posture/v1.  A rule,
+  evm.timelock-delay-changed, raises a timelock's delay changing, beside
+  the rules for a multisig's signers and a proxy's upgrade.
+
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's
   own verified audit log, the agent's own telemetry and any identity the
