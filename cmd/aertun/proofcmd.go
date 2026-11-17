@@ -246,6 +246,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["clock"] = st.Predicate.Clock
 	case st.Predicate.BreachScope != nil:
 		out["breach_scope"] = st.Predicate.BreachScope
+	case st.Predicate.VEXRecord != nil:
+		out["vex_record"] = st.Predicate.VEXRecord
 	}
 	return out
 }
@@ -325,6 +327,13 @@ func describe(st *proof.Statement) string {
 		fmt.Fprintf(&b, "  evidence: %d indicator(s) from %s %s; %d event(s) read; the store holds "+
 			"the margin before %v, the window %v, the margin after %v", len(v.Indicators), v.Vendor,
 			v.Reference, v.Events, v.HeldBefore, v.HeldDuring, v.HeldAfter)
+	}
+	if v := p.VEXRecord; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d of %d checked statement(s) contradicted, between %.4f and %.4f, "+
+			"against %g; %d uncheckable; %d proof(s) used about %d asset(s), %d by trusted signers; "+
+			"%d superseded, %d left out unverified, %d left out for an untrusted signer",
+			v.Share.K, v.Share.N, v.Share.Lower, v.Share.Upper, v.Tolerance, v.Uncheckable, v.Used,
+			v.Assets, v.Trusted, v.Superseded, v.LeftOut, v.UntrustedLeftOut)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

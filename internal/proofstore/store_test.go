@@ -4,6 +4,7 @@
 package proofstore
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -67,6 +68,13 @@ func TestAProofThatVerifiesIsKeptOnce(t *testing.T) {
 	if err != nil || len(all) != 1 || all[0].ID != id || all[0].Broken != "" ||
 		all[0].KeptBy != "dana" || all[0].Statement == nil {
 		t.Fatalf("listed %+v, %v", all, err)
+	}
+	// The digest is of the statement as signed, and the id is its start.
+	var e proof.Envelope
+	_ = json.Unmarshal(env, &e)
+	payload, _ := base64.StdEncoding.DecodeString(e.Payload)
+	if want := proof.SHA256(payload)["sha256"]; all[0].Digest != want || want[:24] != id {
+		t.Errorf("the digest is %q, want %q", all[0].Digest, want)
 	}
 	info, _ := os.Stat(filepath.Join(Dir(root), id+".json"))
 	if info.Mode().Perm() != 0o600 {
@@ -144,7 +152,7 @@ func TestAKeptProofEditedAfterwardsShowsAsBroken(t *testing.T) {
 		}
 		edit(t, filepath.Join(Dir(root), id+".json"))
 		all, _ := List(root)
-		if len(all) != 1 || all[0].Broken == "" || all[0].Statement != nil {
+		if len(all) != 1 || all[0].Broken == "" || all[0].Statement != nil || all[0].Digest != "" {
 			t.Errorf("%s edited: listed %+v", name, all)
 		}
 		if e, err := Get(root, id); err != nil || e.Broken == "" {

@@ -152,6 +152,9 @@ type Predicate struct {
 	// BreachScope is set on a breach-scope proof: a vendor's disclosure of
 	// its own breach, held against this organisation's events.
 	BreachScope *BreachScopeEvidence `json:"breach_scope,omitempty"`
+	// VEXRecord is set on a VEX record: one issuer's not_affected
+	// statements scored over the not-affected proofs kept about it.
+	VEXRecord *VEXRecordEvidence `json:"vex_record,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -274,7 +277,8 @@ func (s *Statement) validateEvidence() error {
 	kinds := 0
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
-		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil, p.BreachScope != nil} {
+		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
+		p.BreachScope != nil, p.VEXRecord != nil} {
 		if set {
 			kinds++
 		}
@@ -340,6 +344,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a breach-scope proof carries its indicators' counts and no other evidence")
 		}
 		return p.BreachScope.validate(s)
+	case PredicateVEXRecord:
+		if p.VEXRecord == nil || kinds != 1 {
+			return fmt.Errorf("a VEX record carries the issuer's counts and no other evidence")
+		}
+		return p.VEXRecord.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}
