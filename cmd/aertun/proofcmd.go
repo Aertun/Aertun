@@ -254,6 +254,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["chain_posture"] = st.Predicate.ChainPosture
 	case st.Predicate.Sealed != nil:
 		out["sealed"] = st.Predicate.Sealed
+	case st.Predicate.MDR != nil:
+		out["mdr"] = st.Predicate.MDR
 	}
 	return out
 }
@@ -347,6 +349,13 @@ func describe(st *proof.Statement) string {
 	}
 	if v := p.Sealed; v != nil {
 		b.WriteString(describeSealed(v))
+	}
+	if v := p.MDR; v != nil {
+		fmt.Fprintf(&b, "  evidence: plan %s for %s, committed at audit entry %d: %d of %d planned run; "+
+			"%d notified within %ds, %d late, %d not at all; missed between %.4f and %.4f against %g; "+
+			"time to notify %ds median, %ds at the 90th percentile; test closed: %v",
+			v.Plan, v.Provider, v.Committed.Seq, v.Run, v.Planned, v.Within, v.SLA, v.Late, v.Never,
+			v.Missed.Lower, v.Missed.Upper, v.Tolerance, v.Median, v.P90, v.Closed)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

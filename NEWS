@@ -76,6 +76,24 @@ Unreleased
   lists the batches.  The predicate is
   https://aertun.github.io/proof/sealed/v1.
 
+* `aertun mdr plan NAME --provider P --emulations F --count N` tests a
+  managed detection provider, or an AI SOC, blind on your own estate.  The
+  plan draws emulations from your list at random times in a window (30
+  days by default) and commits its digest to the audit log before any is
+  shown; `aertun mdr next` says only what has fallen due, never when the
+  next one comes.  A verified person records each run (`mdr ran`), which
+  counts only within a day of falling due, and each notification
+  (`mdr notified --item N --at TIME --ref REF`, or `--source S` to join
+  the provider's alerts from the event store by host and time, never by
+  guessing).  `aertun mdr prove NAME --sla 30m --tolerance R` signs the
+  missed share — notified late or not at all — with exact one-sided
+  bounds: refuted when the lower bound is over the tolerance, naming each
+  missed item; proven when the upper bound is at or under it on at least
+  30 runs; inconclusive otherwise, and always until the test has closed,
+  so it cannot be stopped on a good day.  The emulations are named only
+  for the items missed, and hosts never.  The predicate is
+  https://aertun.github.io/proof/mdr/v1.
+
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's
   own verified audit log, the agent's own telemetry and any identity the

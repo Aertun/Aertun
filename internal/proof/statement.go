@@ -161,6 +161,9 @@ type Predicate struct {
 	// Sealed is set on a sealed-alert proof: an alert's digest found in a
 	// batch the audit log sealed, and the anchored head that covers it.
 	Sealed *SealedEvidence `json:"sealed,omitempty"`
+	// MDR is set on an MDR proof: a provider's notifications on emulations
+	// run blind, from a plan committed before any was run.
+	MDR *MDREvidence `json:"mdr,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -284,7 +287,7 @@ func (s *Statement) validateEvidence() error {
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
-		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil} {
+		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil} {
 		if set {
 			kinds++
 		}
@@ -365,6 +368,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a sealed-alert proof carries sealing evidence and no other")
 		}
 		return p.Sealed.validate(s)
+	case PredicateMDR:
+		if p.MDR == nil || kinds != 1 {
+			return fmt.Errorf("an MDR proof carries MDR evidence and no other")
+		}
+		return p.MDR.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

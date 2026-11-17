@@ -213,6 +213,14 @@ var commandNeeds = map[string]need{
 	"verdict":         {action: auth.ActTriage},
 	"verdict list":    {action: auth.ActView},
 	"verdict prove":   {action: auth.ActTriage},
+	// A provider's blind test: drawing the plan, reading what has fallen
+	// due and proving ask for tune themselves, because the schedule is the
+	// secret the test rests on and the proof a measurement in the
+	// organisation's name; recording a run or a notification is an
+	// analyst's report of what happened, taken at this row and asked again
+	// of a verified person by the command. No subcommand steps down: there
+	// is nothing here a viewer should read.
+	"mdr": {action: auth.ActTriage},
 	// The benchmark measures the analyst and, against a real model, spends
 	// the model budget to do it: the same weight as the analyst's own eval.
 	// Rendering a document somebody already has is only reading.
@@ -733,6 +741,7 @@ var commandAreas = map[string]string{
 	"auditlog": auth.AreaLog, "compliance": auth.AreaLog, "bench": auth.AreaSecurity,
 	"windtunnel": auth.AreaSecurity, "proof": auth.AreaSecurity, "verdict": auth.AreaSecurity,
 	"chain": auth.AreaSecurity,
+	"mdr":   auth.AreaSecurity,
 	"twin":  auth.AreaSecurity,
 	"forge": auth.AreaSecurity, "forge verify": auth.AreaLog,
 	"alert": auth.AreaSecurity,
