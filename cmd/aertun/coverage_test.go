@@ -238,6 +238,17 @@ var coverage = map[string]surfaces{
 			"measurement of agents; drawing and proving sign with a key file " +
 			"named on the command line"},
 
+	// A detection provider tested blind, on a schedule committed first.
+	"mdr": {GUI: "/proving/proofs",
+		Why: "the signed result is kept with the other proofs; the plan itself has no screen " +
+			"because its schedule is the one thing the provider must not learn, and a provider " +
+			"under test is often given a seat on the console it would be shown on, so it is " +
+			"read at a terminal, by whoever may draw one, and only as each item falls due",
+		NoMCP: "the schedule must be kept from the provider, and an AI SOC under test may be the " +
+			"very agent at this interface; a run or a notification is recorded as a verified " +
+			"person's word, which a model cannot give, and proving signs with a key file named " +
+			"on the command line"},
+
 	// Another vendor's AI verdicts, scored against people's decisions.
 	"verdict": {
 		GUI: "/proving/proofs",

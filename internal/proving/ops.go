@@ -27,7 +27,10 @@ import (
 // written outside, as anything that could be either is. An evidence proof's
 // words are rebuilt from closed sets too, but they carry the ids and
 // observables the investigation's author cited, strictly parsed and still
-// the author's choice, so they are labelled as written outside as well.
+// the author's choice, so they are labelled as written outside as well. An
+// MDR proof's words are rebuilt from its numbers, and the emulation ids a
+// refutation names come from the operator's own list, strictly parsed and
+// never the provider's, so they are this program's.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -41,11 +44,12 @@ var proofKinds = map[string]string{
 	proof.PredicateTriage:         "triage",
 	proof.PredicateEvidence:       "evidence",
 	proof.PredicateRevocation:     "revocation",
+	proof.PredicateMDR:            "mdr",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation"}
+	"not-affected", "evidence", "revocation", "mdr"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -60,7 +64,7 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
-		st.Predicate.Revocation != nil {
+		st.Predicate.Revocation != nil || st.Predicate.MDR != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -325,6 +329,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
 				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
 				With("refused", ops.Ours(v.Refused)).With("sources", sources))
+		case p.MDR != nil:
+			v := p.MDR
+			row.With("evidence", ops.Object().With("plan", ops.Ours(v.Plan)).
+				With("provider", ops.Ours(v.Provider)).
+				With("committed_at_entry", ops.Ours(int(v.Committed.Seq))).
+				With("window_start", ops.Ours(v.WindowStart)).With("window_end", ops.Ours(v.WindowEnd)).
+				With("window_closed", ops.Ours(v.Closed)).With("sla_seconds", ops.Ours(v.SLA)).
+				With("tolerance", ops.Ours(v.Tolerance)).With("planned", ops.Ours(v.Planned)).
+				With("run", ops.Ours(v.Run)).With("within_sla", ops.Ours(v.Within)).
+				With("late", ops.Ours(v.Late)).With("not_notified", ops.Ours(v.Never)).
+				With("missed", ops.Object().With("k", ops.Ours(v.Missed.K)).With("n", ops.Ours(v.Missed.N)).
+					With("lower", ops.Ours(v.Missed.Lower)).With("upper", ops.Ours(v.Missed.Upper))).
+				With("median_seconds", ops.Ours(v.Median)).With("p90_seconds", ops.Ours(v.P90)))
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }
