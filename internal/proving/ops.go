@@ -27,7 +27,10 @@ import (
 // written outside, as anything that could be either is. An evidence proof's
 // words are rebuilt from closed sets too, but they carry the ids and
 // observables the investigation's author cited, strictly parsed and still
-// the author's choice, so they are labelled as written outside as well.
+// the author's choice, so they are labelled as written outside as well. So
+// are a chain-posture proof's: its words are rebuilt from numbers and closed
+// sets, but its subject carries the name the posture file gives and its
+// settings the addresses the file declares, which are the claimant's.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -44,11 +47,12 @@ var proofKinds = map[string]string{
 	proof.PredicateClock:          "clock",
 	proof.PredicateBreachScope:    "breach-scope",
 	proof.PredicateVEXRecord:      "vex-record",
+	proof.PredicateChainPosture:   "chain-posture",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record"}
+	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -372,6 +376,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("uncheckable", ops.Ours(v.Uncheckable)).
 				With("contradicting_proofs", ops.Ours(v.ContradictingProofs)).
 				With("contradicted_share", boundAnswer(v.Share)))
+		case p.ChainPosture != nil:
+			v := p.ChainPosture
+			settings := ops.ListOf(v.Settings, func(s proof.PostureSetting) *ops.Answer {
+				return ops.Object().With("address", ops.Outside(s.Address)).
+					With("setting", ops.Ours(s.Setting)).With("declared", ops.Outside(s.Declared)).
+					With("found", ops.Outside(s.Found)).With("outcome", ops.Ours(s.Outcome)).
+					With("reason", ops.Ours(s.Reason))
+			})
+			row.With("evidence", ops.Object().With("name", ops.Outside(v.Name)).
+				With("chain_id", ops.Ours(v.ChainID)).With("block", ops.Ours(v.Block)).
+				With("block_hash", ops.Ours(v.BlockHash)).With("finalized", ops.Ours(v.Finalized)).
+				With("held", ops.Ours(v.Held)).With("regressed", ops.Ours(v.Regressed)).
+				With("unread", ops.Ours(v.Unread)).With("settings", settings))
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

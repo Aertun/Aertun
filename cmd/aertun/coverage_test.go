@@ -228,6 +228,14 @@ var coverage = map[string]surfaces{
 			"thing under test choosing its test; the replay itself is served " +
 			"over MCP, by aertun mcp --twin",
 	},
+	// A protocol's posture on a chain, read at one block and signed: the
+	// proof is kept and read with every other on the Proofs screen and
+	// through the proof operations.
+	"chain": {GUI: "/proving/proofs",
+		NoMCP: "proving signs with a key file named on the command line, which an MCP " +
+			"server must never hold on a caller's behalf, and reads from an endpoint whose " +
+			"URL carries a credential; an agent choosing the endpoint would choose the " +
+			"witness its own claim is checked against"},
 	// Claim cards: pre-registered tests of vendors' claims.
 	"claim": {GUI: "/proving/claims", MCP: []string{"list_claims"}},
 

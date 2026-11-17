@@ -248,6 +248,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["breach_scope"] = st.Predicate.BreachScope
 	case st.Predicate.VEXRecord != nil:
 		out["vex_record"] = st.Predicate.VEXRecord
+	case st.Predicate.ChainPosture != nil:
+		out["chain_posture"] = st.Predicate.ChainPosture
 	}
 	return out
 }
@@ -334,6 +336,10 @@ func describe(st *proof.Statement) string {
 			"%d superseded, %d left out unverified, %d left out for an untrusted signer",
 			v.Share.K, v.Share.N, v.Share.Lower, v.Share.Upper, v.Tolerance, v.Uncheckable, v.Used,
 			v.Assets, v.Trusted, v.Superseded, v.LeftOut, v.UntrustedLeftOut)
+	}
+	if v := p.ChainPosture; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d setting(s) on chain %d at block %d: %d held, %d regressed, "+
+			"%d unread", len(v.Settings), v.ChainID, v.Block, v.Held, v.Regressed, v.Unread)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

@@ -171,6 +171,16 @@ var Purposes = []Purpose{
 			"never fetches anything: the trusted certificates are stored " +
 			"when a person confirms them",
 	},
+	{
+		Name: "chain",
+		What: "reading an EVM chain's state from the JSON-RPC endpoint an " +
+			"operator names — a multisig's threshold and owners, a " +
+			"timelock's delay, a proxy's admin and implementation — to " +
+			"prove a protocol's posture at one block",
+		Without: "no chain posture can be proved from a hosted endpoint. A " +
+			"node run on this machine is still reached, since a " +
+			"connection that stays on the host is not egress",
+	},
 }
 
 // Lookup returns a purpose by name.

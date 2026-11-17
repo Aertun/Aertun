@@ -112,6 +112,7 @@ Ed25519 and ML-DSA-65.
 | **Clock** | an incident's awareness, major or material decision was made when its record says, and every reporting deadline it started was met | the signed audit log, the log's Bitcoin anchors, and the deadlines of the regimes the incident is under | `aertun incident prove` |
 | **Breach scope** | a supplier's disclosure of its own breach holds: no indicator outside the window it gave, and none inside it when it said you were not affected | your own event store, searched in the window and a margin either side, with whether the store holds each period whole | `aertun vendor check-breach` |
 | **VEX record** | over a period, an issuer's `not_affected` statements were contradicted at most this often | the not-affected proofs kept here about that issuer and signed by a key this store trusts, each verified again as it is read; uncheckable statements counted and never in the rate | `aertun vuln vex-record` |
+| **Chain posture** | a protocol's multisig thresholds, timelock delays and proxy admins are what it declares | the chain itself, read over JSON-RPC at one block named by its hash | `aertun chain posture` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:
@@ -362,7 +363,7 @@ Chrome with a WebAuthn virtual authenticator:
 | **HTTP and MCP** | 30 checks: sign-in and two factors, cross-site requests, rate limiting, security headers, cookies, OAuth metadata with PKCE, the agent interface's authorisation, refusals and proof verification. |
 | **OpenID Connect** | 13 checks against Keycloak 26 over HTTPS: sign-in with PKCE; one factor is asked for a passkey; an address outside the domain, a forged callback, a provider at a private address without `--reach`, and a certificate from an unknown authority are each refused. |
 | **SAML 2.0** | 7 checks against Keycloak 26: a signed assertion signs in, one factor is asked for a passkey, an address outside the domain is refused. |
-| **Test suite** | Ninety-six packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
+| **Test suite** | Ninety-seven packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
 
 **Speed** — four CPUs of an Intel Core i5-1235U laptop under WSL2, Go
 1.27.4: the median of three runs of `go test -bench . -count 3` over

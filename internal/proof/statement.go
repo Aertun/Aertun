@@ -155,6 +155,9 @@ type Predicate struct {
 	// VEXRecord is set on a VEX record: one issuer's not_affected
 	// statements scored over the not-affected proofs kept about it.
 	VEXRecord *VEXRecordEvidence `json:"vex_record,omitempty"`
+	// ChainPosture is set on a chain-posture proof: the settings a posture
+	// file declares, each with what was read from the chain at one block.
+	ChainPosture *ChainPostureEvidence `json:"chain_posture,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -278,7 +281,7 @@ func (s *Statement) validateEvidence() error {
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
-		p.BreachScope != nil, p.VEXRecord != nil} {
+		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil} {
 		if set {
 			kinds++
 		}
@@ -349,6 +352,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a VEX record carries the issuer's counts and no other evidence")
 		}
 		return p.VEXRecord.validate(s)
+	case PredicateChainPosture:
+		if p.ChainPosture == nil || kinds != 1 {
+			return fmt.Errorf("a chain-posture proof carries chain-posture evidence and no other")
+		}
+		return p.ChainPosture.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

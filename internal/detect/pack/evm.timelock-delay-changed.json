@@ -1,0 +1,98 @@
+{
+  "id": "evm.timelock-delay-changed",
+  "title": "A timelock's minimum delay changed",
+  "why": "the delay is how long everybody has to see a change coming before it takes effect, and shortening it is how an attacker who holds the proposer role stops anybody seeing",
+  "blind": "a timelock that is not OpenZeppelin's TimelockController and names its delay change otherwise",
+  "sources": [
+    "evm/logs"
+  ],
+  "severity": 5,
+  "when": {
+    "any": [
+      {
+        "match": {
+          "field": "raw.signature",
+          "op": "equals",
+          "values": [
+            "0x11c24f4ead16507c69ac467fbd5e4eed5fb5c699626d2cc6d66421df253886d5"
+          ]
+        }
+      },
+      {
+        "match": {
+          "field": "raw.event",
+          "op": "prefix",
+          "values": [
+            "MinDelayChange("
+          ]
+        }
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "name": "MinDelayChange, decoded by the explorer",
+      "match": true,
+      "event": {
+        "source": "evm/logs",
+        "time": "2026-09-01T00:00:00Z",
+        "received": "2026-09-01T00:00:05Z",
+        "class": 6003,
+        "disposition": 1,
+        "actor": {
+          "issuer": "evm",
+          "value": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        },
+        "message": "MinDelayChange(uint256 oldDuration, uint256 newDuration)",
+        "raw": {
+          "signature": "0x11c24f4ead16507c69ac467fbd5e4eed5fb5c699626d2cc6d66421df253886d5",
+          "tx": "0xabc",
+          "block_number": "1",
+          "event": "MinDelayChange(uint256 oldDuration, uint256 newDuration)"
+        }
+      }
+    },
+    {
+      "name": "MinDelayChange, on a contract the explorer has not verified",
+      "match": true,
+      "event": {
+        "source": "evm/logs",
+        "time": "2026-09-01T00:00:00Z",
+        "received": "2026-09-01T00:00:05Z",
+        "class": 6003,
+        "disposition": 1,
+        "actor": {
+          "issuer": "evm",
+          "value": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        },
+        "raw": {
+          "signature": "0x11c24f4ead16507c69ac467fbd5e4eed5fb5c699626d2cc6d66421df253886d5",
+          "tx": "0xabc",
+          "block_number": "1"
+        }
+      }
+    },
+    {
+      "name": "an operation scheduled, which waits out the delay rather than changing it",
+      "match": false,
+      "event": {
+        "source": "evm/logs",
+        "time": "2026-09-01T00:00:00Z",
+        "received": "2026-09-01T00:00:05Z",
+        "class": 6003,
+        "disposition": 1,
+        "actor": {
+          "issuer": "evm",
+          "value": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        },
+        "message": "CallScheduled(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data, bytes32 predecessor, uint256 delay)",
+        "raw": {
+          "signature": "0x4cf4410cc57040e44862ef0f45f3dd5a5e02db8eb8add648d4b0e236f1d07dca",
+          "tx": "0xabc",
+          "block_number": "1",
+          "event": "CallScheduled(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data, bytes32 predecessor, uint256 delay)"
+        }
+      }
+    }
+  ]
+}
