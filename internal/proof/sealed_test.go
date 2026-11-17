@@ -70,6 +70,7 @@ func sealedInput(t *testing.T) (SealedInput, *sealedFixture) {
 	ev := SealedEvidence{Digest: f.digests[2], LogEntries: 10, Batches: 2, Entry: 7,
 		Sealed: instant(sl0), BatchRoot: f.batch.Head().Root, BatchSize: 5, BatchIndex: 2,
 		BatchPath: path, EntryLeaf: f.leaves[6], Anchor: AnchorBitcoin, Height: 870000}
+	ev.BlockHash, ev.Mined, ev.Header = testBlock(sl0.Add(30 * time.Minute))
 	f.head(t, &ev, 9)
 	return SealedInput{Evidence: ev, Program: "test", Now: sl0.Add(time.Hour),
 		Materials: []Material{{Name: "audit-log", Digest: SHA256([]byte("log")), Entries: 10}}}, f
@@ -82,6 +83,10 @@ func unreached(ev *SealedEvidence) {
 		Rewritten: ev.Rewritten, Batches: ev.Batches, Unkept: ev.Unkept}
 }
 
+// noBlock clears what is said of a block, as the command leaves it when no
+// block was checked.
+func noBlock(ev *SealedEvidence) { ev.BlockHash, ev.Mined, ev.Header = "", "", "" }
+
 func TestASealedAlertsVerdict(t *testing.T) {
 	cases := map[string]struct {
 		change func(*SealedEvidence, *sealedFixture)
@@ -91,9 +96,17 @@ func TestASealedAlertsVerdict(t *testing.T) {
 		"its head is in a block": {func(*SealedEvidence, *sealedFixture) {}, Proven, 4},
 		"its head is pending in the calendars": {func(ev *SealedEvidence, _ *sealedFixture) {
 			ev.Anchor, ev.Height = AnchorPending, 0
+			noBlock(ev)
+		}, Inconclusive, 4},
+		// A timestamp's attestation is a height and nothing more: with no
+		// header checked for that block, it is not an anchor.
+		"its head names a block nobody checked": {func(ev *SealedEvidence, _ *sealedFixture) {
+			ev.Anchor = AnchorUnconfirmed
+			noBlock(ev)
 		}, Inconclusive, 4},
 		"nothing anchored covers it": {func(ev *SealedEvidence, f *sealedFixture) {
 			ev.Anchor, ev.Height = AnchorNone, 0
+			noBlock(ev)
 			f.head(t, ev, 10)
 		}, Inconclusive, 4},
 		"the log breaks": {func(ev *SealedEvidence, _ *sealedFixture) {
@@ -143,15 +156,28 @@ func TestASealedProofSaysWhatFixesTheTime(t *testing.T) {
 	if st.Subject[0].Name != "alert/"+in.Evidence.Digest[:16] || st.Subject[0].Digest["sha256"] != in.Evidence.Digest {
 		t.Errorf("the subject: %+v", st.Subject)
 	}
-	if d := st.Predicate.Checks[3].Detail; !strings.Contains(d, "block 870000 was mined") ||
-		!strings.Contains(d, "ots verify") {
+	if d := st.Predicate.Checks[3].Detail; !strings.Contains(d, "attestation at block 870000") ||
+		!strings.Contains(d, in.Evidence.BlockHash+", mined 2026-11-10T12:30:00Z") ||
+		!strings.Contains(d, "the work of a real block") {
 		t.Errorf("the anchor: %s", d)
+	}
+	un, _ := sealedInput(t)
+	un.Evidence.Anchor = AnchorUnconfirmed
+	noBlock(&un.Evidence)
+	ust, err := ProveSealed(un)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := ust.Predicate.Checks[3].Detail; !strings.Contains(d, "naming Bitcoin block 870000") ||
+		!strings.Contains(d, "rests on the audit log alone") || !strings.Contains(d, "anchor upgrade") {
+		t.Errorf("an unconfirmed anchor: %s", d)
 	}
 	if d := st.Predicate.Checks[1].Detail; !strings.Contains(d, "audit entry 7, written at 2026-11-10T12:00:00.123456789Z") ||
 		!strings.Contains(d, "batch of 5") {
 		t.Errorf("the seal: %s", d)
 	}
 	in.Evidence.Anchor, in.Evidence.Height = AnchorNone, 0
+	noBlock(&in.Evidence)
 	f.head(t, &in.Evidence, 10)
 	st, err = ProveSealed(in)
 	if err != nil {
@@ -197,8 +223,20 @@ func TestASealedProofThatDoesNotHoldTogetherIsRefused(t *testing.T) {
 		"a block of nothing":           func(ev *SealedEvidence) { ev.Height = 0 },
 		"a block beyond any chain":     func(ev *SealedEvidence) { ev.Height = MaxBitcoinHeight + 1 },
 		"a pending head with a block":  func(ev *SealedEvidence) { ev.Anchor = AnchorPending },
+		"a pending head with a header": func(ev *SealedEvidence) { ev.Anchor, ev.Height = AnchorPending, 0 },
 		"nothing anchored, a smaller head": func(ev *SealedEvidence) {
 			ev.Anchor, ev.Height = AnchorNone, 0
+			noBlock(ev)
+		},
+		"a block with no header": func(ev *SealedEvidence) { ev.Header = "" },
+		"a hash that is not its header's": func(ev *SealedEvidence) {
+			ev.BlockHash = strings.Repeat("0", 64)
+		},
+		"a time that is not its header's":    func(ev *SealedEvidence) { ev.Mined = "2026-11-10T11:00:00Z" },
+		"an unconfirmed block with a header": func(ev *SealedEvidence) { ev.Anchor = AnchorUnconfirmed },
+		"an unconfirmed block of nothing": func(ev *SealedEvidence) {
+			ev.Anchor, ev.Height = AnchorUnconfirmed, 0
+			noBlock(ev)
 		},
 	}
 	for name, change := range cases {
@@ -232,6 +270,14 @@ func TestASealedProofCarriesOnlyWhatItsEvidenceSays(t *testing.T) {
 		},
 		"made pending": func(s *Statement) {
 			s.Predicate.Sealed.Anchor, s.Predicate.Sealed.Height = AnchorPending, 0
+			noBlock(s.Predicate.Sealed)
+		},
+		"an unconfirmed block made confirmed": func(s *Statement) {
+			s.Predicate.Sealed.Anchor = AnchorUnconfirmed
+		},
+		"the block made earlier": func(s *Statement) { s.Predicate.Sealed.Mined = "2026-11-09T12:30:00Z" },
+		"another block's header": func(s *Statement) {
+			_, _, s.Predicate.Sealed.Header = testBlock(sl0.Add(-30 * 24 * time.Hour))
 		},
 		"a hash in the path": func(s *Statement) { s.Predicate.Sealed.BatchPath[1] = f.digests[4] },
 		"the entry moved":    func(s *Statement) { s.Predicate.Sealed.Entry = 8 },

@@ -112,7 +112,9 @@ var Purposes = []Purpose{
 	},
 	{
 		Name: "anchor",
-		What: "publishing an audit head where the operator cannot alter it",
+		What: "publishing an audit head where the operator cannot alter it, " +
+			"through OpenTimestamps calendars, and reading the header of the " +
+			"Bitcoin block that holds it from public block explorers",
 		Without: "heads are not anchored. Rewriting history stays detectable " +
 			"against a head somebody else holds and is no longer provable " +
 			"against one nobody controls",

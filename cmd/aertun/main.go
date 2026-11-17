@@ -176,7 +176,7 @@ Its own record and settings
   aertun privacy export SUBJECT [--out FILE] [--audit] [--pseudonym p_…] | statement
                                         a data subject's events as a handover document, and the honest privacy posture
   aertun auditlog dir | verify | show SEQ | export -o FILE | head --save | verify-head FILE | prove SEQ | consistency
-  aertun auditlog anchor [submit|upgrade|status]   the log head, committed to Bitcoin
+  aertun auditlog anchor [submit|upgrade [--explorer URL ...]|status]   the log head, committed to Bitcoin, each block's header checked
   aertun logd [status]                     the log writer, run as its own account
   aertun siem ocsf|cef|jsonl --envelope F | verify FILE --envelope F   its own audit log, still verifiable
   aertun siem stream [status] | key | send  its own audit log, pushed to a SIEM as it is written

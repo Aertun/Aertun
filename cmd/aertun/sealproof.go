@@ -201,7 +201,11 @@ func sealedEvidence(root, digest string) (proof.SealedEvidence, []proof.Material
 	ev.Anchor, ev.HeadSize = proof.AnchorNone, len(events)
 	if cover, ok := seal.Cover(placed, c.Index); ok {
 		ev.Anchor, ev.HeadSize = cover.Anchor(), cover.Size
-		if cover.State == anchor.Anchored {
+		switch {
+		case cover.State == anchor.Anchored:
+			ev.Height, ev.BlockHash = int(cover.Height), cover.Block.Hash
+			ev.Mined, ev.Header = cover.Block.Mined.Format(time.RFC3339), cover.Block.Header
+		case cover.Unconfirmed:
 			ev.Height = int(cover.Height)
 		}
 		materials = append(materials, proof.Material{Name: "anchor-proof", Digest: proof.SHA256(cover.Body)})
@@ -227,12 +231,12 @@ func describeSealed(v *proof.SealedEvidence) string {
 	case v.Entry == 0:
 		return fmt.Sprintf("  evidence: in none of %d sealed batch(es) of a log of %d entries", v.Batches, v.LogEntries)
 	case v.Anchor == proof.AnchorBitcoin:
-		return fmt.Sprintf("  evidence: sealed in entry %d at %s, under the head of %d entries in Bitcoin block %d",
-			v.Entry, v.Sealed, v.HeadSize, v.Height)
+		return fmt.Sprintf("  evidence: sealed in entry %d at %s, under the head of %d entries in Bitcoin "+
+			"block %d (%s, mined %s)", v.Entry, v.Sealed, v.HeadSize, v.Height, v.BlockHash, v.Mined)
 	}
 	return fmt.Sprintf("  evidence: sealed in entry %d at %s; the head of %d entries is %s, so the time is "+
 		"the log's own", v.Entry, v.Sealed, v.HeadSize, map[string]string{proof.AnchorPending: "pending in the calendars",
-		proof.AnchorNone: "not anchored"}[v.Anchor])
+		proof.AnchorUnconfirmed: "stamped for a block nobody has checked", proof.AnchorNone: "not anchored"}[v.Anchor])
 }
 
 // loadBoundedJSON is loadJSON under a size limit: absent is empty.

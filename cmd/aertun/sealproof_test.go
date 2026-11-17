@@ -92,8 +92,9 @@ func recordSent(t *testing.T, root string, head audit.Head, body []byte, stored 
 		t.Fatal(err)
 	}
 	hf.Heads = append(hf.Heads, head)
-	af.Proofs = append(af.Proofs, anchor.Proof{Digest: head.Root, Calendar: "https://alice.btc.calendar.opentimestamps.org",
-		Body: body, State: stored, SubmittedAt: time.Now().UTC().Format(time.RFC3339)})
+	af.Proofs = append(af.Proofs, inCheckedBlock(t, anchor.Proof{Digest: head.Root,
+		Calendar: "https://alice.btc.calendar.opentimestamps.org", Body: body, State: stored,
+		SubmittedAt: time.Now().UTC().Format(time.RFC3339)}, time.Now()))
 	if err := saveJSON(headsPath(root), hf); err != nil {
 		t.Fatal(err)
 	}

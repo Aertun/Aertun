@@ -405,18 +405,29 @@ func LogTree(events []audit.Event) (*translog.Log, error) {
 // Placed is a head of the log sent to OpenTimestamps, placed in the log as
 // it stands, with what its proof attests.
 type Placed struct {
-	Size   int
-	Root   string
-	State  anchor.State
+	Size int
+	Root string
+	// State is Anchored only for a head whose Bitcoin block was checked
+	// (anchor.Confirm); a head whose timestamp names a block nobody has
+	// checked, or whose header does not hold it, is Pending with Unconfirmed
+	// set, and is no anchor.
+	State       anchor.State
+	Unconfirmed bool
+	// Height is the block the timestamp names; Block is that block as it
+	// was checked, when it was.
 	Height uint64
+	Block  anchor.Block
 	// Body is the OpenTimestamps proof, for its digest as a material.
 	Body []byte
 }
 
 // Anchor is the word a proof uses for the head's state.
 func (p Placed) Anchor() string {
-	if p.State == anchor.Anchored {
+	switch {
+	case p.State == anchor.Anchored:
 		return proof.AnchorBitcoin
+	case p.Unconfirmed:
+		return proof.AnchorUnconfirmed
 	}
 	return proof.AnchorPending
 }
@@ -426,7 +437,11 @@ func (p Placed) Anchor() string {
 //
 // What a proof attests is internal/anchor's to say, and it is asked again
 // here: a proof's state is derived from its operations walked from its
-// digest (anchor.Classify), never read from the state it was stored with.
+// digest (anchor.Classify), never read from the state it was stored with,
+// and a Bitcoin attestation counts only when the header kept with it holds
+// the value the walk reaches and shows a real block's work
+// (anchor.Confirm). An attestation is a height and nothing more; one
+// written into the file by hand reaches no block.
 // A digest is placed only through a head the log recorded at a size
 // (log-heads.json, written when the head was sent), and only when the log's
 // first entries of that size hash to it now. A digest no recorded head names
@@ -471,15 +486,22 @@ func Anchors(t *translog.Log, heads []audit.Head, proofs []anchor.Proof) ([]Plac
 				}
 				continue
 			}
-			placed = append(placed, Placed{Size: size, Root: p.Digest, State: state, Height: height,
-				Body: p.Body})
+			pl := Placed{Size: size, Root: p.Digest, State: state, Height: height, Body: p.Body}
+			if state == anchor.Anchored {
+				if blk, cerr := anchor.Confirm(p); cerr == nil {
+					pl.Block = blk
+				} else {
+					pl.State, pl.Unconfirmed = anchor.Pending, true
+				}
+			}
+			placed = append(placed, pl)
 		}
 	}
 	return placed, rewritten
 }
 
-// Cover is the earliest head that includes the entry at index: a confirmed
-// attestation before a pending one, the lowest block among confirmed ones,
+// Cover is the earliest head that includes the entry at index: one whose
+// block was checked before any that is not, the lowest block among those,
 // and the smallest head among equals — the tightest bound there is.
 func Cover(placed []Placed, index int) (Placed, bool) {
 	better := func(a, b Placed) bool {

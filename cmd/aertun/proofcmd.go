@@ -326,7 +326,8 @@ func describe(st *proof.Statement) string {
 	if v := p.Clock; v != nil {
 		anchored := "no anchor yet"
 		if v.Anchor != nil {
-			anchored = fmt.Sprintf("anchored in block %d", v.Anchor.Block)
+			anchored = fmt.Sprintf("anchored in block %d, %s, mined %s", v.Anchor.Block, v.Anchor.Hash,
+				v.Anchor.Mined)
 		}
 		fmt.Fprintf(&b, "  evidence: %s at audit entry %d (%s); %d obligation(s)", v.Trigger, v.Entry,
 			anchored, len(v.Duties))

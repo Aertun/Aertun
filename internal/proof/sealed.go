@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/aertun/aertun/internal/anchor"
 	"github.com/aertun/aertun/internal/translog"
 )
 
@@ -36,13 +37,14 @@ import (
 //     anchored that its first entries no longer hash to — or when the digest
 //     is in no batch the log records sealing, or its path to the batch's
 //     root, or the entry's path to the head, does not verify;
-//   - proven when it was sealed and a confirmed Bitcoin attestation
-//     commits to a head that includes the entry: the alert existed no later
-//     than the block that holds the commitment;
-//   - inconclusive when it was sealed and nothing confirmed covers the
-//     entry yet: the head that does was sent and is pending in the
-//     calendars, or no head sent since covers it. The entry's time is then
-//     the log's own word, and the proof says so.
+//   - proven when it was sealed and a Bitcoin attestation whose block was
+//     checked commits to a head that includes the entry: the alert existed
+//     no later than the block that holds the commitment;
+//   - inconclusive when it was sealed and nothing checked covers the entry
+//     yet: the head that does was sent and is pending in the calendars, its
+//     timestamp names a block whose header has not been checked, or no head
+//     sent since covers it. The entry's time is then the log's own word, and
+//     the proof says so.
 //
 // # What is attested, exactly
 //
@@ -50,12 +52,16 @@ import (
 // N entries, the head `aertun auditlog anchor` sends. Not the chain as a
 // whole and not an entry: a head, by its root and the size it covers. The
 // proof names that root and size, the entry's leaf and path into it, and
-// the block height the attestation names. internal/anchor walks the
-// attestation's operations from the root to the Bitcoin attestation, which
-// shows the attestation is about this root; whether that block holds the
-// commitment needs block headers, which Aertun does not have, and is
-// checked with `ots verify`. The block's time is the chain's: the proof
-// names the height, and the time is read from the chain.
+// the block the attestation names. internal/anchor walks the attestation's
+// operations from the root to the Bitcoin attestation, which shows the
+// attestation is about this root. That attestation is a height and nothing
+// more — anybody who can write the file it is kept in can append one — so
+// it counts only with the block's header: the one explorers that must agree
+// returned for that height, whose merkle root is the value the walk reaches
+// and whose work is that of a real block. The proof carries the header, so
+// the work is checked again whenever the proof is, and names the block's
+// hash, so a reader can look it up in any node. The block's time is the
+// header's, which Bitcoin lets run up to two hours off.
 //
 // # What it does not cover
 //
@@ -81,6 +87,10 @@ const (
 	// AnchorPending is a head a calendar holds and has not yet put in a
 	// block. It is not an anchor.
 	AnchorPending = "pending"
+	// AnchorUnconfirmed is a head whose timestamp names a Bitcoin block,
+	// with no header checked for that block that holds it. A timestamp's
+	// attestation is a height and nothing more, so it is not an anchor.
+	AnchorUnconfirmed = "unconfirmed"
 	// AnchorNone is no head sent to be anchored that covers the entry.
 	AnchorNone = "none"
 )
@@ -153,13 +163,27 @@ type SealedEvidence struct {
 	// HeadPath is the RFC 6962 audit path from the entry's leaf, at index
 	// Entry-1, to the head's root, nearest the leaf first.
 	HeadPath []string `json:"head_path,omitempty"`
-	// Anchor is what fixes that head in time: bitcoin for a confirmed
-	// attestation, pending for a head a calendar holds and has not yet put
-	// in a block, none when no head sent to be anchored covers the entry.
+	// Anchor is what fixes that head in time: bitcoin for an attestation
+	// whose block was checked, unconfirmed for one whose block was not,
+	// pending for a head a calendar holds and has not yet put in a block,
+	// none when no head sent to be anchored covers the entry.
 	Anchor string `json:"anchor,omitempty"`
 	// Height is the Bitcoin block the attestation names, when Anchor is
-	// bitcoin.
+	// bitcoin or unconfirmed.
 	Height int `json:"height,omitempty"`
+	// BlockHash is that block's hash, when Anchor is bitcoin: what a reader
+	// looks up at that height, in any node or explorer, to see the block is
+	// in the chain.
+	BlockHash string `json:"block_hash,omitempty"`
+	// Mined is the time the block's header carries, RFC 3339, when Anchor
+	// is bitcoin. Bitcoin lets a block's own time run up to two hours off.
+	Mined string `json:"mined,omitempty"`
+	// Header is the block's header, eighty bytes in hex, when Anchor is
+	// bitcoin. Its hash is BlockHash and its time is Mined; the work it
+	// shows is checked again whenever the proof is; and its merkle root is
+	// the value the OpenTimestamps proof reaches from HeadRoot, which the
+	// command checked before signing.
+	Header string `json:"header,omitempty"`
 }
 
 // SealedInput is what a sealed-alert proof is made from: the evidence as
@@ -255,7 +279,8 @@ func (ev *SealedEvidence) wellFormed() error {
 	}
 	unreached := ev.Entry == 0 && ev.Sealed == "" && ev.BatchRoot == "" && ev.BatchSize == 0 &&
 		ev.BatchIndex == 0 && len(ev.BatchPath) == 0 && ev.EntryLeaf == "" && ev.HeadSize == 0 &&
-		ev.HeadRoot == "" && len(ev.HeadPath) == 0 && ev.Anchor == "" && ev.Height == 0
+		ev.HeadRoot == "" && len(ev.HeadPath) == 0 && ev.Anchor == "" && ev.Height == 0 &&
+		ev.BlockHash == "" && ev.Mined == "" && ev.Header == ""
 	if !ev.logVerifies() {
 		if ev.Batches != 0 || ev.Unkept != 0 || !unreached {
 			return fmt.Errorf("nothing is taken from a log that does not verify, and this names " +
@@ -283,22 +308,35 @@ func (ev *SealedEvidence) wellFormed() error {
 		return fmt.Errorf("the entry is shown by its leaf and a path of hashes in a head of the " +
 			"log that includes it")
 	}
+	noBlock := ev.BlockHash == "" && ev.Mined == "" && ev.Header == ""
 	switch ev.Anchor {
 	case AnchorBitcoin:
 		if ev.Height < 1 || ev.Height > MaxBitcoinHeight {
 			return fmt.Errorf("a Bitcoin attestation names a block between 1 and %d", MaxBitcoinHeight)
 		}
+		hd, err := anchor.ParseHeader(ev.Header)
+		if err != nil || hd.Hash() != ev.BlockHash || hd.Time().Format(time.RFC3339) != ev.Mined {
+			return fmt.Errorf("an anchored head's block hash and time are its header's")
+		}
+		if err := hd.Worked(); err != nil {
+			return fmt.Errorf("an anchored head's block is not one to believe: %w", err)
+		}
+	case AnchorUnconfirmed:
+		if ev.Height < 1 || ev.Height > MaxBitcoinHeight || !noBlock {
+			return fmt.Errorf("an unconfirmed attestation names a block between 1 and %d, and "+
+				"nothing of the block itself", MaxBitcoinHeight)
+		}
 	case AnchorPending:
-		if ev.Height != 0 {
+		if ev.Height != 0 || !noBlock {
 			return fmt.Errorf("a pending head names no block")
 		}
 	case AnchorNone:
-		if ev.Height != 0 || ev.HeadSize != ev.LogEntries {
+		if ev.Height != 0 || !noBlock || ev.HeadSize != ev.LogEntries {
 			return fmt.Errorf("with nothing anchored, the entry is shown in the log as read, " +
 				"and no block is named")
 		}
 	default:
-		return fmt.Errorf("an anchor is bitcoin, pending or none")
+		return fmt.Errorf("an anchor is bitcoin, unconfirmed, pending or none")
 	}
 	return nil
 }
@@ -381,9 +419,14 @@ func (ev *SealedEvidence) checks() []Check {
 	switch ev.Anchor {
 	case AnchorBitcoin:
 		anchored.Detail = fmt.Sprintf("an OpenTimestamps proof walks from that root to a Bitcoin "+
-			"attestation at block %d, so the alert existed no later than block %d was mined; whether "+
-			"the block holds the commitment needs block headers Aertun does not have, and is "+
-			"checked with ots verify", ev.Height, ev.Height)
+			"attestation at block %d; that block's header (%s, mined %s) holds the value the walk "+
+			"reaches and shows the work of a real block, so the alert existed no later than that "+
+			"block was mined", ev.Height, ev.BlockHash, ev.Mined)
+	case AnchorUnconfirmed:
+		anchored.Detail = fmt.Sprintf("an OpenTimestamps proof walks from that root to an "+
+			"attestation naming Bitcoin block %d, and no header checked for that block holds it, so "+
+			"the time %s rests on the audit log alone; aertun auditlog anchor upgrade fetches the "+
+			"block's header from explorers that must agree, and checks it", ev.Height, ev.Sealed)
 	case AnchorPending:
 		anchored.Detail = fmt.Sprintf("that head was sent to OpenTimestamps calendars and no Bitcoin "+
 			"attestation covers entry %d yet, so the time %s rests on the audit log alone; "+

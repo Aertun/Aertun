@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/aertun/aertun/internal/anchor"
 )
 
 var ck0 = time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
@@ -19,12 +21,18 @@ func ckAt(d time.Duration) string { return instant(ck0.Add(d)) }
 func clockInput() ClockInput {
 	return ClockInput{Evidence: ClockEvidence{Incident: "inc-20261110-abc123", Trigger: "aware",
 		Entry: 41, Decided: ckAt(0), Recorded: ckAt(-20 * time.Millisecond), Verified: true,
-		Anchor: &ClockHead{Size: 60, Root: strings.Repeat("ab", 32), Block: 921004,
-			Calendar: "alice.btc.calendar.opentimestamps.org"},
+		Anchor: clockHead(60, "ab", 921004, ck0.Add(40*time.Minute), "alice.btc.calendar.opentimestamps.org"),
 		Linked: 2, Lead: 5400,
 		Duties: []ClockDuty{{Regime: "GDPR Article 33", Due: ckAt(72 * time.Hour),
 			Done: ckAt(30 * time.Hour), Outcome: DutyMet}}},
 		Lines: []byte("{}\n"), Program: "test", Now: ck0.Add(96 * time.Hour)}
+}
+
+// clockHead is a head anchored in a block mined in the test at a time.
+func clockHead(size int, root string, block uint64, mined time.Time, calendar string) *ClockHead {
+	h := &ClockHead{Size: size, Root: strings.Repeat(root, 32), Block: block, Calendar: calendar}
+	h.Hash, h.Mined, h.Header = testBlock(mined)
+	return h
 }
 
 func TestAClocksVerdict(t *testing.T) {
@@ -60,9 +68,20 @@ func TestAClocksVerdict(t *testing.T) {
 			ev.Duties[0].Moved, ev.Duties[0].Recorded = true, ckAt(30*time.Hour)
 		}, Refuted},
 		"an anchored head the log no longer matches": {func(ev *ClockEvidence) {
-			ev.Broken = []ClockHead{{Size: 30, Root: strings.Repeat("cd", 32), Block: 920000,
-				Calendar: "bob.btc.calendar.opentimestamps.org"}}
+			ev.Broken = []ClockHead{*clockHead(30, "cd", 920000, ck0.Add(-48*time.Hour),
+				"bob.btc.calendar.opentimestamps.org")}
 		}, Refuted},
+		// An entry cannot be written after the block that anchors it: the
+		// time in it is then not when it was written. Bitcoin lets a
+		// block's own time run two hours off, and no further.
+		"written after the block that anchors it": {func(ev *ClockEvidence) {
+			ev.Anchor = clockHead(60, "ab", 921004, ck0.Add(-2*time.Hour-time.Second),
+				"alice.btc.calendar.opentimestamps.org")
+		}, Refuted},
+		"within the two hours a block's time may run off": {func(ev *ClockEvidence) {
+			ev.Anchor = clockHead(60, "ab", 921004, ck0.Add(-2*time.Hour),
+				"alice.btc.calendar.opentimestamps.org")
+		}, Proven},
 	}
 	for name, c := range cases {
 		in := clockInput()
@@ -117,7 +136,26 @@ func TestAClockThatDoesNotHoldTogetherIsRefused(t *testing.T) {
 		"a calendar as a URL": func(ev *ClockEvidence) {
 			ev.Anchor.Calendar = "https://alice.btc.calendar.opentimestamps.org/"
 		},
-		"a root that is not hex":     func(ev *ClockEvidence) { ev.Anchor.Root = "root" },
+		"a root that is not hex": func(ev *ClockEvidence) { ev.Anchor.Root = "root" },
+		"a block with no header": func(ev *ClockEvidence) { ev.Anchor.Header = "" },
+		"a hash that is not its header's": func(ev *ClockEvidence) {
+			ev.Anchor.Hash = strings.Repeat("0", 64)
+		},
+		"a time that is not its header's": func(ev *ClockEvidence) {
+			ev.Anchor.Mined = "2026-11-10T08:00:00Z"
+		},
+		"a header with its nonce changed": func(ev *ClockEvidence) {
+			// Half of all nonces meet the easy target, so one that does not
+			// is looked for; the hash is the changed header's own.
+			for n := 0; n < 64; n++ {
+				hd, _ := anchor.ParseHeader(ev.Anchor.Header)
+				hd[76] ^= byte(n + 1)
+				if hd.Worked() != nil {
+					ev.Anchor.Header, ev.Anchor.Hash = hd.Hex(), hd.Hash()
+					return
+				}
+			}
+		},
 		"a time not exact":           func(ev *ClockEvidence) { ev.Decided = "2026-11-10T09:00:00.000Z" },
 		"a lead with nothing linked": func(ev *ClockEvidence) { ev.Linked = 0 },
 		"a move that agrees": func(ev *ClockEvidence) {
@@ -157,8 +195,18 @@ func TestAClockCarriesOnlyWhatItsEvidenceSays(t *testing.T) {
 			s.Predicate.Clock.Duties[0].Done = ckAt(30 * time.Hour)
 		},
 		"the decision made later": func(s *Statement) { s.Predicate.Clock.Decided = ckAt(time.Hour) },
-		"a second kind":           func(s *Statement) { s.Predicate.Revocation = &RevocationEvidence{} },
-		"the subject":             func(s *Statement) { s.Subject[0].Name = "incident/inc-20261110-abc123/material" },
+		"the block made earlier": func(s *Statement) {
+			s.Predicate.Clock.Anchor.Mined = "2026-11-09T09:40:00Z"
+		},
+		"another block's hash": func(s *Statement) {
+			s.Predicate.Clock.Anchor.Hash = strings.Repeat("0", 64)
+		},
+		"another block's header": func(s *Statement) {
+			_, _, s.Predicate.Clock.Anchor.Header = testBlock(ck0.Add(-30 * 24 * time.Hour))
+		},
+		"the block's number": func(s *Statement) { s.Predicate.Clock.Anchor.Block = 800000 },
+		"a second kind":      func(s *Statement) { s.Predicate.Revocation = &RevocationEvidence{} },
+		"the subject":        func(s *Statement) { s.Subject[0].Name = "incident/inc-20261110-abc123/material" },
 	}
 	for name, change := range tamper {
 		var copied Statement

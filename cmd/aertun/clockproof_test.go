@@ -56,9 +56,17 @@ func clockProof(t *testing.T, root, id string) (*proof.Statement, error) {
 }
 
 // anchorHead commits the log as it stands and files a Bitcoin attestation
-// for its root, as `auditlog anchor` and `anchor upgrade` would once a
-// calendar answered: the attestation sits directly on the root.
+// for its root with the header of the block that holds it, as `auditlog
+// anchor` and `anchor upgrade` would once a calendar answered and explorers
+// returned the block: the attestation sits directly on the root, and the
+// block is mined now.
 func anchorHead(t *testing.T, root string, block uint64) audit.Head {
+	t.Helper()
+	return anchorHeadMined(t, root, block, time.Now())
+}
+
+// anchorHeadMined is anchorHead with the time the block's header carries.
+func anchorHeadMined(t *testing.T, root string, block uint64, mined time.Time) audit.Head {
 	t.Helper()
 	events, err := audit.Read(auditPath(root))
 	if err != nil {
@@ -95,9 +103,9 @@ func anchorHead(t *testing.T, root string, block uint64) audit.Head {
 	}
 	af := &anchorFile{}
 	_ = loadJSON(anchorPath(root), af)
-	af.Proofs = append(af.Proofs, anchor.Proof{Digest: head.Root,
+	af.Proofs = append(af.Proofs, inCheckedBlock(t, anchor.Proof{Digest: head.Root,
 		Calendar: "https://alice.btc.calendar.opentimestamps.org", Body: body,
-		State: anchor.Anchored, Height: block})
+		State: anchor.Anchored, Height: block}, mined))
 	if err := saveJSON(anchorPath(root), af); err != nil {
 		t.Fatal(err)
 	}
@@ -160,14 +168,12 @@ func TestAMovedClockAndARewrittenLogAreRefuted(t *testing.T) {
 	// is not the anchor the decision rests on.
 	root, id = clockSite(t)
 	anchorHead(t, root, 921004)
+	// The head really was anchored at this root; the log's first entries no
+	// longer hash to it at the size it was sent at.
 	f := &headFile{}
 	_ = loadJSON(headsPath(root), f)
-	af := &anchorFile{}
-	_ = loadJSON(anchorPath(root), af)
-	forged := strings.Repeat("0", 64)
-	f.Heads[0].Root, af.Proofs[0].Digest = forged, forged
+	f.Heads[0].Size--
 	_ = saveJSON(headsPath(root), f)
-	_ = saveJSON(anchorPath(root), af)
 	st, err = clockProof(t, root, id)
 	if err == nil || st.Predicate.Verdict != proof.Refuted || len(st.Predicate.Clock.Broken) != 1 ||
 		st.Predicate.Clock.Anchor != nil ||

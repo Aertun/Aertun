@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
+	"github.com/aertun/aertun/internal/anchor"
 	"github.com/aertun/aertun/internal/incident"
 )
 
@@ -36,14 +38,21 @@ import (
 //
 //   - refuted when the log has no entry for the decision, the incident's
 //     record of it or of a discharge disagrees with the log — a clock moved
-//     afterwards — an anchored head no longer matches the log, or an
+//     afterwards — an anchored head no longer matches the log, the entry
+//     says it was written after the block that anchors it was mined, or an
 //     obligation was discharged late or is past due;
 //   - proven when none of that, the decision was made by a verified
-//     person, a confirmed Bitcoin anchor covers its entry, and every
-//     obligation it started is discharged or ruled out;
+//     person, a Bitcoin anchor whose block was checked covers its entry,
+//     and every obligation it started is discharged or ruled out;
 //   - inconclusive otherwise: nothing anchors the entry yet, so its time
 //     rests on this program's own log; the person was not verified; or an
 //     obligation's clock is still running.
+//
+// An anchor counts only with its block: the header two explorers returned
+// for the height the timestamp names, whose merkle root is the value the
+// timestamp reaches and whose work is that of a real block (internal/anchor).
+// The proof carries the header, so the work is checked again whenever the
+// proof is, and names the block's hash, so a reader can look it up.
 //
 // The deadlines are the published headline ones the incident package
 // carries, and it says that is not legal advice; the proof is arithmetic on
@@ -104,8 +113,36 @@ type ClockHead struct {
 	Root string `json:"root"`
 	// Block is the Bitcoin block the attestation is in.
 	Block uint64 `json:"block"`
+	// Hash is that block's hash: what a reader looks up at that height, in
+	// any node or explorer, to see the block is in the chain.
+	Hash string `json:"block_hash"`
+	// Mined is the time the block's header carries, RFC 3339. Bitcoin lets a
+	// block's own time run up to two hours off.
+	Mined string `json:"mined"`
+	// Header is the block's header, eighty bytes in hex. Its hash is Hash
+	// and its time is Mined; the work it shows is checked again whenever
+	// the proof is; and its merkle root is the value the OpenTimestamps
+	// proof reaches from Root, which the command checked before signing.
+	Header string `json:"header"`
 	// Calendar is the host of the OpenTimestamps calendar that made it.
 	Calendar string `json:"calendar"`
+}
+
+// BlockTimeSlack is how far a block's own time may run from the time it was
+// mined: Bitcoin accepts one up to two hours ahead.
+const BlockTimeSlack = 2 * time.Hour
+
+// checkBlock holds a head's block to its header: the hash and the time are
+// the header's, and work was done for it that a block is believed at.
+func (h ClockHead) checkBlock() error {
+	hd, err := anchor.ParseHeader(h.Header)
+	if err != nil || hd.Hash() != h.Hash || hd.Time().Format(time.RFC3339) != h.Mined {
+		return fmt.Errorf("an anchored head's block hash and time are its header's")
+	}
+	if err := hd.Worked(); err != nil {
+		return fmt.Errorf("an anchored head's block is not one to believe: %w", err)
+	}
+	return nil
 }
 
 // ClockEvidence is what a clock proof rests on.
@@ -244,6 +281,9 @@ func (ev *ClockEvidence) wellFormed(now time.Time) error {
 		if h.Size <= 0 || !hex64.MatchString(h.Root) || h.Block == 0 || !calendarShape.MatchString(h.Calendar) {
 			return fmt.Errorf("an anchored head is a size, a root, a block and a calendar's host")
 		}
+		if err := h.checkBlock(); err != nil {
+			return err
+		}
 	}
 	regimes := map[string]incident.Obligation{}
 	for _, o := range incident.Obligations {
@@ -266,8 +306,20 @@ func (ev *ClockEvidence) wellFormed(now time.Time) error {
 	return nil
 }
 
+// postdated reports whether the decision's entry says it was written after
+// the block that anchors it was mined, which cannot be: the time in the
+// entry is then not when it was written.
+func (ev *ClockEvidence) postdated() bool {
+	if ev.Anchor == nil || ev.Entry == 0 {
+		return false
+	}
+	decided, ok1 := parseInstant(ev.Decided)
+	mined, ok2 := parseInstant(ev.Anchor.Mined)
+	return ok1 && ok2 && decided.After(mined.Add(BlockTimeSlack))
+}
+
 func (ev *ClockEvidence) verdict() Verdict {
-	if ev.Entry == 0 || ev.moved() || len(ev.Broken) > 0 {
+	if ev.Entry == 0 || ev.moved() || len(ev.Broken) > 0 || ev.postdated() {
 		return Refuted
 	}
 	open := false
@@ -310,15 +362,24 @@ func (ev *ClockEvidence) checks() []Check {
 		}
 	}
 
-	anchored := Check{Name: "anchored", Passed: len(ev.Broken) == 0}
+	anchored := Check{Name: "anchored", Passed: len(ev.Broken) == 0 && !ev.postdated()}
 	switch {
+	case ev.postdated():
+		anchored.Detail = fmt.Sprintf("entry %d says it was written at %s, and the log head of %d "+
+			"entries that holds it is in Bitcoin block %d (%s), mined at %s: an entry cannot be "+
+			"written after the block that anchors it, so the time in it is not when it was written",
+			ev.Entry, ev.Decided, ev.Anchor.Size, ev.Anchor.Block, ev.Anchor.Hash, ev.Anchor.Mined)
+		anchored.Failures = []string{"written after its block: " + ev.Decided + " in the log, and block " +
+			strconv.FormatUint(ev.Anchor.Block, 10) + " mined at " + ev.Anchor.Mined}
 	case ev.Anchor != nil:
 		anchored.Detail = fmt.Sprintf("entry %d is under the log head of %d entries anchored in "+
-			"Bitcoin block %d by %s, so it existed no later than that block", ev.Entry,
-			ev.Anchor.Size, ev.Anchor.Block, ev.Anchor.Calendar)
+			"Bitcoin block %d (%s, mined %s) by %s; the block's header holds the commitment and "+
+			"shows the work of a real block, so the entry existed no later than that block",
+			ev.Entry, ev.Anchor.Size, ev.Anchor.Block, ev.Anchor.Hash, ev.Anchor.Mined, ev.Anchor.Calendar)
 	case ev.Entry > 0:
-		anchored.Detail = fmt.Sprintf("no confirmed anchor covers entry %d yet, so its time rests "+
-			"on this program's own log (aertun auditlog anchor, then anchor upgrade)", ev.Entry)
+		anchored.Detail = fmt.Sprintf("no anchor whose block was checked covers entry %d yet, so "+
+			"its time rests on this program's own log (aertun auditlog anchor, then anchor upgrade)",
+			ev.Entry)
 	default:
 		anchored.Detail = "there is no entry to anchor"
 	}

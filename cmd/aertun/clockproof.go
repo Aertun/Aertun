@@ -5,8 +5,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -205,12 +205,17 @@ func incidentProve(root string, args []string) error {
 	// The anchors: every head with a confirmed Bitcoin attestation, held to
 	// the log as it is now.
 	if ev.Entry > 0 {
-		ev.Anchor, ev.Broken, err = clockAnchors(root, events, ev.Entry)
+		var unchecked int
+		ev.Anchor, ev.Broken, unchecked, err = clockAnchors(root, events, ev.Entry)
 		if err != nil {
 			return err
 		}
 		if ev.Anchor != nil {
 			line(map[string]any{"anchor": ev.Anchor})
+		} else if unchecked > 0 {
+			w.Human("  %s%d timestamp(s) name a Bitcoin block whose header has not been checked, "+
+				"so none counts yet: aertun auditlog anchor upgrade fetches and checks it%s\n",
+				dim, unchecked, reset)
 		}
 	}
 
@@ -277,22 +282,25 @@ func triggerList() string {
 	return strings.Join(out, ", ")
 }
 
-// clockAnchors is the earliest confirmed anchor covering an entry, and every
-// confirmed anchor whose head no longer matches the log.
+// clockAnchors is the earliest anchor covering an entry whose block was
+// checked, every such anchor whose head no longer matches the log, and how
+// many timestamps name a block nobody has checked yet.
 //
-// Each attestation is classified again from its own bytes rather than from
-// the state stored beside it, and each head is recomputed from the log: a
+// Each timestamp is confirmed again from its own bytes and the header kept
+// with it (anchor.Confirm) rather than from the state stored beside it: a
+// Bitcoin attestation is a height and nothing more, and one written into the
+// file by hand reaches no block. Each head is recomputed from the log: a
 // head that matches is one the log still commits to; one that does not —
 // or is longer than the log now is — was anchored before the log was
 // rewritten, which is the thing an anchor exists to show.
-func clockAnchors(root string, events []audit.Event, entry int) (*proof.ClockHead, []proof.ClockHead, error) {
+func clockAnchors(root string, events []audit.Event, entry int) (*proof.ClockHead, []proof.ClockHead, int, error) {
 	heads := &headFile{}
 	if err := loadJSON(headsPath(root), heads); err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	anchors := &anchorFile{}
 	if err := loadJSON(anchorPath(root), anchors); err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	roots := map[string]audit.Head{}
 	for _, h := range heads.Heads {
@@ -300,22 +308,27 @@ func clockAnchors(root string, events []audit.Event, entry int) (*proof.ClockHea
 	}
 	var best *proof.ClockHead
 	var broken []proof.ClockHead
+	unchecked := 0
 	seen := map[string]bool{}
 	for _, p := range anchors.Proofs {
 		head, ok := roots[p.Digest]
-		digest, derr := hex.DecodeString(p.Digest)
-		if !ok || derr != nil || len(p.Body) == 0 {
+		if !ok || len(p.Body) == 0 {
 			continue
 		}
-		state, height, _, cerr := anchor.Classify(digest, p.Body)
-		if cerr != nil || state != anchor.Anchored || height == 0 {
+		blk, cerr := anchor.Confirm(p)
+		if errors.Is(cerr, anchor.ErrUnchecked) {
+			unchecked++
+		}
+		if cerr != nil || blk.Height == 0 {
 			continue
 		}
+		height := blk.Height
 		u, uerr := url.Parse(p.Calendar)
 		if uerr != nil || u.Hostname() == "" {
 			continue
 		}
-		ch := proof.ClockHead{Size: head.Size, Root: head.Root, Block: height,
+		ch := proof.ClockHead{Size: head.Size, Root: head.Root, Block: height, Hash: blk.Hash,
+			Mined: blk.Mined.Format(time.RFC3339), Header: blk.Header,
 			Calendar: strings.ToLower(u.Hostname())}
 		key := fmt.Sprintf("%d/%s/%d", ch.Size, ch.Root, ch.Block)
 		if seen[key] {
@@ -326,7 +339,7 @@ func clockAnchors(root string, events []audit.Event, entry int) (*proof.ClockHea
 		if head.Size > 0 && head.Size <= len(events) {
 			now, err := audit.TreeHead(events[:head.Size], time.Now())
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, 0, err
 			}
 			matches = now.Root == head.Root
 		}
@@ -341,5 +354,5 @@ func clockAnchors(root string, events []audit.Event, entry int) (*proof.ClockHea
 			best = &c
 		}
 	}
-	return best, broken, nil
+	return best, broken, unchecked, nil
 }

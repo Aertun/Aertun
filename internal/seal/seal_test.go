@@ -263,6 +263,24 @@ func attested(magic, payload []byte) []byte {
 
 func inBlock(height uint64) []byte { return attested(bitcoinMagic, varint(height)) }
 
+// checkedInBlock is a head's proof with the header of the block that holds
+// it, mined in the test: what `auditlog anchor upgrade` keeps once explorers
+// have returned the block's header.
+func checkedInBlock(t *testing.T, root string, height uint64, mined time.Time) anchor.Proof {
+	t.Helper()
+	digest, err := hex.DecodeString(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reached := sha256.Sum256(digest)
+	p := anchor.Proof{Digest: root, Body: inBlock(height), State: anchor.Anchored, Height: height,
+		Header: anchor.MineForTesting(reached[:], mined).Hex(), HeaderHeight: height}
+	if _, err := anchor.Confirm(p); err != nil {
+		t.Fatalf("the test's own anchor is not confirmed: %v", err)
+	}
+	return p
+}
+
 func pendingAt(uri string) []byte {
 	return attested(pendingMagic, append(varint(uint64(len(uri))), uri...))
 }
@@ -282,25 +300,51 @@ func TestHeadsArePlacedAndTheirStateIsReadFromTheirProofs(t *testing.T) {
 		t.Fatalf("the tree here and the log's own disagree: %s %s", again.Root, h4.Root)
 	}
 	heads := []audit.Head{{Size: 4, Root: h4.Root}, {Size: 6, Root: h6.Root}}
+	mined := time.Date(2026, 11, 10, 12, 30, 0, 0, time.UTC)
+	other := checkedInBlock(t, digestOf("another log"), 870030, mined)
 	proofs := []anchor.Proof{
-		{Digest: h4.Root, Body: inBlock(870010), State: anchor.Anchored},
+		checkedInBlock(t, h4.Root, 870010, mined),
 		// Stored as anchored, and its proof is only a calendar's promise.
 		{Digest: h6.Root, Body: pendingAt("https://alice.btc.calendar.opentimestamps.org"), State: anchor.Anchored, Height: 1},
 		// A root no recorded head names cannot be placed.
 		{Digest: digestOf("unrecorded"), Body: inBlock(870000)},
 		// Not a block anybody mined.
 		{Digest: h6.Root, Body: inBlock(0)},
+		// "In block 870020", written into the file by hand: a height and
+		// nothing more, with no header that holds it.
+		{Digest: h6.Root, Body: inBlock(870020), State: anchor.Anchored, Height: 870020},
+		// And the same beside a header that is another commitment's.
+		{Digest: h6.Root, Body: inBlock(870030), State: anchor.Anchored, Height: 870030,
+			Header: other.Header, HeaderHeight: 870030},
 	}
 	placed, rewritten := Anchors(tree, heads, proofs)
-	if rewritten != 0 || len(placed) != 2 || placed[0].State != anchor.Anchored || placed[0].Height != 870010 ||
+	if rewritten != 0 || len(placed) != 4 || placed[0].State != anchor.Anchored || placed[0].Height != 870010 ||
+		placed[0].Block.Hash == "" || !placed[0].Block.Mined.Equal(mined) || placed[0].Anchor() != "bitcoin" ||
 		placed[1].State != anchor.Pending || placed[1].Anchor() != "pending" {
 		t.Fatalf("%d rewritten, placed %+v", rewritten, placed)
+	}
+	for _, p := range placed[2:] {
+		if p.State == anchor.Anchored || !p.Unconfirmed || p.Anchor() != "unconfirmed" || p.Block.Hash != "" {
+			t.Errorf("an attestation no checked header holds was placed as %+v", p)
+		}
+	}
+	if placed[2].Height != 870020 || placed[3].Height != 870030 {
+		t.Errorf("the blocks the unconfirmed attestations name: %d %d", placed[2].Height, placed[3].Height)
 	}
 	if c, ok := Cover(placed, 3); !ok || c.Size != 4 || c.Anchor() != "bitcoin" {
 		t.Errorf("entry 4 is covered by the head of 4 in a block: %+v", c)
 	}
-	if c, ok := Cover(placed, 4); !ok || c.Size != 6 || c.State != anchor.Pending {
-		t.Errorf("entry 5 is covered by the pending head of 6 alone: %+v", c)
+	if c, ok := Cover(placed, 4); !ok || c.Size != 6 || c.State == anchor.Anchored {
+		t.Errorf("entry 5 is covered by a head of 6 no block holds: %+v", c)
+	}
+	// A header mined in a test is a block only in a test: with the work a
+	// block is believed at as a deployment has it, the same proof is no
+	// anchor.
+	restoreWork()
+	real, _ := Anchors(tree, heads, proofs[:1])
+	restoreWork = anchor.EasyWorkForTesting()
+	if len(real) != 1 || real[0].State == anchor.Anchored || !real[0].Unconfirmed {
+		t.Errorf("a header nobody worked for was believed: %+v", real)
 	}
 	if _, ok := Cover(placed[:1], 4); ok {
 		t.Error("a head of 4 covered entry 5")
@@ -337,4 +381,16 @@ func TestTheEarliestAnchoredHeadCovers(t *testing.T) {
 	if _, ok := Cover(placed, 9); ok {
 		t.Error("an entry past every head was covered")
 	}
+}
+
+// A head placed in a test is anchored in a block mined in the test, which
+// internal/anchor believes only while a test has lowered the work a block
+// is believed at.
+var restoreWork func()
+
+func TestMain(m *testing.M) {
+	restoreWork = anchor.EasyWorkForTesting()
+	code := m.Run()
+	restoreWork()
+	os.Exit(code)
 }

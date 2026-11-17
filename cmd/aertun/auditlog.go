@@ -380,11 +380,11 @@ func cmdAuditLog(root string, args []string) error {
 		case len(args) == 1 || args[1] == "submit":
 			return auditAnchor(root)
 		case args[1] == "upgrade":
-			return anchorUpgrade(root)
+			return anchorUpgrade(root, args[2:])
 		case args[1] == "status":
 			return anchorStatus(root)
 		}
-		return fmt.Errorf("usage: aertun auditlog anchor [submit] | upgrade | status")
+		return fmt.Errorf("usage: aertun auditlog anchor [submit] | upgrade [--explorer URL ...] | status")
 	default:
 		return fmt.Errorf("unknown auditlog command %q; try show, verify, "+
 			"export, head, verify-head, prove, consistency or anchor", args[0])

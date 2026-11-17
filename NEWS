@@ -19,10 +19,12 @@ Unreleased
   time and every discharge's are taken from the verified audit log, and
   the incident's own record is held against them: a clock moved in it
   afterwards refutes, and so does an anchored log head the log no longer
-  matches, an obligation discharged late or one past due.  Proven needs a
-  verified person's decision under a log head anchored in Bitcoin and every
-  obligation discharged or ruled out; until then it is inconclusive and says
-  why.  The predicate is https://aertun.github.io/proof/clock/v1.
+  matches, an entry dated more than two hours after the block that anchors
+  it, an obligation discharged late or one past due.  Proven needs a
+  verified person's decision under a log head anchored in a Bitcoin block
+  whose header was checked, and every obligation discharged or ruled out;
+  until then it is inconclusive and says why.  The predicate is
+  https://aertun.github.io/proof/clock/v1.
 
 * `aertun vuln vex-record --source NAME --since DATE --tolerance R` signs a
   VEX issuer's track record from the not-affected proofs kept here about
@@ -65,11 +67,12 @@ Unreleased
   each alert's RFC 8785 canonical JSON, the digests are kept beside the
   store, and the alerts themselves are not kept.  A detection run seals
   the findings it raises in its own entry.  `aertun proof sealed --alert
-  FILE` (or `--finding ID`) signs when one existed: proven when a
-  confirmed Bitcoin attestation covers a head of the verified log that
-  includes the entry that sealed it, so it existed no later than that
-  block; inconclusive while the head is pending or nothing anchored covers
-  it, saying the time rests on the log alone; refuted when the digest is
+  FILE` (or `--finding ID`) signs when one existed: proven when a Bitcoin
+  attestation whose block was checked covers a head of the verified log
+  that includes the entry that sealed it, so it existed no later than that
+  block; inconclusive while the head is pending, its timestamp names a
+  block nobody has checked, or nothing anchored covers it, saying the time
+  rests on the log alone; refuted when the digest is
   in no sealed batch, its path to the batch's root or the entry's to the
   head does not verify, or the log does not — including a head sent to be
   anchored that the log no longer matches.  `aertun alert seal --list`
@@ -93,6 +96,22 @@ Unreleased
   so it cannot be stopped on a good day.  The emulations are named only
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
+
+* A Bitcoin timestamp counts only with its block.  An OpenTimestamps
+  attestation is a block height and nothing more, and anybody who can
+  write the store could append one to back-date a head; so `aertun
+  auditlog anchor upgrade` now fetches the header of the block each
+  attestation names from public explorers (three by default, or the ones
+  `--explorer URL` names, such as a node of your own), takes it only when
+  two return the same header and none returns another, and keeps it only
+  when its merkle root is the value the timestamp reaches.  The clock and
+  sealed-alert proofs check that again offline, with the header's work —
+  it must meet its own target at a difficulty of at least 50 trillion —
+  and carry the header, the block's hash and the time it was mined, so
+  whoever reads one can look the block up in any node.  A timestamp with
+  no checked header is no anchor: `anchor status` shows it as unchecked,
+  and a proof resting on it is inconclusive.  Stores anchored before this
+  need `aertun auditlog anchor upgrade` run once.
 
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's

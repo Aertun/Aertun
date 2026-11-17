@@ -370,7 +370,8 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("duties", duties)
 			if a := v.Anchor; a != nil {
 				evidence.With("anchor", ops.Object().With("size", ops.Ours(a.Size)).
-					With("block", ops.Ours(int(a.Block))).With("calendar", ops.Ours(a.Calendar)))
+					With("block", ops.Ours(int(a.Block))).With("block_hash", ops.Ours(a.Hash)).
+					With("mined", ops.Ours(a.Mined)).With("calendar", ops.Ours(a.Calendar)))
 			}
 			row.With("evidence", evidence)
 		case p.VEXRecord != nil:
@@ -411,7 +412,8 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("batch_path", ops.ListOf(v.BatchPath, hashes)).
 				With("entry_leaf", ops.Ours(v.EntryLeaf)).With("head_size", ops.Ours(v.HeadSize)).
 				With("head_root", ops.Ours(v.HeadRoot)).With("head_path", ops.ListOf(v.HeadPath, hashes)).
-				With("anchor", ops.Ours(v.Anchor)).With("height", ops.Ours(v.Height)))
+				With("anchor", ops.Ours(v.Anchor)).With("height", ops.Ours(v.Height)).
+				With("block_hash", ops.Ours(v.BlockHash)).With("mined", ops.Ours(v.Mined)))
 		case p.MDR != nil:
 			v := p.MDR
 			row.With("evidence", ops.Object().With("plan", ops.Ours(v.Plan)).
