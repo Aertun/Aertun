@@ -47,7 +47,7 @@ const AgentSource = "aertun/agent"
 // selfDetail are the audit details a rule about aertun may read. Others are
 // left out: they are either free text somebody typed, or not needed.
 var selfDetail = []string{"role", "surface", "failures", "setting", "to",
-	"autonomy", "agent", "reason", "conversation"}
+	"autonomy", "agent", "reason", "conversation", "alone"}
 
 // agentDetail are the audit details a rule about a model may read: what it
 // proposed and where, which tool it called, and the closed words. The
@@ -117,6 +117,13 @@ func storeSelfEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.E
 			if v, ok := e.Detail[k]; ok {
 				raw[k] = v
 			}
+		}
+		// The kind of a request for a second administrator, under its own
+		// name: "kind" is already the kind of actor, and a rule reading the
+		// one must never be handed the other. The same name a peer's
+		// stream gives it (internal/inbound), so one rule reads both.
+		if v, ok := e.Detail["kind"]; ok {
+			raw["request_kind"] = v
 		}
 		if _, ok := e.Detail["accepted_risk"]; ok {
 			// Whether a risk was accepted, not the reason somebody typed.

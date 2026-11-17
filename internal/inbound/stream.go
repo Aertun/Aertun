@@ -191,6 +191,12 @@ func streamEvent(line []byte, issuer string, received time.Time) (telemetry.Even
 		if !ok {
 			continue
 		}
+		if name == "accepted_risk" {
+			// Whether a risk was accepted, never the reason somebody typed,
+			// exactly as this deployment's own log is read.
+			raw["accepted_risk"] = "yes"
+			continue
+		}
 		if as, keep := streamDetail[name]; keep {
 			raw[as] = scalar(v)
 		}

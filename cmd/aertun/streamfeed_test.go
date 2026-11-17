@@ -61,10 +61,20 @@ func newSendingSite(t *testing.T, n int, headContext string) *sendingSite {
 	for i := 1; i <= n; i++ {
 		rec := audit.Record{Action: "finding.triaged", Resource: fmt.Sprintf("/findings/f%d", i),
 			Outcome: audit.Success, Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true}
-		if i == n-1 {
+		switch {
+		case i == n-1:
 			rec = audit.Record{Action: "dual.proposed", Resource: "/", Outcome: audit.Success,
 				Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true,
 				Detail: map[string]string{"alone": "true", "kind": "grant", "role": "admin"}}
+		case i == n-2 && n > 3:
+			rec = audit.Record{Action: "dual.proposed", Resource: "/", Outcome: audit.Success,
+				Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true,
+				Detail: map[string]string{"kind": "owner", "to": "lee@b.example"}}
+		case i == n-3 && n > 3:
+			rec = audit.Record{Action: "config.set", Resource: "/", Outcome: audit.Success,
+				Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true,
+				Detail: map[string]string{"setting": "admin.behind_tls_proxy", "to": "false",
+					"accepted_risk": "the proxy terminates TLS on the same host"}}
 		}
 		if _, err := l.Append(rec); err != nil {
 			t.Fatal(err)
@@ -237,8 +247,11 @@ func TestAnotherDeploymentsAuditStreamIsTakenInOrder(t *testing.T) {
 		if e.Actor.Issuer != "site-b" {
 			t.Fatalf("an actor is named under %q, not the feed", e.Actor.Issuer)
 		}
-		if e.Raw["action"] == "dual.proposed" {
+		if e.Raw["action"] == "dual.proposed" && e.Raw["alone"] == "true" {
 			alone = &stored[i]
+		}
+		if strings.Contains(e.Raw["accepted_risk"], "proxy") {
+			t.Fatalf("the reason somebody typed arrived in the event store: %+v", e.Raw)
 		}
 	}
 	if alone == nil || alone.Raw["alone"] != "true" || alone.Raw["request_kind"] != "grant" || alone.Raw["role"] != "admin" {
@@ -266,8 +279,19 @@ func TestAnotherDeploymentsAuditStreamIsTakenInOrder(t *testing.T) {
 			}
 		}
 	}
-	if reads == 0 || !fired["aertun.privileged-change-alone"] {
-		t.Fatalf("%d shipped rules read a stream, and the change made alone fired %v", reads, fired)
+	for _, want := range []string{"aertun.privileged-change-alone",
+		"aertun.ownership-transfer-requested", "aertun.setting-weakened"} {
+		if !fired[want] {
+			t.Errorf("%s did not fire on the peer's record of it (fired: %v)", want, fired)
+		}
+	}
+	// Every rule over this program's own log reads a peer's log too.
+	for _, pf := range files {
+		var r detect.Rule
+		if json.Unmarshal(pf.Body, &r) == nil && slices.Contains(r.Sources, "aertun/audit") &&
+			!slices.Contains(r.Sources, inbound.StreamSource) {
+			t.Errorf("%s reads this deployment's log and not a peer's", r.ID)
+		}
 	}
 	for _, quiet := range []string{"aertun.break-glass", "aertun.audit-log-moved", "aertun.admin-token-issued"} {
 		if fired[quiet] {

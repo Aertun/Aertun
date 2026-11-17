@@ -52,9 +52,10 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant",
           "alone": "true",
-          "not_before": "2026-11-06T10:00:00Z"
+          "not_before": "2026-11-06T10:00:00Z",
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     },
@@ -76,7 +77,8 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant"
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     },
@@ -98,8 +100,9 @@
           "action": "dual.approved",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant",
-          "alone": "true"
+          "alone": "true",
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     }
