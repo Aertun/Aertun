@@ -50,9 +50,16 @@ import (
 // own verifier says it ran, is used. One that no longer verifies is counted
 // and left out, never used; and since what a proof that does not verify says
 // it is about cannot be believed, every such proof in the store is counted,
-// whoever it was about. Whether a key this store trusts signed each proof
-// used is counted as well: a signature says which key signed, never whose,
-// and the reader of a record decides how far an untrusted signer's proofs go.
+// whoever it was about.
+//
+// Only proofs signed by a key this store trusts are used, unless whoever
+// makes the record asks for the rest as well, and the record says which.
+// Anybody who may hand a proof in can make a key that signs one, so a record
+// that counted every kept proof could be made to say anything; trusting a
+// signer takes two administrators (internal/proofstore). A proof left out
+// for its signer is counted, and is no proof's successor: only the proofs
+// used compete for "the latest proof of a document", so an untrusted proof
+// handed in later cannot push a trusted contradiction out of the count.
 //
 // The same document about the same asset proved more than once is counted
 // once, from the latest proof of it, which held it to the most evidence.
@@ -113,12 +120,20 @@ type VEXRecordEvidence struct {
 	Tolerance float64 `json:"tolerance"`
 	// Read is every kept proof the record read: the not-affected proofs
 	// about the issuer made in the period, and every kept proof that no
-	// longer verifies. It is LeftOut, Superseded and Used together.
+	// longer verifies. It is LeftOut, UntrustedLeftOut, Superseded and Used
+	// together.
 	Read int `json:"read"`
 	// LeftOut is the kept proofs that no longer verify, counted and never
 	// used. Every one in the store is counted, because what a proof that
 	// does not verify says it is about cannot be believed.
 	LeftOut int `json:"left_out"`
+	// UntrustedLeftOut is the proofs left out because a key this store does
+	// not trust signed them, counted and never used; zero when they were
+	// asked for.
+	UntrustedLeftOut int `json:"untrusted_left_out"`
+	// IncludeUntrusted says proofs signed by keys this store does not trust
+	// were asked for and used.
+	IncludeUntrusted bool `json:"include_untrusted"`
 	// Superseded is the proofs of a document about an asset that a later
 	// proof of the same document about the same asset replaced, so no
 	// statement is counted twice.
@@ -184,10 +199,13 @@ type VEXRecordInput struct {
 	// that verified when they were read, in any order.
 	Proofs []VEXRecordProof
 	// LeftOut are the ids of the kept proofs that no longer verify.
-	LeftOut   []string
-	Materials []Material
-	Program   string
-	Now       time.Time
+	LeftOut []string
+	// IncludeUntrusted uses proofs signed by keys this store does not trust
+	// as well; without it they are counted and left out.
+	IncludeUntrusted bool
+	Materials        []Material
+	Program          string
+	Now              time.Time
 }
 
 func recordFailureOf(id string, contradicted, checked int) string {
@@ -273,12 +291,17 @@ func ProveVEXRecord(in VEXRecordInput) (*Statement, error) {
 		}
 		return proofs[i].ID < proofs[j].ID
 	})
+	// Only the proofs that may be used compete for the latest of a document.
+	eligible := func(p VEXRecordProof) bool { return p.Trusted || in.IncludeUntrusted }
 	latest := map[[2]string]int{}
 	for i, p := range proofs {
-		latest[[2]string{p.Document, p.Asset}] = i
+		if eligible(p) {
+			latest[[2]string{p.Document, p.Asset}] = i
+		}
 	}
 	ev := &VEXRecordEvidence{Source: in.Source, Since: day(in.Since), Until: day(in.Until),
-		Tolerance: in.Tolerance, Read: len(proofs) + len(left), LeftOut: len(left), MinChecked: MinSample}
+		Tolerance: in.Tolerance, Read: len(proofs) + len(left), LeftOut: len(left),
+		IncludeUntrusted: in.IncludeUntrusted, MinChecked: MinSample}
 	assets := map[string]bool{}
 	var failures []string
 	// The subject is every proof read, in order: each verified one by its id
@@ -287,6 +310,10 @@ func ProveVEXRecord(in VEXRecordInput) (*Statement, error) {
 	var read bytes.Buffer
 	for i, p := range proofs {
 		read.WriteString(p.ID + " " + p.Digest + "\n")
+		if !eligible(p) {
+			ev.UntrustedLeftOut++
+			continue
+		}
 		if latest[[2]string{p.Document, p.Asset}] != i {
 			ev.Superseded++
 			continue
@@ -360,17 +387,22 @@ func (ev *VEXRecordEvidence) wellFormed() error {
 		return fmt.Errorf("a VEX record names an issuer, a period in UTC that starts before it " +
 			"ends, and a tolerance more than none and less than all")
 	}
-	for _, n := range []int{ev.Read, ev.LeftOut, ev.Superseded, ev.Used, ev.Trusted, ev.Untrusted,
+	for _, n := range []int{ev.Read, ev.LeftOut, ev.UntrustedLeftOut, ev.Superseded, ev.Used, ev.Trusted, ev.Untrusted,
 		ev.Assets, ev.Statements, ev.NotAffected, ev.Supported, ev.Contradicted, ev.Uncheckable,
 		ev.ContradictingProofs} {
 		if n < 0 || n > maxVEXRecordCount {
 			return fmt.Errorf("a VEX record's counts are whole numbers within what a store could hold")
 		}
 	}
-	if ev.Read > MaxVEXRecordProofs || ev.Used < 1 || ev.Read != ev.LeftOut+ev.Superseded+ev.Used ||
+	if ev.Read > MaxVEXRecordProofs || ev.Used < 1 ||
+		ev.Read != ev.LeftOut+ev.UntrustedLeftOut+ev.Superseded+ev.Used ||
 		ev.Trusted+ev.Untrusted != ev.Used || ev.Assets < 1 || ev.Assets > ev.Used {
 		return fmt.Errorf("the proofs read, left out, superseded and used do not add up, or the " +
 			"record rests on none")
+	}
+	if ev.IncludeUntrusted && ev.UntrustedLeftOut != 0 || !ev.IncludeUntrusted && ev.Untrusted != 0 {
+		return fmt.Errorf("a record uses the proofs of keys this store does not trust only when " +
+			"they were asked for, and then leaves none out for it")
 	}
 	if ev.NotAffected > ev.Statements || ev.ContradictingProofs > ev.Used ||
 		ev.ContradictingProofs > ev.Contradicted || (ev.ContradictingProofs == 0) != (ev.Contradicted == 0) {
@@ -401,8 +433,16 @@ func (ev *VEXRecordEvidence) claim() string {
 	return fmt.Sprintf("Of the not_affected statements in %s's VEX documents that this program "+
 		"held to each asset's bill of materials, advisories and reachability analysis between %s "+
 		"and %s, and that the evidence could test, a share of at most %s was contradicted, "+
-		"counting a statement once for each package it is about.", ev.Source, ev.Since, ev.Until,
-		ev.tolerance())
+		"counting a statement once for each package it is about, from %s.", ev.Source, ev.Since,
+		ev.Until, ev.tolerance(), ev.whose())
+}
+
+// whose says which proofs a record was made from.
+func (ev *VEXRecordEvidence) whose() string {
+	if ev.IncludeUntrusted {
+		return "every kept proof, whether or not a key this store trusts signed it"
+	}
+	return "the proofs signed by a key this store trusts"
 }
 
 // checks are the record's checks, from the evidence and, when it is refuted,
@@ -413,6 +453,13 @@ func (ev *VEXRecordEvidence) checks(failures []string) []Check {
 		"period, each verified as it was read, and %d that no longer verify, counted and not "+
 		"used, whoever they were about, since what one says it is about cannot be believed",
 		ev.Read, ev.Read-ev.LeftOut, ev.Source, ev.LeftOut)
+	if ev.IncludeUntrusted {
+		read += "; proofs signed by keys this store does not trust were asked for, and used"
+	} else {
+		read += fmt.Sprintf("; %d signed by a key this store does not trust, counted and not "+
+			"used, since anybody who may hand a proof in can make a key that signs one",
+			ev.UntrustedLeftOut)
+	}
 	read += fmt.Sprintf("; %d superseded by a later proof of the same document about the same "+
 		"asset, so no statement is counted twice", ev.Superseded)
 	read += fmt.Sprintf("; %d used, about %d asset(s): %d signed by a key this store trusts and "+

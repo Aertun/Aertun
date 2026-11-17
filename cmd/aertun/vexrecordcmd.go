@@ -34,6 +34,8 @@ func vulnVEXRecord(root string, args []string) error {
 	untilAt := fs.String("until", "", "the period's end, not included (default: now)")
 	tolerance := fs.Float64("tolerance", 0, "the share of checked statements the issuer may have "+
 		"had contradicted, between 0 and 1, declared before the record is made (required)")
+	includeUntrusted := fs.Bool("include-untrusted", false, "also count kept proofs signed by "+
+		"keys this store does not trust, and say so in the record; without it they are counted and left out")
 	keyAt := fs.String("key", "", "the dual signing key file (aertun content keygen makes one)")
 	pubAt := fs.String("public-key", "", "with --key, where to write the public key a verifier needs")
 	outAt := fs.String("out", "", "where to write the proof (default: standard output)")
@@ -104,7 +106,7 @@ func vulnVEXRecord(root string, args []string) error {
 		return err
 	}
 	in := proof.VEXRecordInput{Source: *source, Since: since, Until: until, Tolerance: *tolerance,
-		Materials: materials, Program: version, Now: now}
+		IncludeUntrusted: *includeUntrusted, Materials: materials, Program: version, Now: now}
 	for _, e := range kept {
 		if e.Broken != "" || e.Statement == nil {
 			// Whom a proof that no longer verifies was about cannot be
@@ -129,6 +131,19 @@ func vulnVEXRecord(root string, args []string) error {
 		return fmt.Errorf("no not-affected proof about %s made between %s and %s is kept here: "+
 			"aertun vuln prove-vex makes them, and aertun proof list --kind not-affected lists "+
 			"those kept", *source, since.Format(time.RFC3339), until.Format(time.RFC3339))
+	}
+	trusted := 0
+	for _, p := range in.Proofs {
+		if p.Trusted {
+			trusted++
+		}
+	}
+	if trusted == 0 && !in.IncludeUntrusted {
+		return fmt.Errorf("%d not-affected proof(s) about %s are kept, and a key this store trusts "+
+			"signed none of them, so a record would rest on proofs anybody could have signed. "+
+			"aertun proof trust NAME --key PUBLIC-KEY --why \"…\" trusts the key that signed them "+
+			"(it takes two administrators), or --include-untrusted counts them and says so",
+			len(in.Proofs), *source)
 	}
 	st, err := proof.ProveVEXRecord(in)
 	if err != nil {

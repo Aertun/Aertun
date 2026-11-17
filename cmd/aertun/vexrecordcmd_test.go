@@ -70,7 +70,7 @@ func vexRecord(t *testing.T, root string, args ...string) (*proof.Statement, err
 	t.Helper()
 	key, pub := signingFiles(t)
 	at := filepath.Join(t.TempDir(), "record.json")
-	err := cmdVuln(root, append([]string{"vex-record", "--source", "acme-scanner",
+	err := cmdVuln(root, append([]string{"vex-record", "--source", "acme-scanner", "--include-untrusted",
 		"--since", time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
 		"--key", key, "--public-key", pub, "--out", at}, args...))
 	if _, serr := os.Stat(at); serr != nil {
@@ -213,5 +213,21 @@ func TestAVEXRecordStartsFromTheIssuersKeptProofs(t *testing.T) {
 	}
 	if proof.MaxVEXRecordProofs != proofstore.MaxKept {
 		t.Errorf("a record reads at most %d proofs and a store keeps %d", proof.MaxVEXRecordProofs, proofstore.MaxKept)
+	}
+}
+
+// Without --include-untrusted a record rests on trusted signers' proofs, and
+// one with none says how to trust a signer rather than counting proofs
+// anybody could have signed.
+func TestAVEXRecordNeedsATrustedSignerOrSaysWhy(t *testing.T) {
+	root := vexSite(t)
+	keptVEX(t, root, repeated(stSupported, 40)...)
+	key, _ := signingFiles(t)
+	err := cmdVuln(root, []string{"vex-record", "--source", "acme-scanner",
+		"--since", time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
+		"--tolerance", "0.1", "--key", key, "--out", filepath.Join(t.TempDir(), "r.json")})
+	if err == nil || !strings.Contains(err.Error(), "aertun proof trust") ||
+		!strings.Contains(err.Error(), "--include-untrusted") {
+		t.Errorf("a record from untrusted proofs alone: %v", err)
 	}
 }

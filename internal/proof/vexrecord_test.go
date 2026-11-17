@@ -62,11 +62,23 @@ func TestAVEXRecordsVerdict(t *testing.T) {
 			p.Document, p.Asset = issuerProof("c", 0, 0, 0).Document, "github:acme/api"
 			return p
 		}()), Proven},
-		"an untrusted signer's proof is used and counted": {func() VEXRecordInput {
+		"an untrusted signer's proof is used when it is asked for": {func() VEXRecordInput {
 			p := issuerProof("a", 40, 0, 0)
 			p.Trusted = false
-			return issuerInput(p)
+			in := issuerInput(p)
+			in.IncludeUntrusted = true
+			return in
 		}(), Proven},
+		// The attack the default is for: a trusted proof found the issuer's
+		// statements contradicted, and a later proof of the same document,
+		// signed by a key nobody trusts, says they all held. The later one
+		// is left out and supersedes nothing.
+		"an untrusted later proof cannot replace a trusted contradiction": {func() VEXRecordInput {
+			p := issuerProof("b", 20, 20, 0)
+			forged := later(p, "b2", 40, 0)
+			forged.Trusted = false
+			return issuerInput(p, forged)
+		}(), Refuted},
 		"a proof left out changes no count": {func() VEXRecordInput {
 			in := issuerInput(issuerProof("a", 40, 0, 0))
 			in.LeftOut = []string{issuerProof("x", 0, 0, 0).ID}
@@ -100,8 +112,8 @@ func TestAVEXRecordSaysWhatItReadAndNamesWhatContradicted(t *testing.T) {
 		t.Fatal(err)
 	}
 	ev := st.Predicate.VEXRecord
-	if st.Predicate.Verdict != Refuted || ev.Read != 5 || ev.LeftOut != 1 || ev.Superseded != 1 ||
-		ev.Used != 3 || ev.Trusted != 3 || ev.Untrusted != 0 || ev.Assets != 1 ||
+	if st.Predicate.Verdict != Refuted || ev.Read != 5 || ev.LeftOut != 1 || ev.UntrustedLeftOut != 1 ||
+		ev.Superseded != 0 || ev.Used != 3 || ev.Trusted != 3 || ev.Untrusted != 0 || ev.Assets != 1 ||
 		ev.Supported != 25 || ev.Contradicted != 20 || ev.Uncheckable != 1 || ev.ContradictingProofs != 2 ||
 		st.Subject[0].Name != "vex-issuer/acme-scanner" {
 		t.Fatalf("%s %+v", st.Predicate.Verdict, ev)
@@ -112,7 +124,8 @@ func TestAVEXRecordSaysWhatItReadAndNamesWhatContradicted(t *testing.T) {
 		t.Errorf("named %q, want %q", got, want)
 	}
 	if d := st.Predicate.Checks[0].Detail; !strings.Contains(d, "1 that no longer verify") ||
-		!strings.Contains(d, "1 superseded") || !strings.Contains(d, "3 signed by a key this store trusts and 0") {
+		!strings.Contains(d, "1 signed by a key this store does not trust, counted and not used") ||
+		!strings.Contains(d, "0 superseded") || !strings.Contains(d, "3 signed by a key this store trusts and 0") {
 		t.Errorf("what was read is not said: %s", d)
 	}
 	if !strings.Contains(st.Predicate.Claim, "a share of at most 0.1 was contradicted") ||
@@ -194,6 +207,27 @@ func TestAVEXRecordThatDoesNotHoldTogetherIsRefused(t *testing.T) {
 	}
 }
 
+// By default a record rests on trusted signers' proofs alone: one with
+// nothing else to rest on is refused, saying what to do, rather than made
+// from proofs anybody could have signed.
+func TestAVEXRecordRestsOnTrustedSignersByDefault(t *testing.T) {
+	p := issuerProof("a", 40, 0, 0)
+	p.Trusted = false
+	if _, err := ProveVEXRecord(issuerInput(p)); err == nil {
+		t.Fatal("a record was made from an untrusted signer's proof alone")
+	}
+	in := issuerInput(issuerProof("b", 40, 0, 0), p)
+	st, err := ProveVEXRecord(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := st.Predicate.VEXRecord
+	if ev.Used != 1 || ev.UntrustedLeftOut != 1 || ev.Untrusted != 0 ||
+		!strings.Contains(st.Predicate.Claim, "the proofs signed by a key this store trusts") {
+		t.Errorf("%+v %q", ev, st.Predicate.Claim)
+	}
+}
+
 // Every word is rebuilt from the numbers when the statement is opened, so an
 // edited one is refused.
 func TestAVEXRecordCarriesOnlyWhatItsNumbersSay(t *testing.T) {
@@ -202,6 +236,7 @@ func TestAVEXRecordCarriesOnlyWhatItsNumbersSay(t *testing.T) {
 	untrusted := issuerProof("c", 5, 0, 0)
 	untrusted.Trusted = false
 	in := issuerInput(a, b, untrusted)
+	in.IncludeUntrusted = true
 	in.LeftOut = []string{issuerProof("x", 0, 0, 0).ID}
 	st, err := ProveVEXRecord(in)
 	if err != nil {
@@ -217,17 +252,18 @@ func TestAVEXRecordCarriesOnlyWhatItsNumbersSay(t *testing.T) {
 		"made proven": func(s *Statement) {
 			s.Predicate.Verdict, s.Predicate.Checks[2].Passed, s.Predicate.Checks[2].Failures = Proven, true, nil
 		},
-		"claim":                 func(s *Statement) { s.Predicate.Claim += " The vendor is reliable." },
-		"a contradiction away":  func(s *Statement) { s.Predicate.VEXRecord.Contradicted-- },
-		"the bounds moved":      func(s *Statement) { s.Predicate.VEXRecord.Share.Lower = 0.01 },
-		"the tolerance raised":  func(s *Statement) { s.Predicate.VEXRecord.Tolerance = 0.6 },
-		"the minimum lowered":   func(s *Statement) { s.Predicate.VEXRecord.MinChecked = 10 },
-		"uncheckable added":     func(s *Statement) { s.Predicate.VEXRecord.Uncheckable += 5 },
-		"left out hidden":       func(s *Statement) { s.Predicate.VEXRecord.LeftOut-- },
-		"left out read away":    func(s *Statement) { s.Predicate.VEXRecord.LeftOut--; s.Predicate.VEXRecord.Read-- },
-		"an untrusted signer":   func(s *Statement) { s.Predicate.VEXRecord.Trusted++; s.Predicate.VEXRecord.Untrusted-- },
-		"an issuer in prose":    func(s *Statement) { s.Predicate.VEXRecord.Source = "Acme Scanner" },
-		"a period in its words": func(s *Statement) { s.Predicate.VEXRecord.Since = "2026-10-01T05:45:00+05:45" },
+		"claim":                          func(s *Statement) { s.Predicate.Claim += " The vendor is reliable." },
+		"a contradiction away":           func(s *Statement) { s.Predicate.VEXRecord.Contradicted-- },
+		"the bounds moved":               func(s *Statement) { s.Predicate.VEXRecord.Share.Lower = 0.01 },
+		"the tolerance raised":           func(s *Statement) { s.Predicate.VEXRecord.Tolerance = 0.6 },
+		"the minimum lowered":            func(s *Statement) { s.Predicate.VEXRecord.MinChecked = 10 },
+		"uncheckable added":              func(s *Statement) { s.Predicate.VEXRecord.Uncheckable += 5 },
+		"left out hidden":                func(s *Statement) { s.Predicate.VEXRecord.LeftOut-- },
+		"left out read away":             func(s *Statement) { s.Predicate.VEXRecord.LeftOut--; s.Predicate.VEXRecord.Read-- },
+		"an untrusted signer":            func(s *Statement) { s.Predicate.VEXRecord.Trusted++; s.Predicate.VEXRecord.Untrusted-- },
+		"untrusted proofs not asked for": func(s *Statement) { s.Predicate.VEXRecord.IncludeUntrusted = false },
+		"an issuer in prose":             func(s *Statement) { s.Predicate.VEXRecord.Source = "Acme Scanner" },
+		"a period in its words":          func(s *Statement) { s.Predicate.VEXRecord.Since = "2026-10-01T05:45:00+05:45" },
 		"a proof not in the store's shape": func(s *Statement) {
 			s.Predicate.Checks[2].Failures[0] = "kept proof acme-vendor-proof found 10 of 20 checked statement(s) contradicted"
 		},
