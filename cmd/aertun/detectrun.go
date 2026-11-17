@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -405,23 +406,33 @@ func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *s
 			return nil, err
 		}
 	}
+	var raised []finding.Finding
+	for _, f := range reg.All(now) {
+		if !before[f.ID] {
+			raised = append(raised, f)
+		}
+	}
+	detail := map[string]string{
+		"rules": strconv.Itoa(len(rules)), "events": strconv.Itoa(events),
+		"matches": strconv.Itoa(matches), "opened": strconv.Itoa(opened),
+		"suppressed": strconv.Itoa(suppressed), "off": strconv.Itoa(off),
+		"correlations":   strconv.Itoa(corrRun.Rules),
+		"correlated":     strconv.Itoa(corrRun.Hits),
+		"indicators":     strconv.Itoa(held.Len()),
+		"indicator_hits": strconv.Itoa(intelHit),
+	}
+	// What the run raised is sealed in this entry, so "Aertun raised it by
+	// then" is a claim `proof sealed --finding` can check.
+	maps.Copy(detail, sealFindings(root, raised))
 	record(root, audit.Record{
 		Action: "detect.run", Resource: "/findings", Outcome: audit.Success,
 		Principal: caller.Name, Kind: caller.Kind, Model: caller.Model, Verified: caller.Verified,
-		Detail: map[string]string{
-			"rules": strconv.Itoa(len(rules)), "events": strconv.Itoa(events),
-			"matches": strconv.Itoa(matches), "opened": strconv.Itoa(opened),
-			"suppressed": strconv.Itoa(suppressed), "off": strconv.Itoa(off),
-			"correlations":   strconv.Itoa(corrRun.Rules),
-			"correlated":     strconv.Itoa(corrRun.Hits),
-			"indicators":     strconv.Itoa(held.Len()),
-			"indicator_hits": strconv.Itoa(intelHit),
-		},
+		Detail: detail,
 	})
 	sum := &detectSummary{Rules: len(rules), Events: events, Matches: matches,
 		Opened: opened, Suppressed: suppressed, Off: off, Corr: corrRun,
 		Indicators: held.Len(), IntelHit: intelHit, Findings: reg.Len(), Through: through}
-	for _, f := range reg.All(now) {
+	for _, f := range raised {
 		// Trial findings are recorded but kept from the automations, as Risk
 		// keeps them from its scores (risk.go): a rule that has not earned
 		// the queue has not earned the power to suspend an account or mail
@@ -429,7 +440,7 @@ func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *s
 		// let them in by — Kinds lists no such field — so the exclusion is
 		// made here, where what the automations see of a run is collected,
 		// rather than left to every author to remember.
-		if !before[f.ID] && f.State == finding.Open && !f.Trial {
+		if f.State == finding.Open && !f.Trial {
 			sum.New = append(sum.New, f)
 		}
 	}

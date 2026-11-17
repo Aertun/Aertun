@@ -31,6 +31,9 @@ import (
 // are a chain-posture proof's: its words are rebuilt from numbers and closed
 // sets, but its subject carries the name the posture file gives and its
 // settings the addresses the file declares, which are the claimant's.
+// the author's choice, so they are labelled as written outside as well. A
+// sealed-alert proof's words are rebuilt from digests and numbers alone —
+// the alert itself is never in it — so they are this program's.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -48,11 +51,12 @@ var proofKinds = map[string]string{
 	proof.PredicateBreachScope:    "breach-scope",
 	proof.PredicateVEXRecord:      "vex-record",
 	proof.PredicateChainPosture:   "chain-posture",
+	proof.PredicateSealed:         "sealed",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture"}
+	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -67,7 +71,8 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
-		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil {
+		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
+		st.Predicate.Sealed != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -389,6 +394,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("block_hash", ops.Ours(v.BlockHash)).With("finalized", ops.Ours(v.Finalized)).
 				With("held", ops.Ours(v.Held)).With("regressed", ops.Ours(v.Regressed)).
 				With("unread", ops.Ours(v.Unread)).With("settings", settings))
+		case p.Sealed != nil:
+			v := p.Sealed
+			hashes := func(h string) *ops.Answer { return ops.Ours(h) }
+			row.With("evidence", ops.Object().With("digest", ops.Ours(v.Digest)).
+				With("log_entries", ops.Ours(v.LogEntries)).With("log_break", ops.Ours(v.LogBreak)).
+				With("rewritten", ops.Ours(v.Rewritten)).With("batches", ops.Ours(v.Batches)).
+				With("unkept", ops.Ours(v.Unkept)).With("entry", ops.Ours(v.Entry)).
+				With("sealed", ops.Ours(v.Sealed)).With("batch_root", ops.Ours(v.BatchRoot)).
+				With("batch_size", ops.Ours(v.BatchSize)).With("batch_index", ops.Ours(v.BatchIndex)).
+				With("batch_path", ops.ListOf(v.BatchPath, hashes)).
+				With("entry_leaf", ops.Ours(v.EntryLeaf)).With("head_size", ops.Ours(v.HeadSize)).
+				With("head_root", ops.Ours(v.HeadRoot)).With("head_path", ops.ListOf(v.HeadPath, hashes)).
+				With("anchor", ops.Ours(v.Anchor)).With("height", ops.Ours(v.Height)))
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

@@ -42,7 +42,7 @@ import (
 // interface run: they read and add to the proofs kept in the store.
 func cmdProof(root string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, verify, list, show, keep, signers, trust or untrust")
+		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust")
 	}
 	switch args[0] {
 	case "detection":
@@ -53,6 +53,8 @@ func cmdProof(root string, args []string) error {
 		return proofEvidence(root, args[1:])
 	case "revocation":
 		return proofRevocation(root, args[1:])
+	case "sealed":
+		return proofSealed(root, args[1:])
 	case "verify":
 		return proofVerify(args[1:])
 	case "list":
@@ -74,7 +76,7 @@ func cmdProof(root string, args []string) error {
 	case "untrust":
 		return proofUntrust(root, args[1:])
 	default:
-		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, verify, list, show, keep, signers, trust or untrust", args[0])
+		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust", args[0])
 	}
 }
 
@@ -250,6 +252,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["vex_record"] = st.Predicate.VEXRecord
 	case st.Predicate.ChainPosture != nil:
 		out["chain_posture"] = st.Predicate.ChainPosture
+	case st.Predicate.Sealed != nil:
+		out["sealed"] = st.Predicate.Sealed
 	}
 	return out
 }
@@ -340,6 +344,9 @@ func describe(st *proof.Statement) string {
 	if v := p.ChainPosture; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d setting(s) on chain %d at block %d: %d held, %d regressed, "+
 			"%d unread", len(v.Settings), v.ChainID, v.Block, v.Held, v.Regressed, v.Unread)
+	}
+	if v := p.Sealed; v != nil {
+		b.WriteString(describeSealed(v))
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

@@ -59,6 +59,23 @@ Unreleased
   evm.timelock-delay-changed, raises a timelock's delay changing, beside
   the rules for a multisig's signers and a proxy's upgrade.
 
+* `aertun alert seal FILE` commits alerts from any monitor — an MDR's,
+  a web3 monitor's, Aertun's own findings exported — to the audit log by
+  digest: one entry per batch carries the Merkle root over the SHA-256 of
+  each alert's RFC 8785 canonical JSON, the digests are kept beside the
+  store, and the alerts themselves are not kept.  A detection run seals
+  the findings it raises in its own entry.  `aertun proof sealed --alert
+  FILE` (or `--finding ID`) signs when one existed: proven when a
+  confirmed Bitcoin attestation covers a head of the verified log that
+  includes the entry that sealed it, so it existed no later than that
+  block; inconclusive while the head is pending or nothing anchored covers
+  it, saying the time rests on the log alone; refuted when the digest is
+  in no sealed batch, its path to the batch's root or the entry's to the
+  head does not verify, or the log does not — including a head sent to be
+  anchored that the log no longer matches.  `aertun alert seal --list`
+  lists the batches.  The predicate is
+  https://aertun.github.io/proof/sealed/v1.
+
 * `aertun proof revocation` signs whether a revocation held.  For an agent
   disabled with the kill switch (`--agent NAME`) it reads this program's
   own verified audit log, the agent's own telemetry and any identity the

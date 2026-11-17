@@ -113,6 +113,7 @@ Ed25519 and ML-DSA-65.
 | **Breach scope** | a supplier's disclosure of its own breach holds: no indicator outside the window it gave, and none inside it when it said you were not affected | your own event store, searched in the window and a margin either side, with whether the store holds each period whole | `aertun vendor check-breach` |
 | **VEX record** | over a period, an issuer's `not_affected` statements were contradicted at most this often | the not-affected proofs kept here about that issuer and signed by a key this store trusts, each verified again as it is read; uncheckable statements counted and never in the rate | `aertun vuln vex-record` |
 | **Chain posture** | a protocol's multisig thresholds, timelock delays and proxy admins are what it declares | the chain itself, read over JSON-RPC at one block named by its hash | `aertun chain posture` |
+| **Sealed alert** | this alert existed by then — a monitor saw it first | the audit log, verified, holding the alert's digest in a batch it sealed (`aertun alert seal`), under a log head anchored in Bitcoin through OpenTimestamps | `aertun proof sealed` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:
