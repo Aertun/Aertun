@@ -478,15 +478,6 @@ button:hover, .btn:hover {
 }
 .btn-danger { background: var(--error); color: var(--on-error); }
 
-/* A button group: adjacent actions sharing one shape, the outer corners full
-   and the inner ones tight. */
-.btn-group { display: flex; flex-wrap: wrap; gap: 2px; margin: 1rem 0; }
-.btn-group > button, .btn-group > .btn { border-radius: var(--shape-xs); }
-.btn-group > :first-child { border-start-start-radius: var(--shape-full);
-                            border-end-start-radius: var(--shape-full); }
-.btn-group > :last-child  { border-start-end-radius: var(--shape-full);
-                            border-end-end-radius: var(--shape-full); }
-
 /* -- cards ----------------------------------------------------------------- */
 
 .card {
@@ -498,8 +489,6 @@ button:hover, .btn:hover {
 }
 .card > :first-child { margin-top: 0; }
 .card > :last-child { margin-bottom: 0; }
-.card-filled { background: var(--surface-container-high); border-color: transparent; }
-
 /* -- forms ----------------------------------------------------------------- */
 
 .field { margin: 0 0 1.5rem; max-width: 44rem; }
@@ -585,8 +574,6 @@ summary { padding-block: 5px; margin-block: -5px; }
 /* Its target reaches 5px below the line, so a button straight after a closed
    panel was drawn over it. */
 details + button, details + .btn { margin-top: 12px; }
-.focusgrid label { min-height: 24px; }
-
 /* A file picker is a control and browsers draw it at whatever height the font
    suggests — 21px here, which is under the floor the text inputs beside it
    already clear. */
@@ -716,24 +703,6 @@ fieldset.choices input[type=radio] { flex: none; }
 
 /* -- tables and lists ------------------------------------------------------ */
 
-/* A page's place is its name, and a list shows it.
- *
- * The slash in a page name has been structure to the store, to the public
- * server and to auth.covers since each of them existed — blog/first is served
- * at /blog/first, and a grant on /blog covers it. Nothing showed it to
- * anybody: the list was flat and alphabetical, so a site with four sections
- * and forty pages read as forty pages.
- *
- * Indentation rather than a widget. There is no JavaScript here and a tree
- * that collapses is a tree with state to keep; the order already puts a child
- * under its parent, and a step to the right is the whole of what a reader
- * needs to see the shape. Four levels because the store allows eight and a
- * sidebar that indents eight times has nothing left to write in. */
-.depth-1 { padding-left: 2rem; }
-.depth-2 { padding-left: 3.5rem; }
-.depth-3 { padding-left: 5rem; }
-.depth-4, .depth-5, .depth-6, .depth-7 { padding-left: 6.5rem; }
-
 /* A wide table scrolls inside this and not with the page.
  *
  * overflow-x alone did not achieve that, which took a real browser to see. The
@@ -772,15 +741,6 @@ dt { font: var(--label-lg); font-weight: 700; color: var(--on-surface-variant);
      margin-top: 1rem; }
 dd { margin: 0.25rem 0 0; }
 
-/* -- security posture ------------------------------------------------------ */
-
-.posture-head {
-  display: flex; flex-wrap: wrap; gap: 1.75rem; align-items: center;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--shape-xl);
-  padding: 1.5rem 1.75rem; margin: 1.5rem 0 2rem;
-}
 /* Display-scale numeral. The score is the one number on the page somebody
    reads from across a room, which is exactly what the display role is for. */
 .score { font: var(--display-md); font-weight: 800; margin: 0;
@@ -788,10 +748,6 @@ dd { margin: 0.25rem 0 0; }
 .score.ok   { color: var(--ok); }
 .score.warn { color: var(--warning); }
 .score.bad  { color: var(--error); }
-.score .outof { font: var(--title-md); color: var(--on-surface-variant);
-                font-weight: 500; }
-.score-note { margin: 0; flex: 1 1 20rem; }
-
 .finding, .rule {
   background: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
@@ -814,13 +770,6 @@ dd { margin: 0.25rem 0 0; }
 .meta { font: var(--body-sm); color: var(--on-surface-variant); }
 
 .controls { line-height: 2.4; }
-.ctl {
-  display: inline-block; padding: 0.2rem 0.6rem; margin: 0 0.3rem 0.3rem 0;
-  border: 1px solid var(--outline-variant); border-radius: var(--shape-sm);
-  background: var(--surface-container); font-family: var(--mono);
-  font-size: 0.85rem;
-}
-
 .dim { color: var(--on-surface-variant); font-weight: 400; }
 .inline { display: inline; }
 
@@ -857,7 +806,7 @@ footer { margin-top: 3rem; padding-top: 1.5rem;
    fighting it. The tonal surfaces disappear, so borders have to carry the
    structure on their own. */
 @media (forced-colors: active) {
-  .card, .notice, .finding, .rule, .pill, .posture-head, .table-wrap {
+  .card, .notice, .finding, .rule, .pill, .table-wrap {
     border: 1px solid CanvasText;
   }
   button, .btn { border: 1px solid ButtonText; }
@@ -964,8 +913,6 @@ tr.detail td { padding-top: 0; border-top: 0; }
    overlapped the search box beside it. */
 .bar-start { flex: 1 1 auto; }
 .brand { min-width: 0; }
-.brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 @media (min-width: 60rem) {
   /* Two columns, one scrollbar, and the menu stays where you can see it.
    *
@@ -1186,46 +1133,6 @@ details[open] > summary > .chev .icon { rotate: 180deg; }
   .sidenav .nav { margin-top: 0; }
 }
 
-/* Confirming a page is still right. Sits with the notes and reads like them:
-   a statement about the page rather than a control that changes it. */
-.checked { margin: 1.5rem 0; }
-
-/* -- doing the same thing to several pages -----------------------------------
- *
- * The two actions sit under the table they act on, in the order of how much
- * they can cost: the additive one first, the destructive one last and marked.
- * Separated by a gap wide enough that reaching one is not nearly reaching the
- * other, which is the failure mode of two adjacent buttons where one is
- * irreversible-feeling.
- */
-.bulkactions { display: flex; flex-wrap: wrap; align-items: center;
-  gap: .75rem 1.5rem; margin: .75rem 0 1rem; }
-.bulkactions .danger { margin-left: auto; }
-
-/* The confirmation. The names are the content of this screen, so they are set
-   as a list to read rather than as a paragraph to skim past. */
-.confirmlist { margin: 1rem 0 1.5rem; padding-left: 1.4rem;
-  font-variant-numeric: tabular-nums; }
-.confirmlist li { margin: .2rem 0; }
-.confirmactions { display: flex; flex-wrap: wrap; align-items: center;
-  gap: 1.5rem; margin: 1rem 0; }
-
-/* -- where a picture is cropped from -----------------------------------------
- *
- * Nine choices laid out as the picture is laid out, so "top left" is in the
- * top left. A three-column grid in reading order needs no positioning to be
- * correct: the markup order and the visual order are the same thing, which is
- * also what keeps a keyboard moving through it in the order it looks.
- *
- * The fieldset is stripped of its own border because the grid is the grouping;
- * the legend stays for a screen reader, visually hidden.
- */
-.focusgrid { display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: .15rem .5rem; border: 0; margin: .4rem 0; padding: 0;
-  max-width: 22rem; }
-.focusgrid label { display: flex; align-items: center; gap: .3rem;
-  font: var(--label-md); white-space: nowrap; }
-
 /* -- turning the page --------------------------------------------------------
  *
  * Both directions and the position between them, so somebody can see where
@@ -1255,11 +1162,6 @@ details[open] > summary > .chev .icon { rotate: 180deg; }
 /* A note somebody has dealt with is kept and set back, so the conversation
    stays readable without the finished parts competing for attention. */
 .note.done { opacity: .65; border-left-color: var(--outline-variant); }
-.notewho { margin: 0 0 .15rem; display: flex; flex-wrap: wrap; gap: .4rem;
-  align-items: baseline; font: var(--label-md); }
-.notetext { margin: 0 0 .4rem; white-space: pre-wrap; }
-.notefield { margin: 0; }
-
 /* -- finding things ----------------------------------------------------------
  *
  * The box in the bar, and the screen behind it.
@@ -1328,31 +1230,6 @@ details[open] > summary > .chev .icon { rotate: 180deg; }
 
 /* -- editing a picture ------------------------------------------------------ */
 
-/* The original and what the recipe would make, side by side.
- *
- * Side by side because the question is a comparison — is the face still in
- * frame — and stacked, on a narrow screen, because two 400-pixel pictures in a
- * row on a phone are two pictures nobody can see. */
-.beforeafter { display: grid; gap: 1.25rem; margin: 0 0 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
-.beforeafter figure { margin: 0; }
-.beforeafter img { display: block; width: 100%; height: auto;
-  max-height: 22rem; object-fit: contain;
-  background: var(--surface-container-high); border-radius: var(--shape-sm); }
-.beforeafter figcaption { font: var(--label-md); color: var(--on-surface-variant);
-  margin-top: .4rem; }
-/* Where a picture would go before there is one to show. Sized like the
-   pictures beside it, so pressing the button does not make the page jump. */
-.beforeafter .noshot { display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 1.5rem; min-height: 12rem;
-  background: var(--surface-container-low); border-radius: var(--shape-sm);
-  border: 1px dashed var(--outline-variant); }
-
-/* The shapes, as a row of choices rather than a dropdown: a ratio is the one
-   part of a crop people know the answer to before they open the screen, and a
-   list you can see is faster than a list you have to open. */
-.shapes { border: 0; padding: 0; margin: 0 0 1.25rem; min-inline-size: 0; }
-.shapes legend { font-weight: 700; padding: 0; margin-bottom: .5rem; }
 .shape { display: inline-flex; align-items: center; gap: .4rem;
   margin: 0 .5rem .5rem 0; padding: .35rem .7rem;
   border: 1px solid var(--outline-variant); border-radius: var(--shape-sm);
@@ -1362,58 +1239,6 @@ details[open] > summary > .chev .icon { rotate: 180deg; }
 .shape input { margin: 0; }
 
 /* -- choosing a file ------------------------------------------------------- */
-
-/* The picker grid.
- *
- * A radio per file rather than a button per file: a keyboard walks it with the
- * arrow keys and a screen reader reads it as the one question it is. The
- * fieldset carries no border of its own, because the cards are the structure
- * and a box around them would be a second one saying the same thing.
- *
- * min-inline-size: 0 on the fieldset because a fieldset will not shrink below
- * its content otherwise, which is how a grid inside one pushes a page sideways
- * on a phone. */
-.pickgrid { border: 0; padding: 0; margin: 0 0 1.25rem; min-inline-size: 0;
-  display: grid; gap: .75rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); }
-
-.pick { display: block; position: relative; cursor: pointer;
-  border: 1px solid var(--outline-variant); border-radius: var(--shape-sm);
-  padding: .6rem; background: var(--surface-container-low); }
-.pick:hover { border-color: var(--outline); }
-/* The checked one is named by its border as well as by the radio, because a
-   radio inside a card is small and the card is what the eye lands on. */
-.pick-on { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
-.pick:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.pick input { position: absolute; top: .6rem; right: .6rem; margin: 0; }
-.pick-body { display: block; }
-.pick-thumb { display: block; width: 100%; height: 7rem; object-fit: contain;
-  background: var(--surface-container-high); border-radius: var(--shape-xs);
-  margin-bottom: .45rem; }
-/* A format name where a picture cannot go. A video has no still until
-   something extracts one, and an empty box says less than "webm". */
-.pick-noshot { display: flex; align-items: center; justify-content: center;
-  font: var(--label-md); font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--on-surface-variant); }
-.pick-name { display: block; font-weight: 600; overflow-wrap: anywhere; }
-.pick .hint { display: block; }
-.pick-alt { font-style: italic; }
-.pick-none { grid-column: 1 / -1; }
-.pick-none .pick-name { margin-bottom: .15rem; }
-
-/* The file attached to a field, beside the field.
- *
- * The input still holds the value — it is the value, and it can still be
- * pasted — and this is what makes it legible: a hash says nothing about which
- * photograph it is. */
-.filefield { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
-  margin-top: .4rem; }
-.filefield-thumb { width: 4rem; height: 3rem; object-fit: contain;
-  background: var(--surface-container-high); border-radius: var(--shape-xs); }
-.filefield-noshot { display: flex; align-items: center; justify-content: center;
-  font: var(--label-md); font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--on-surface-variant); }
-.filefield-pick { font-weight: 600; }
 
 /* One result per row, and the reason it matched beside it rather than under
    it: a list where every entry is two lines is a list you cannot scan. */
@@ -1518,8 +1343,6 @@ body.nav-hidden > .sidenav { display: none; }
    agent's consent: one column, centred, rather than a form pushed to the
    left of an empty second column. */
 .signin.signin-solo { grid-template-columns: minmax(0, 1fr); max-width: 30rem; }
-.signin-panel .consent-actions { display: grid; gap: .5rem; margin: 1.25rem 0; }
-.signin-panel .consent-actions button { width: 100%; }
 .signin-panel {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -1551,46 +1374,6 @@ body.nav-hidden > .sidenav { display: none; }
 }
 
 /* -- documentation ---------------------------------------------------------- */
-
-/* Prose, at a width somebody can read. The measure matters more here than
-   anywhere else in the product: a manual set to the full width of a desktop
-   window is a manual people skim and then say was not clear. */
-.doc { max-width: 68ch; margin: 0 0 2.5rem; scroll-margin-top: 1rem; }
-.doc h3 { margin: 0 0 .35rem; }
-.doc h4 { margin: 1.75rem 0 .5rem; font: var(--title-md); font-weight: 700; }
-.doc p { max-width: 68ch; }
-.doc .table-wrap, .doc pre { max-width: 68ch; }
-.doc ul, .doc ol { max-width: 66ch; padding-left: 1.4rem; }
-.doc li { margin: 0 0 .5rem; }
-.chapter { margin: 2.5rem 0 1rem; padding-top: .75rem;
-           border-top: 2px solid var(--outline-variant); }
-
-.toc { margin: 0 0 2rem; padding: 1rem 1.25rem;
-       background: var(--surface-container-low);
-       border: 1px solid var(--outline-variant);
-       border-radius: var(--shape-lg); max-width: 68ch; }
-.toc h2 { margin: 0 0 .5rem; font: var(--title-md); font-weight: 700; }
-.toc h3 { margin: 1rem 0 .35rem; font: var(--label-lg); font-weight: 800;
-          text-transform: uppercase; letter-spacing: .06em;
-          color: var(--on-surface-variant); }
-.toc ul { list-style: none; margin: 0; padding: 0; }
-.toc li { margin: 0 0 .3rem; }
-
-/* A screenshot with its caption.
- *
- * Bordered rather than floated: these sit in the reading order between two
- * paragraphs, which is where a step-by-step walkthrough wants them. The
- * caption is the alternative text as well as the visible label, so it is a
- * real figcaption rather than a paragraph that happens to be underneath. */
-.shot { margin: 1.25rem 0 1.75rem; max-width: 68ch; }
-.shot img {
-  display: block; max-width: 100%; height: auto;
-  border: 1px solid var(--outline-variant); border-radius: var(--shape-md);
-  background: var(--surface-container-lowest);
-}
-.shot figcaption {
-  margin-top: .5rem; font: var(--body-md); color: var(--on-surface-variant);
-}
 
 pre.code {
   background: var(--surface-container-high); color: var(--on-surface);
@@ -1669,10 +1452,6 @@ td.actions, th.actions { white-space: nowrap; }
 td.actions > a, td.actions > form, th.actions > a, th.actions > form {
   display: inline-block; vertical-align: middle; margin-right: 0.6rem; }
 td.actions > *:last-child, th.actions > *:last-child { margin-right: 0; }
-/* A cell holding one short identifier, an agent's name say, keeps it whole:
-   broken across lines it reads as two names. */
-td.ident { white-space: nowrap; }
-td.ident code { overflow-wrap: normal; word-break: normal; }
 /* A link drawn as a button keeps the button's own layout, which centres its
    label; inline-block would set the label at the top of the 48px target. */
 td.actions > a.btn, th.actions > a.btn { display: inline-flex; }
@@ -1700,18 +1479,6 @@ td.actions > a.btn, th.actions > a.btn { display: inline-flex; }
  * one box read as two ways to do one thing. They are two different acts. */
 .owner { margin-top: 1rem; padding-top: 1rem;
          border-top: 1px solid var(--outline-variant); }
-
-/* Whose job a page is, under its state in the Checked column.
- *
- * Not a tag. A tag is a state with a fixed set of values and a colour that
- * means something; an owner is a name, and painting names in state colours
- * would say the name is a state. So: a plain quiet line, and its own block so
- * a long name wraps under the tag instead of widening the column. */
-.owner-of {
-  display: block; margin-top: 0.2rem;
-  font: var(--label-md); color: var(--on-surface-variant);
-  overflow-wrap: break-word;
-}
 
 /* The accessibility findings on the review screen. */
 .findings { list-style: none; padding: 0; margin: 0.5rem 0; }
@@ -1756,36 +1523,6 @@ td.actions > a.btn, th.actions > a.btn { display: inline-flex; }
 .gates dd { margin: .25rem 0 0; color: var(--on-surface-variant); max-width: 68ch; }
 
 
-/* The editor and the page it edits, side by side.
- *
- * A grid rather than a float, so the two columns are equal and neither can
- * push the other off-screen. minmax(0,1fr) rather than 1fr because a grid
- * track's default minimum is its content, and a wide preview would otherwise
- * stretch the column past the viewport and take the form with it.
- *
- * Stacked below 62rem. A form and a preview at 400px each are two things
- * nobody can use, and on a phone the preview is the one to move out of the
- * way — the person is there to type. */
-.editing {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-@media (max-width: 62rem) {
-  .editing { grid-template-columns: minmax(0, 1fr); }
-  .editing .preview { order: -1; }
-}
-.editing .preview { position: sticky; top: 1rem; }
-.editing .preview h2 { margin-top: 0; }
-.editing iframe {
-  width: 100%;
-  height: min(70vh, 720px);
-  border: 1px solid var(--outline-variant, #ccc);
-  border-radius: var(--shape-md);
-  background: var(--surface, #fff);
-}
-
 /* -- settings and design, as disclosures -------------------------------------
  *
  * Nineteen groups of settings and eight of design tokens were all expanded:
@@ -1812,20 +1549,6 @@ td.actions > a.btn, th.actions > a.btn { display: inline-flex; }
 /* A group that opened itself because something in it is weaker than its
    default says so on its edge, not only in the pill. */
 .settinggroup:has(.pill.warn) { border-color: var(--warning); }
-
-/* A list of screens with a line each saying what they answer.
- *
- * Used on /security, where five routes existed and nothing linked to any of
- * them. Not a table, because there are two columns of which one is prose, and
- * not a row of chips, because the explanation is the point — a bare list of
- * five nouns would have been the same problem in a different shape.
- */
-.subnav { list-style: none; margin: .5rem 0 1rem; padding: 0;
-  display: grid; gap: .15rem; }
-.subnav li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem;
-  padding: .5rem .75rem; border-radius: var(--shape-sm); min-height: 40px; }
-.subnav li:hover { background: var(--surface-container); }
-.subnav a { font-weight: 600; }
 
 /* -- printing ----------------------------------------------------------------
  *
@@ -1873,13 +1596,6 @@ table.queue td:nth-child(5), table.queue td:nth-child(6) {
 .stats-row dt { font: var(--label-md); color: var(--on-surface-variant); }
 .stats-row dd { margin: .2rem 0 0; font-size: 1.6rem; font-weight: 700;
   font-variant-numeric: tabular-nums; }
-.chart { margin: 1rem 0; }
-.chart svg { width: 100%; height: 160px; display: block;
-  border-bottom: 1px solid var(--outline-variant); }
-.chart rect { fill: var(--primary); }
-.chart rect:hover { fill: var(--on-surface); }
-.chart figcaption { font: var(--label-md); color: var(--on-surface-variant); margin-top: .3rem; }
-
 /* -- the menu, as a popover on a narrow screen --------------------------------
  *
  * The sidebar element carries the popover attribute. On a wide screen it is
@@ -2116,36 +1832,7 @@ table.queue td:nth-child(5), table.queue td:nth-child(6) {
   .dt-bar .real, .dt-bar .false, .dt-bar .benign { fill: CanvasText; }
 }
 
-/* The agent map: a declaration drawn. Reads on the left, the agent in the
-   middle, what it may do on the right. A write is the only thing in a
-   status colour, because it is the only thing on the map that is a risk. */
-.agmap { width: 100%; max-width: 760px; height: auto; display: block; }
-.agmap .box { fill: var(--surface-container-low); stroke: var(--outline-variant); stroke-width: 1; }
-.agmap .box.core { fill: var(--primary-container); stroke: var(--primary); stroke-width: 1.5; }
-.agmap .box.write { stroke: var(--viz-critical); stroke-width: 1.5; }
-.agmap .box.none { stroke-dasharray: 4 3; }
-.agmap .box.gate { fill: var(--warning-container); stroke: var(--viz-warning-stroke); }
-.agmap .box.cap, .agmap .box.read, .agmap .box.tool, .agmap .box.deleg { stroke: var(--outline-variant); }
-.agmap .edge { stroke: var(--outline-variant); stroke-width: 1; }
-.agmap .edge.write { stroke: var(--viz-critical); }
-.agmap .head { fill: var(--on-surface-variant); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-.agmap .label { fill: var(--on-surface); font-size: 13px; font-weight: 600; }
-.agmap .label.core { font-size: 15px; }
-.agmap .sub { fill: var(--on-surface-variant); font-size: 11px; }
-.agmap .gatelabel { fill: var(--on-warning-container); font-size: 11px; font-weight: 600; }
 textarea.code { font-family: var(--mono); font-size: 0.85rem; width: 100%; }
-
-/* The capabilities an agent may hold: many short names, so in columns. */
-fieldset.caps-set { max-width: 56rem; }
-.caps { columns: 19rem; column-gap: 2rem; }
-.caps p { break-inside: avoid; margin: 0 0 0.35rem; display: flex;
-  align-items: center; gap: 0.5rem; }
-.caps p label { white-space: nowrap; }
-
-/* Beside a capability: whether the agent stops and asks before using it. */
-.caps label.ask { margin-left: auto; font: var(--body-sm); color: var(--on-surface-variant); }
-.agmap .box.ask { fill: var(--warning-container); stroke: var(--viz-warning-stroke); }
-.agmap .label.ask { fill: var(--on-warning-container); }
 
 /* A button that is one of many in a table, and should not shout. */
 button.quiet { background: transparent; color: var(--primary);
@@ -2157,14 +1844,6 @@ button.quiet:hover { background: var(--surface-container-high); }
 /* Something a person is asked to agree to is shown whole, on any screen:
    wrapped, never cut off at the edge. */
 pre.code.whole { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: visible; }
-
-/* A conversation handed over from a chatbot. */
-ol.thread { list-style: none; padding: 0; margin: 1rem 0; display: grid; gap: 0.6rem; max-width: 46rem; }
-ol.thread .msg { padding: 0.7rem 1rem; border-radius: var(--shape-sm); border: 1px solid var(--outline-variant);
-  background: var(--surface-container-low); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 85%; }
-ol.thread .msg.from-visitor { background: var(--primary-container); color: var(--on-primary-container); justify-self: start; }
-ol.thread .msg:not(.from-visitor) { justify-self: end; }
-ol.thread .who { display: block; font: var(--label-md); font-weight: 700; margin-bottom: 0.2rem; }
 
 /* The mark in its two colours: the loop in the interface's blue, the tail
    in violet. Lighter tones in the dark theme, so both clear 3:1 against the
@@ -2342,10 +2021,9 @@ td .danger:hover, td button.danger:hover { background: var(--error-container);
 /* The last of the capitals: severity pills, field labels, contents
    headings. Weight comes down with them, since the capitals were what the
    heavy weight was compensating for. */
-.pill, .label, .toc h3, .agmap .head {
+.pill, .label {
   text-transform: none; letter-spacing: 0; font-weight: 500;
 }
-.agmap .head { font-weight: 600; }
 .palette-open kbd { white-space: nowrap; }
 .findbar .palette-open { width: auto; border: 0; background: transparent; }
 th[scope="row"] { font-weight: 500; }
@@ -2374,16 +2052,10 @@ th[scope="row"] { font-weight: 500; }
 .rowmenu-open { min-height: 40px; width: 40px; height: 40px; padding: 0;
   border-radius: var(--shape-full); background: transparent; color: var(--on-surface-variant); }
 .rowmenu-open:hover { background: color-mix(in srgb, var(--on-surface) var(--state-hover), transparent); }
-.rowmenu { position: fixed; position-area: bottom span-left; top: auto; right: auto;
-  margin: .25rem 0 0; min-width: 13rem; }
-.menu button, .menu-danger { display: flex; align-items: center; justify-content: flex-start;
+.menu button { display: flex; align-items: center; justify-content: flex-start;
   width: 100%; min-height: 40px; padding: 0 .9rem; border: 0; border-radius: var(--shape-full);
   background: transparent; color: var(--on-surface); font: var(--label-lg); }
-.menu .menu-danger { color: var(--error); }
 .menu button:hover { background: color-mix(in srgb, var(--on-surface) var(--state-hover), transparent); }
-.menu .menu-danger:hover { background: var(--error-container); color: var(--on-error-container); }
-.rowmenu { position-try-fallbacks: flip-block; }
-
 /* A short key to coloured words on the screen above a table. */
 .legend { list-style: none; padding: 0; margin: .5rem 0 1rem; display: flex;
   flex-wrap: wrap; gap: .5rem 1.5rem; font: var(--body-md); color: var(--on-surface-variant); }
@@ -2410,20 +2082,6 @@ th[scope="row"] { font-weight: 500; }
 .takeover img { border: 1px solid var(--outline-variant, #ccc); max-width: 100%; }
 .takeover img.takeover-page[data-live] { cursor: crosshair; }
 .takeover button { margin-right: 4px; }
-.ask-fields { margin: 0 0 12px; display: grid; gap: 8px; }
-.ask-fields > div {
-  background: var(--surface-container-lowest); border: 1px solid var(--outline-variant);
-  border-radius: 12px; padding: 10px 14px;
-}
-.ask-fields dt { font: 500 13px/1.4 var(--mono); color: var(--on-surface-variant); }
-.ask-fields dd { margin: 4px 0 0; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
-.ask-json summary { cursor: pointer; font-weight: 500; margin-bottom: 8px; }
-
-/* A run's steps: the long column is what it tried, so the controls beside
-   it keep their words on one line rather than wrapping into a circle. */
-.run-steps button, .run-steps summary, .run-steps thead th { white-space: nowrap; }
-.run-steps td:nth-child(2) code { overflow-wrap: break-word; }
-
 /* The wordmark: the mark is the A of the name, and "ertun" follows it on the
    same baseline, as in the brand's own drawing (docs/brand), whose numbers
    these are: the letters are this typeface at weight 500, the mark's box is
@@ -2437,14 +2095,6 @@ th[scope="row"] { font-weight: 500; }
 /* Members: an invitation code shown once, large enough to copy by eye, and
    a removal that has to be opened before it can be confirmed. */
 .code-big code { font-size: 1.4rem; letter-spacing: .06em; padding: .4rem .7rem; }
-.inline-remove { display: inline-block; margin-left: .5rem; }
-.inline-remove summary { cursor: pointer; color: var(--error, #b3261e); font-weight: 500; }
-.inline-remove form { display: grid; gap: .4rem; margin-top: .5rem; max-width: 18rem; }
-
-/* Boards: what members wrote, as text, one card each. */
-.post-queue { list-style: none; padding: 0; display: grid; gap: .75rem; }
-.post-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
-
 /* Forced colours draw no fills, and the search box was a fill with no
    border: the placeholder floated on the page with nothing around it. */
 @media (forced-colors: active) {
@@ -2644,17 +2294,11 @@ button, .btn {
               box-shadow var(--motion-fast-effects-duration) var(--motion-fast-effects);
 }
 button:active, .btn:active { border-radius: var(--shape-sm); }
-.btn-xs { min-height: 32px; padding: 0 12px; }
-.btn-md { min-height: 56px; padding: 0 24px; font: var(--title-md); font-weight: var(--weight-medium); }
-.btn-md:active { border-radius: var(--shape-md); }
 /* Outlined, as Expressive redrew it: the label in on-surface-variant and a
    quieter outline-variant rule, not primary on outline. */
 .btn-outlined { color: var(--on-surface-variant); border-color: var(--outline-variant); }
 .btn-outlined:hover { background: color-mix(in srgb, var(--on-surface-variant) var(--state-hover), transparent); }
 .btn-text { padding: 0 12px; }
-/* Connected button group: 2 apart, inner corners CornerSmall (8). */
-.btn-group { gap: 2px; }
-.btn-group > button, .btn-group > .btn { border-radius: var(--shape-sm); }
 button:disabled, .btn[aria-disabled="true"] {
   background: color-mix(in srgb, var(--on-surface) 10%, transparent);
   color: color-mix(in srgb, var(--on-surface) 38%, transparent); cursor: not-allowed; }
@@ -2714,7 +2358,7 @@ html { scrollbar-color: var(--outline) transparent; }
 /* The navigation, expanded: items 56 high with a 24 icon, 8 to the label in
  * LabelLarge, 16 in from either side. The current one sits in a full-width
  * secondary-container indicator, its icon filled. */
-.sidenav .nav a, .navgroups .nav a, .railfly .nav a {
+.sidenav .nav a, .navgroups .nav a {
   min-height: 56px; padding: 0 16px; gap: 12px;
   font: var(--label-lg); font-weight: var(--weight-medium); letter-spacing: .00625rem;
   color: var(--on-surface-variant); }
@@ -2735,7 +2379,7 @@ html { scrollbar-color: var(--outline) transparent; }
 .menu { padding: 4px; min-width: 14rem; border-radius: var(--shape-lg);
   background: var(--surface-container-low); box-shadow: var(--elevation-2); }
 .menu:popover-open { gap: 2px; }
-.menu a, .menu button, .menu-danger { min-height: 44px; padding: 0 16px; gap: 12px;
+.menu a, .menu button { min-height: 44px; padding: 0 16px; gap: 12px;
   border-radius: var(--shape-xs); font: var(--body-lg); letter-spacing: .03125rem; }
 .menu > a:first-of-type, .menu > :first-child button { border-start-start-radius: var(--shape-md); border-start-end-radius: var(--shape-md); }
 .menu > a:last-of-type, .menu > :last-child button { border-end-start-radius: var(--shape-md); border-end-end-radius: var(--shape-md); }
@@ -2905,8 +2549,6 @@ summary > .chev .icon { width: 20px; height: 20px; }
 .auto-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 12px; margin: 0 0 12px; clear: both; }
 .auto-actions dt { font-weight: var(--weight-medium); margin-top: 8px; }
 .auto-actions dd { margin: 0; }
-.row-actions form { display: inline-flex; gap: 8px; flex-wrap: wrap; }
-
 /* Confirm it's you. */
 .notice.stepup { display: flex; gap: 12px; align-items: flex-start; background: var(--surface-container-high);
   color: var(--on-surface); border-radius: var(--shape-lg); padding: 12px 16px; }
@@ -2921,29 +2563,6 @@ summary > .chev .icon { width: 20px; height: 20px; }
 .feed-secret dd { margin: 0; overflow-wrap: anywhere; }
 .feed-secret code { user-select: all; }
 
-/* Design: the styles, each shown as a card shape and a button shape drawn the
-   way that style draws them, in the admin's own tokens. */
-.design-look { margin: 0 0 24px; display: grid; gap: 12px; }
-.style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 12px; }
-.style-card { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "r swatch" "r name" "r words"; gap: 4px 12px;
-  padding: 12px 16px; border-radius: var(--shape-lg); background: var(--surface-container-low); cursor: pointer; min-width: 0; }
-.style-card > input { grid-area: r; align-self: start; margin-top: 4px; }
-.style-card > strong { grid-area: name; }
-.style-card > .hint { grid-area: words; }
-.style-card.on { outline: 2px solid var(--primary); }
-.style-swatch { grid-area: swatch; display: flex; gap: 8px; align-items: center; height: 44px; }
-.style-swatch i { width: 64px; height: 40px; background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: 12px; }
-.style-swatch b { width: 40px; height: 20px; background: var(--primary); border-radius: 999px; }
-.style-expressive i { border-radius: 20px; border-color: transparent; background: var(--secondary-container); } .style-expressive b { height: 24px; }
-.style-glass i { background: color-mix(in srgb, var(--surface-container-high) 55%, transparent); border-color: color-mix(in srgb, var(--outline-variant) 60%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--on-surface) 10%, transparent); }
-.style-editorial i { background: transparent; border: 0; border-top: 1px solid var(--outline); border-radius: 0; } .style-editorial b { border-radius: 3px; }
-.style-bold i { border: 2px solid var(--on-surface); border-radius: 0; box-shadow: 3px 3px 0 var(--on-surface); } .style-bold b { border-radius: 0; box-shadow: 2px 2px 0 var(--on-surface); }
-.style-soft i { border-color: transparent; border-radius: 18px; box-shadow: 0 6px 16px color-mix(in srgb, var(--on-surface) 12%, transparent); }
-.style-business i { border-radius: 4px; box-shadow: 0 1px 2px color-mix(in srgb, var(--on-surface) 12%, transparent); } .style-business b { border-radius: 4px; }
-.icon-preview { grid-area: swatch; display: flex; gap: 10px; align-items: center; height: 36px; color: var(--primary); }
-.icon-preview .icon { width: 24px; height: 24px; fill: currentColor; }
-
 /* Review, 3 October: what a pass over every screen at 1280 and 390 wide,
    light and dark, found. */
 /* A title made from an event can carry an unbroken identifier
@@ -2957,12 +2576,8 @@ td form.inline input:not([type=checkbox]):not([type=hidden]) { min-width: 0; wid
    label's margin. */
 .wf-filters label { margin: 0; }
 .wf-filters > button, form.inline:has(label > input:not([type=hidden]), label > select) > button { margin-block-end: 8px; }
-/* The style and icon pickers are grids of cards; the 28rem every other
-   fieldset keeps to made them one long column. */
-.design-look fieldset { max-width: none; }
 /* Percentages of different widths no longer push their bars out of line. */
 .wf-points { display: inline-block; min-width: 3.5ch; text-align: end; }
-.row > .row-full { flex: 1 1 100%; }
 /* Every screen's column is the same width. With auto margins a grid item
    shrinks to its content, so a screen of short cards (Security) sat
    narrower and further right than one with a wide table (Findings), and
@@ -2996,33 +2611,9 @@ body:has(> .sidenav) > main { width: 100%; }
    primary action. */
 .btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); }
 
-/* Evaluations: run results in a short list, step times beside their bar. */
-.eval-runs { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; }
-.eval-runs a { font-family: var(--mono); font-size: .8125rem; }
-.step-time { white-space: nowrap; }
-.keep-case { margin-top: 24px; }
-.eval-results th[scope="row"] { min-width: 14rem; }
-.eval-run { max-width: 36rem; }
-
-/* Shield: where things stand, in one line above everything else. */
-.shield-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; }
 /* A band whose words are already set the way they are read ("Asks first",
    "Held to watching") is not capitalised word by word. */
 .wf-band.as-written { text-transform: none; }
-/* What a playbook does, one tap away, so ten of them fit a screen. */
-.shield-more { margin: 4px 0 8px; }
-.shield-more > summary { cursor: pointer; color: var(--primary); font: var(--label-lg, 500 .875rem/1.4 var(--font)); width: fit-content; }
-.shield-more[open] > summary { margin-bottom: 4px; }
-/* A verdict is two words side by side, not two lines. */
-.shield-judge { display: inline-flex; flex-wrap: nowrap; gap: 4px; margin: 0; }
-/* An address or a sentence, not the width of the page. */
-.shield-inline input:not([type=hidden]) { max-width: 24rem; }
-
-/* The site report. The law each duty comes from is quieter than the duty. */
-.duty-law { display: block; margin-top: 2px; font-size: .8125rem; color: var(--on-surface-variant); }
-.duty-more { margin: 8px 0 16px; }
-.duty-more > summary { cursor: pointer; color: var(--primary); width: fit-content; }
-.duty-more ul { margin: 8px 0; }
 /* The draft statement reads as the page it will become: a sheet, not a card. */
 .statement { max-width: 44rem; padding: 20px 24px; margin: 12px 0 16px; border-radius: var(--shape-lg);
   background: var(--surface-container-lowest); outline: 1px solid var(--outline-variant); }
@@ -3032,7 +2623,6 @@ body:has(> .sidenav) > main { width: 100%; }
 /* What a person still has to write, impossible to miss and not alarming. */
 mark.fill { background: var(--tertiary-container); color: var(--on-tertiary-container);
   border-radius: 4px; padding: 0 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
-.statement-md { width: 100%; max-width: 44rem; font-family: var(--mono); font-size: .8125rem; }
 /* A band in a table cell is a label: one line, and the table scrolls if
    it must, rather than "Not / known" stacked in a narrow column. */
 td > .wf-band { white-space: nowrap; }
@@ -3045,13 +2635,6 @@ dialog.idle-warn h2 { margin: 0 0 8px; }
 dialog.idle-warn p { margin: 0 0 20px; }
 dialog.idle-warn p[role="status"]:empty { display: none; }
 dialog.idle-warn .btn-text { margin-left: 12px; }
-
-/* The organisation's policy: a label before each value, and a form that
-   stacks rather than spreading across the card. */
-.param-k { display: inline-block; min-width: 5.5rem; font: 500 .8125rem/1.5 var(--font); color: var(--on-surface-variant); }
-.param-form { display: grid; gap: 6px; max-width: 32rem; margin-top: 8px; }
-.param-form fieldset { border: 0; padding: 0; margin: 0 0 4px; display: grid; gap: 6px; }
-.param-form legend { font-weight: 500; margin-bottom: 4px; }
 
 /* Review, 7 October: no word broken in two, and a status on one line.
 
@@ -3086,25 +2669,7 @@ td code, th code { display: inline-block; max-width: 40ch; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis; vertical-align: bottom; }
 /* A command, and what a step was given, are text to read rather than
    identifiers: they wrap where their words do, and are never cut short. */
-td code.cmd, th code.cmd, .run-steps td:nth-child(2) code { display: inline; max-width: none; white-space: normal; }
-
-/* The fleet's map: who called what. Wider than an agent's, so it scrolls
-   inside its frame on a phone rather than shrinking past reading. */
-.fleetmap { max-width: none; min-width: 760px; }
-.fleetmap .box.person { fill: var(--surface-container-high); }
-.fleetmap .box.agent { fill: var(--primary-container); stroke: var(--primary); }
-.fleetmap .box.external-agent, .fleetmap .box.app { fill: var(--secondary-container); }
-.fleetmap .box.tool-server, .fleetmap .box.model-route, .fleetmap .box.aertun { fill: var(--surface-container-low); }
-.fleetmap .box.host { fill: var(--warning-container); stroke: var(--viz-warning-stroke); }
-
-
-/* A row of labelled fields that wraps as a whole: each label stays with its
-   field, and the button sits on the fields' baseline. */
-form.fieldrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 0 0 8px; }
-form.fieldrow .field { flex: 1 1 12rem; margin: 0; max-width: none; }
-form.fieldrow .field.wide { flex: 2 1 18rem; }
-form.fieldrow .field input { width: 100%; }
-form.fieldrow > button { margin-bottom: 2px; }
+td code.cmd, th code.cmd { display: inline; max-width: none; white-space: normal; }
 
 /* Review, 10 October: what a pass over every screen's screenshots found,
    each finding checked by a second reader against the picture.
@@ -3144,18 +2709,6 @@ form.fieldrow > button { margin-bottom: 2px; }
   table.stacks td form.inline, table.stacks td .actions { margin-top: .25rem; }
 }
 
-/* A button in a table row is one of many rows' buttons: tonal, so a column
-   of them does not outshout the page's own action. A destructive one keeps
-   its red outline, and one that must stand out says so with .btn-filled. */
-td button:not(.danger):not(.btn-danger):not(.btn-text):not(.btn-outlined):not(.btn-filled):not(.iconbutton),
-td .btn:not(.danger):not(.btn-danger):not(.btn-text):not(.btn-outlined):not(.btn-filled) {
-  background: var(--secondary-container); color: var(--on-secondary-container);
-  min-height: 40px; padding: 0 1.1rem;
-}
-td button:not(.danger):not(.btn-danger):not(.btn-text):not(.btn-outlined):not(.btn-filled):not(.iconbutton):hover {
-  background: color-mix(in srgb, var(--on-secondary-container) var(--state-hover), var(--secondary-container));
-}
-
 /* A short number is a short field. */
 input[type=number] { max-width: 12rem; }
 .short { max-width: 20rem; }
@@ -3172,12 +2725,6 @@ input[type=file]::file-selector-button {
 /* (Records, Listings, Design, Media, the page editor, Provenance, Sections,
    History, Notes, Types, Forms, Structure.) */
 
-/* A record's field in the Data table is one line: long text ends in an
-   ellipsis, and the whole record opens with Edit. */
-td.clip { max-width: 24ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-td.nowrap { white-space: nowrap; }
-td.nowrap form.inline { display: inline-block; margin-left: 4px; }
-
 /* A listing is headed by its label; the name a page uses follows it, small
    and in the code face. Its sample rows wait behind a summary. */
 h2 .key, h3 .key { font: var(--body-md); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -3185,65 +2732,6 @@ h2 .key, h3 .key { font: var(--body-md); font-family: ui-monospace, SFMono-Regul
 details.sample { margin: 0 0 1rem; }
 details.sample > summary { color: var(--primary); font-weight: 500; }
 details.sample .table-wrap { margin-top: 8px; }
-
-/* Design: each choice's button is its own width, under what it applies.
-   While the site's own stylesheet is in use the settings are switched off
-   and drawn faded, so nobody changes values that do nothing. */
-.design-look > button { justify-self: start; }
-fieldset.whileown { border: 0; padding: 0; margin: 0; max-width: none; min-width: 0; }
-fieldset.whileown:disabled { opacity: .55; }
-
-/* Media: a small picture beside each image's name, so pictures can be told
-   apart by sight. Its address is in a box that holds the whole of it, to
-   select and copy. */
-.media-name { display: flex; gap: 12px; align-items: flex-start; }
-.media-thumb { width: 48px; height: 48px; flex: none; object-fit: cover;
-  border-radius: var(--shape-sm); background: var(--surface-container-high); }
-details.media-path input { width: 100%; min-width: 22rem; margin-top: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8125rem; }
-
-/* The page editor: the fields and the page's details in one column, the
-   preview in the other, held in view while the fields scroll. On a phone the
-   fields come first, then the preview, then the details. */
-.edit-main { min-width: 0; }
-.help:has(+ .editing) { margin-bottom: 16px; }
-.edit-details { margin-top: 40px; }
-.edit-details > section:first-child h2 { margin-top: 0; }
-@media (max-width: 62rem) {
-  .edit-main { display: contents; }
-  .editing .preview { order: 1; position: static; }
-  .edit-details { order: 2; margin-top: 16px; }
-}
-
-/* Nothing here yet: a neutral line and where to go, never the green of a
-   passed check. */
-.emptystate { padding: 20px 24px; border-radius: var(--shape-lg);
-  background: var(--surface-container-low); max-width: 62ch; }
-.emptystate p { margin: 0 0 4px; }
-/* Pages to pick from, as a row of outlined chips. */
-ul.pagepick { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 16px 0; }
-ul.pagepick a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px;
-  border: 1px solid var(--outline-variant); border-radius: var(--shape-full); text-decoration: none; }
-ul.pagepick a:hover { background: var(--surface-container); }
-
-/* A part of a declaring form (the type, then the field) is as wide as the
-   form, so its grid keeps its columns. */
-fieldset.part { max-width: none; }
-
-/* Checkboxes in a form that declares something get a row of their own,
-   rather than whichever grid cell was left over. */
-.checkrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; margin: 0 0 12px; }
-.checkrow > p { margin: 0; }
-.checkrow .hint { margin: 0; }
-
-/* The one place on a screen where something cannot be undone: last on the
-   page, in a card outlined in the error colour, with a red button in both
-   schemes. */
-section.danger-zone { margin: 40px 0 16px; padding: 4px 20px 16px;
-  border: 1px solid var(--error); border-radius: var(--shape-lg); }
-section.danger-zone h2 { color: var(--error); }
-section.danger-zone button.danger { background: transparent; color: var(--error); border-color: var(--error); }
-section.danger-zone button.danger:hover { background: var(--error); color: var(--on-error); }
 
 /* -- review 10 October: agents and administration -------------------------- */
 /* (Agents, the agent form, Runs, Fleet, Memory, Models, Apps, Integrations,
@@ -3258,51 +2746,10 @@ section.danger-zone button.danger:hover { background: var(--error); color: var(-
 /* You: the tabs, one closed group each, under the group's name. */
 .settinggroup > summary > h4 { margin: 0; font: var(--title-sm); }
 
-/* Agents: the templates as cards, the research behind each one closed. */
-.agent-templates .auto-head a { text-transform: capitalize; }
-.agent-templates .auto-card > p:first-of-type::first-letter { text-transform: uppercase; }
-.agent-templates details { margin-top: 8px; }
-.agent-templates summary { cursor: pointer; color: var(--primary); font: var(--label-lg); }
-.agent-templates details > p { margin: 6px 0 0; }
-
-/* The agent form: capabilities by area, each area closed until it holds
-   one. "Ask first" sits right after the name, and only for a capability
-   that is chosen: beside an unchosen one it is a choice that means nothing. */
-.capgroup { border-top: 1px solid var(--outline-variant); padding: .25rem 0; }
-.capgroup:first-of-type { border-top: 0; }
-.capgroup > summary { cursor: pointer; padding: .5rem 0; font: var(--title-sm); }
-.capgroup > summary .hint { font: var(--body-sm); margin-left: .5rem; }
-.capgroup .caps { padding: .25rem 0 .5rem; }
-.capgroup .caps p { flex-wrap: wrap; gap: 4px 12px; }
-.capgroup .caps label.ask { margin-left: 0; }
-.capgroup .caps p:has(input[name=cap]:not(:checked)) label.ask { visibility: hidden; }
-
-/* Declaring an agent: describing it instead is one closed line above the
-   form, not a second form competing with it. */
-details.describe { padding-block: .5rem; }
-details.describe > summary { cursor: pointer; padding: .5rem 0; }
-details.describe > summary > h2 { margin: 0 .5rem 0 0; font: var(--title-md); display: inline; }
-details.describe[open] > summary { margin-bottom: .75rem; }
-
-/* An agent's map and the fleet's, on a phone: scaled to the screen their
-   labels were a few pixels high, and the fleet's ran off its edge. The
-   sentence under each carries the same facts, so on a phone it stands in
-   for the drawing (and the note about where the drawing comes from goes
-   with it). */
-.mapframe { margin: 0 0 .5rem; }
-@media (max-width: 40rem) {
-  .wf-fig svg.agmap, .wf-fig .mapframe { display: none; }
-  .mapsays .drawnnote { display: none; }
-  .mapsays { font: var(--body-md); color: var(--on-surface); }
-}
-
 /* Runs: "2 days ago" on one line, an outcome's name capitalised in its
    filter chip. */
 td.when { white-space: nowrap; }
 .chips .cap { text-transform: capitalize; }
-.runs-table th[scope=row] { min-width: 16rem; }
-.runs-table td > a { white-space: nowrap; }
-
 /* Settings' weakened card is read, not shouted: .bad set every word of it in
    bold red, on a red block that in the dark theme filled a phone's screen.
    A red edge and a red heading say the same thing. */
@@ -3324,59 +2771,9 @@ td.when { white-space: nowrap; }
 table.declared th[scope=row] { min-width: 14rem; }
 table.declared th[scope=row] code.cmd { overflow-wrap: break-word; }
 
-/* Models: short numbers side by side in short fields, their shared hint
-   under the row; the currency closes the budgets card. */
-.numrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 1.5rem; }
-.numrow .field { flex: 0 1 15rem; margin-bottom: .5rem; }
-.budgetcard > form:first-child > h3 { margin-top: 0; }
-.numrow .field input { max-width: 12rem; }
-.numhelp { margin: 0 0 1.25rem; max-width: 44rem; }
-.currencyform { border-top: 1px solid var(--outline-variant); margin-top: 1.5rem; padding-top: 1.25rem; }
-.currencyform input { max-width: 8rem; }
-
 /* -- review 10 October: site and growth ------------------------------------ */
 /* (Transfer, Analytics, Personalise, Chatbots, Experiments, Boards, Inbox,
    the permanent web, the public site's furniture.) */
-/* Transfer's starters: one card each, side by side where there is room, and
-   the form that applies one is a single row that wraps on a phone. */
-.starters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 12px; margin: 0 0 1rem; }
-.starters .card { display: flex; flex-direction: column; gap: 8px; margin: 0; }
-.starters .card > * { margin: 0; }
-.starters h3 { text-transform: capitalize; }
-.starters form.inline { margin-top: auto; }
-.starters form.inline input:not([type=checkbox]) { min-width: 0; width: 8rem; }
-/* Analytics' three counts fit one row on a phone, rather than leaving the
-   third alone on a row of its own. */
-.stats-row.stats-three { grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); }
-/* A personalisation condition is one row: what it looks at, then the values,
-   side by side; stacked on a phone. */
-fieldset.conds { max-width: 60rem; }
-.cond { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; gap: 0 1rem; align-items: end; }
-.cond .field { margin-bottom: .75rem; }
-.cond label { display: block; }
-@media (max-width: 40rem) { .cond { grid-template-columns: 1fr; } .cond .field + .field { margin-bottom: 1.25rem; } }
-/* The permanent web's file list: sizes line up on the right, to compare. */
-details.files-list { margin: 0 0 1rem; }
-details.files-list .table-wrap { margin-top: 12px; }
-details.files-list th:last-child, details.files-list td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* A conversation: the reply is as wide as the thread above it, and ending
-   the conversation sits apart from the reply, below a rule, outlined red. */
-form.conv-reply { max-width: 46rem; }
-form.conv-reply textarea { width: 100%; max-width: none; }
-form.conv-end { max-width: 46rem; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--outline-variant); }
-form.conv-end button.danger { background: transparent; color: var(--error); border: 1px solid var(--error); }
-form.conv-end button.danger:hover { background: var(--error); color: var(--on-error); }
-/* A chatbot's settings: headed groups, the rarely changed ones folded, and
-   Save kept in reach at the bottom of the window from any field. */
-.settings-form h3 { margin: 32px 0 12px; padding-top: 16px; border-top: 1px solid var(--outline-variant); }
-.settings-form > h3:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
-details.settings-more { margin: 0 0 12px; }
-details.settings-more > summary { font: var(--title-sm); }
-details.settings-more[open] > summary { margin-bottom: 12px; }
-.settings-form .savebar { position: sticky; bottom: 0; z-index: 1; margin: 16px -1.15rem -1rem; padding: 12px 1.15rem;
-  background: var(--surface-container-low); border-top: 1px solid var(--outline-variant);
-  border-radius: 0 0 var(--shape-md) var(--shape-md); }
-
 /* -- review 10 October: security operations -------------------------------- */
 /* (Findings, Shield, Cases, Risk, Detections, Automations, Feeds, Hunt,
    Events, Running, Rules, Scan, Sign-ins, Security.) */
@@ -3414,15 +2811,6 @@ fieldset.choices label > input { margin-top: .2rem; width: auto; }
 fieldset.choices label > span { min-width: 0; }
 fieldset.choices label strong { font-weight: 600; }
 fieldset.choices p { margin: .5rem 0; clear: both; }
-
-/* Shield: the trial run lines up with the card's text, and a change is a
-   reason on its own line, then the choice. */
-.shield-try .btn-text { margin-inline-start: -12px; }
-.shield-change { display: grid; gap: .5rem; justify-items: start; max-width: 32rem; }
-.shield-change .field { margin: 0; width: 100%; }
-.shield-change .hint { margin: 0; }
-.shield-change .seg button.on { font-weight: 700; }
-.shield-change .seg button .icon { width: 18px; height: 18px; margin-inline-end: 4px; vertical-align: -3px; }
 
 /* Hunt: what to stack and over when on one row, the condition on the next
    as one sentence. */
@@ -3475,12 +2863,6 @@ fieldset.choices p { margin: .5rem 0; clear: both; }
    card is no taller than what it says. */
 .finding { padding: .9rem 1.1rem; }
 .finding > p:first-of-type { margin-top: 0; }
-.finding-foot { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; align-items: baseline; }
-.finding-foot > p { margin: 0; }
-.fix-note { color: var(--on-surface-variant); }
-.finding-low { margin: 0 0 1rem; }
-.finding-low > summary { cursor: pointer; color: var(--primary); font: var(--label-lg);
-  width: fit-content; margin-bottom: .75rem; }
 h2 + .help { margin-bottom: 1rem; }
 .rule.critical { border-left-color: var(--error); }
 .rule.high { border-left-color: var(--viz-serious); }
@@ -3502,53 +2884,14 @@ td.ev-value { min-width: 12rem; white-space: nowrap; }
 .stats-row > div { display: flex; flex-direction: column; justify-content: flex-start; }
 
 /* -- review 10 October: assurance and workforce ---------------------------- */
-/* (Frameworks, Parameters, Workforce, Inventory, Reminders, Controls, KSI,
-   AI evidence, Integrity, Policy, Site, Vulnerabilities.) */
-.param-id { font-size: .75rem; color: var(--on-surface-variant); }
-.ssp-form select { width: auto; min-width: 14rem; max-width: 100%; }
-.ssp-form + .hint { margin-top: 4px; }
-.jump-list { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 1rem 0; }
-.jump-list .hint { margin-right: 8px; }
-/* Each a target a finger can find: the codes are two or three letters. */
-.jump-list a { font: var(--label-lg); display: inline-flex; align-items: center; justify-content: center;
-  min-width: 2.5rem; min-height: 2.5rem; padding: 0 .5rem; border-radius: var(--shape-full); text-decoration: none; }
-.jump-list a:hover { background: var(--surface-container-high); }
 .wf-fig .wfbars { max-width: 36rem; }
 .wf-tasks > span { display: inline-block; margin: 0 .75rem .25rem 0; white-space: nowrap; }
 .wf-machines td:nth-child(2), .wf-machines td:nth-child(6) { white-space: nowrap; }
-td .duty-more { margin: 4px 0 0; }
-.step-cost { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cost-table td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cost-table tfoot th, .cost-table tfoot td { font-weight: 600; border-top: 1px solid var(--outline-variant); }
-.question-form fieldset { border: 1px solid var(--outline-variant); border-radius: 8px; padding: .5rem .75rem; margin: 0 0 .75rem; }
-.question-form legend { font-weight: 600; padding: 0 .25rem; }
-.question-form label { display: inline-flex; align-items: center; gap: .35rem; margin-right: .75rem; min-height: 40px; }
 .approval-group { margin-block: 1.5rem; }
 .approval-group h2 .count { font-size: .8em; color: var(--on-surface-variant); }
 .approvals-table td { vertical-align: top; }
-.earned-table td { vertical-align: top; }
-
 /* -- research --------------------------------------------------------------- */
-/* The rendered report: every number a link to the computation it came from,
-   every citation saying what it cites, and an untraced number marked where
-   it sits. */
-.report-body { max-width: 75ch; }
-.report-body h3 { margin-top: 1.25rem; }
-.report-body a.value { font-variant-numeric: tabular-nums; text-decoration-style: dotted; }
-.report-body .cite { color: var(--primary); cursor: help; }
-.report-body blockquote, td blockquote { margin: .5rem 0; padding-left: .8rem; border-left: 3px solid var(--outline-variant); }
-
-/* -- today: views --------------------------------------------------------------
- * An answer to a question asked on Today, and the ones somebody kept: cards
- * drawn by this program from the records, never markup a model wrote.
- */
-.view-cards { display: grid; gap: 1rem; margin: .5rem 0 1rem; }
-.view-card { background: var(--surface-container-low); border: 1px solid var(--outline-variant);
-  border-radius: var(--shape-sm); padding: .75rem 1rem; }
-.view-figure { margin: .2rem 0 0; font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.view-bar { display: block; width: 200px; height: .75rem; }
-.view-bar rect { fill: var(--primary); }
-.view-kept { margin: 0 0 1.5rem; }
+td blockquote { margin: .5rem 0; padding-left: .8rem; border-left: 3px solid var(--outline-variant); }
 
 /* -- agent sessions: the timeline ---------------------------------------------
  *

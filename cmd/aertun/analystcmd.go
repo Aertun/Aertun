@@ -868,18 +868,3 @@ func analystEval(root string, args []string) error {
 		"records every verdict%s\n", dim, reset)
 	return nil
 }
-
-// ---- agents as a log source -------------------------------------------------
-
-// agentsSeen is what has been observed of the agents so far.
-type agentsSeen struct {
-	// Seq is the last audit entry read.
-	Seq int64 `json:"seq"`
-	// Did is each agent's actions, and First when it was first seen.
-	Did   map[string][]string  `json:"did"`
-	First map[string]time.Time `json:"first"`
-}
-
-func agentsSeenPath(root string) string {
-	return filepath.Join(agentsDir(root), "observed.json")
-}

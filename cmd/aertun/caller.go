@@ -266,9 +266,9 @@ func osUser() string {
 // purpose — turned access control off across the whole store, and the only
 // symptom was that everything started working:
 //
-//	aertun add index=home.json          refused, no token
+//	aertun auth grant mallory admin      refused, no token
 //	echo 'not json' > policy.json
-//	aertun add index=home.json          "draft 995b0d7e386f  1 page(s)"
+//	aertun auth grant mallory admin      granted
 //
 // So an unreadable policy is now treated as a policy in force that cannot be
 // evaluated, and the answer to every question is no. Absent still means

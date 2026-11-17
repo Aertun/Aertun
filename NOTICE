@@ -48,10 +48,10 @@ each under its own licence.
   Font License 1.1. The licence and what was changed are beside the file, in
   OFL.txt and README.md, and both are carried in the binary.
 
-* The interface icons (internal/admin/assets/icons and internal/icons) are
-  Material Symbols by Google LLC
-  (https://github.com/google/material-design-icons), under the Apache License
-  2.0, whose text is beside them in LICENSE. Only each icon's SVG path is kept.
+* The interface icons (internal/admin/assets/icons) are Material Symbols by
+  Google LLC (https://github.com/google/material-design-icons), under the
+  Apache License 2.0, whose text is beside them in LICENSE. Only each icon's
+  SVG path is kept.
 
 * Operating-system and product lifecycle dates (internal/lifecycle) come from
   endoflife.date (https://endoflife.date), under the MIT licence:

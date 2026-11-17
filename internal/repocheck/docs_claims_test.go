@@ -217,7 +217,7 @@ func TestTheLicenceTextIsOneText(t *testing.T) {
 func TestEveryCopyCarriesTheLicenceAndNotices(t *testing.T) {
 	notice := read(t, "NOTICE")
 	for _, embedded := range []string{"Go standard library", "internal/admin/assets/fonts",
-		"internal/admin/assets/icons", "internal/icons", "internal/lifecycle"} {
+		"internal/admin/assets/icons", "internal/lifecycle"} {
 		if !strings.Contains(notice, embedded) {
 			t.Errorf("NOTICE does not name %s, which the binary carries", embedded)
 		}

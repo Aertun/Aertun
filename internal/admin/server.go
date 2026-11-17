@@ -58,7 +58,6 @@ import (
 	"github.com/aertun/aertun/internal/clientip"
 	"github.com/aertun/aertun/internal/dpop"
 	"github.com/aertun/aertun/internal/enrol"
-	"github.com/aertun/aertun/internal/icons"
 	"github.com/aertun/aertun/internal/lockout"
 	"github.com/aertun/aertun/internal/oauthas"
 	"github.com/aertun/aertun/internal/throttle"
@@ -301,16 +300,13 @@ func (s *Server) refresh() {
 
 // New builds the server and parses the admin templates once.
 //
-// html/template rather than Aertun's own engine, and the distinction matters.
-// aertun's language is deliberately powerless because *users* write in it and
-// user templates are an injection surface. These templates are ours, shipped in
-// the binary, and never author-supplied — so the stdlib's contextual escaping is
-// exactly right and there is no surface to remove.
+// html/template, whose contextual escaping is exactly right here: these
+// templates are ours, shipped in the binary and never written by anybody
+// who signs in.
 func New(p *auth.Policy, ts *auth.TokenStore) (*Server, error) {
 	t, err := template.New("").Funcs(template.FuncMap{
-		"icon":      uiIcon,
-		"toneicon":  toneIcon,
-		"iconNames": icons.Names,
+		"icon":     uiIcon,
+		"toneicon": toneIcon,
 		// signedOutIcon is the mark in the built-in colours, inline, for the
 		// pages somebody sees before signing in: /icon.svg carries the
 		// operator's colour and is served only to the signed in, so without
