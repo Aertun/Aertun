@@ -1,8 +1,28 @@
 Aertun NEWS
 ***********
 
-Unreleased
-==========
+Version 0.2.0
+=============
+
+Aertun 0.2 holds more of security work to evidence: detection coverage
+technique by technique, each dependency against the release before it, AI-written
+vulnerability reports against the source they cite, managed detection tested
+blind, alerts sealed by a Bitcoin block, a protocol's on-chain posture, a VEX
+issuer's record and another site's audit log, each as a signed proof, and any
+proven one as an in-toto verification result a policy engine reads.  It meets
+the tools already in place: Wazuh in both directions, LiteLLM's gateway
+records and traces, a GitHub Action, Kubernetes manifests and a Helm chart.
+
+Upgrading from 0.1:
+
+* A feed for a signed audit stream is now the kind `stream`; one added under
+  the earlier name must be removed and added again (below).
+* azure/activity keeps `raw.operation`, `raw.status` and `raw.category`
+  where it kept one `raw.value`, and duo/auth `raw.user_name` and
+  `raw.application` where it kept one `raw.name`: each overwrote another.
+  A rule of your own reading the old names needs the new ones.
+* The detection proof's verifier is version 2: an entry labelled as an attack
+  is no longer counted as one a rule must stay quiet on.
 
 * Wazuh, both ways.  `aertun inbound add webhook wazuh --mapping
   wazuh/alerts --seal` takes a manager's alerts, signed as Standard Webhooks

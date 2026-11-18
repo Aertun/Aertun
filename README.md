@@ -51,8 +51,8 @@ Download the binary for your platform from the
 and run it — there is nothing else to install:
 
 ```bash
-curl -LO https://github.com/aertun/aertun/releases/download/v0.1.0/aertun-linux-amd64
-curl -LO https://github.com/aertun/aertun/releases/download/v0.1.0/SHA256SUMS
+curl -LO https://github.com/aertun/aertun/releases/download/v0.2.0/aertun-linux-amd64
+curl -LO https://github.com/aertun/aertun/releases/download/v0.2.0/SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS && chmod +x aertun-linux-amd64
 
 ./aertun-linux-amd64 init --owner you@example.com   # a store, its Owner, and the link that adds your passkey
@@ -452,7 +452,7 @@ provenance attestation for every binary. Pick the file for your platform —
 `aertun-windows-arm64.exe` — then check it before you run it:
 
 ```bash
-VERSION=0.1.0 FILE=aertun-linux-amd64
+VERSION=0.2.0 FILE=aertun-linux-amd64
 curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/$FILE"
 curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/SHA256SUMS"
 sha256sum -c --ignore-missing SHA256SUMS            # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
@@ -466,18 +466,18 @@ listed; the attestation proves which workflow, commit and tag built it.
 
 **Run the container.** `ghcr.io/aertun/aertun` is the binary alone on
 `gcr.io/distroless/static-debian12:nonroot`, with no shell, tagged with the
-version without its `v` (`0.1.0`, `0.1`, `latest`) for amd64 and arm64:
+version without its `v` (`0.2.0`, `0.2`, `latest`) for amd64 and arm64:
 
 ```bash
-docker run --rm -v aertun:/srv ghcr.io/aertun/aertun:0.1.0 --root /srv/store init --owner you@example.com
-docker run -p 8080:8080 -v aertun:/srv ghcr.io/aertun/aertun:0.1.0
+docker run --rm -v aertun:/srv ghcr.io/aertun/aertun:0.2.0 --root /srv/store init --owner you@example.com
+docker run -p 8080:8080 -v aertun:/srv ghcr.io/aertun/aertun:0.2.0
 ```
 
 The image is attested like the binaries, by the release workflow from the
 tag:
 
 ```bash
-gh attestation verify oci://ghcr.io/aertun/aertun:0.1.0 --repo aertun/aertun
+gh attestation verify oci://ghcr.io/aertun/aertun:0.2.0 --repo aertun/aertun
 ```
 
 **Build from source.** Go 1.27 or later and nothing else — `go.mod` has no
