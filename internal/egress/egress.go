@@ -174,6 +174,16 @@ var Purposes = []Purpose{
 			"when a person confirms them",
 	},
 	{
+		Name: "registry",
+		What: "reading what a package registry says about a release in a " +
+			"bill of materials and the release before it — who published " +
+			"each and how, its provenance, its install scripts — from npm, " +
+			"PyPI and the Go module proxy, or the mirrors an operator names",
+		Without: "no continuity proof can be made. The bill is still read, " +
+			"and its advisories, reachability and VEX checks still run " +
+			"offline",
+	},
+	{
 		Name: "chain",
 		What: "reading an EVM chain's state from the JSON-RPC endpoint an " +
 			"operator names — a multisig's threshold and owners, a " +

@@ -327,6 +327,10 @@ var commandNeeds = map[string]need{
 	// came to in the organisation's name: the command asks for tune itself,
 	// as prove-vex does, because a row here may only narrow its parent.
 	"vuln vex-record": {action: auth.ActAssess},
+	// Holding a bill's packages to the releases before them reads public
+	// registries and signs what they said in the organisation's name: the
+	// command asks for tune itself, as prove-vex does.
+	"vuln continuity": {action: auth.ActAssess},
 	"vuln assets":     {action: auth.ActView},
 
 	// Storing a credential for another company's system is the heaviest

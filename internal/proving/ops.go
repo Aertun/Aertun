@@ -41,7 +41,10 @@ import (
 // words are rebuilt from its numbers and from technique ids of a fixed
 // shape, so they are this program's; the rule ids its evidence lists are
 // the rules' authors' choice, strictly shaped, and labelled as written
-// outside.
+// outside. A continuity proof's words are rebuilt from its numbers and
+// closed sets, and every name a publisher chose is in it as a digest; the
+// package URLs it lists are the bill's, strictly shaped, and labelled as
+// written outside.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -63,12 +66,13 @@ var proofKinds = map[string]string{
 	proof.PredicateMDR:            "mdr",
 	proof.PredicatePeerLog:        "peer-log",
 	proof.PredicateCoverage:       "coverage",
+	proof.PredicateContinuity:     "continuity",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
 	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr",
-	"peer-log", "coverage"}
+	"peer-log", "coverage", "continuity"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -85,7 +89,7 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
 		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
 		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil ||
-		st.Predicate.Coverage != nil {
+		st.Predicate.Coverage != nil || st.Predicate.Continuity != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -455,6 +459,27 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 					With("root", ops.Ours(v.Last.Root)))
 			}
 			row.With("evidence", evidence)
+		case p.Continuity != nil:
+			v := p.Continuity
+			release := func(r *proof.ContinuityRelease) *ops.Answer {
+				if r == nil {
+					return ops.Ours(nil)
+				}
+				return ops.Object().With("version", ops.Outside(r.Version)).
+					With("published", ops.Ours(r.Published)).With("listed", ops.Ours(r.Listed)).
+					With("yanked", ops.Ours(r.Yanked)).With("provenance", ops.Ours(r.Provenance)).
+					With("trusted_publishing", ops.Ours(r.Trusted)).With("ref", ops.Ours(r.Ref)).
+					With("commit", ops.Ours(r.Commit)).With("attestation", ops.Ours(r.Attestation))
+			}
+			packages := ops.ListOf(v.Packages, func(p proof.ContinuityPackage) *ops.Answer {
+				return ops.Object().With("purl", ops.Outside(p.Purl)).With("outcome", ops.Ours(p.Outcome)).
+					With("unread", ops.Ours(p.Unread)).With("lost", ops.ListOf(p.Lost, func(l string) *ops.Answer { return ops.Ours(l) })).
+					With("now", release(p.Now)).With("before", release(p.Before))
+			})
+			row.With("evidence", ops.Object().With("held", ops.Ours(v.Held)).
+				With("regressed", ops.Ours(v.Regressed)).With("first", ops.Ours(v.First)).
+				With("unread", ops.Ours(v.Unread)).With("outside", ops.Ours(v.Outside)).
+				With("public_registries", ops.Ours(v.PublicRegistries)).With("packages", packages))
 		case p.Coverage != nil:
 			v := p.Coverage
 			techniques := ops.ListOf(v.Techniques, func(t proof.TechniqueCoverage) *ops.Answer {

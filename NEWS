@@ -4,6 +4,25 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun vuln continuity BILL --key F` holds each npm, PyPI and Go package
+  in a bill of materials (CycloneDX or SPDX) to the release before it, as
+  its registry describes both, and signs what came of it.  A package is
+  refuted when it lost what its predecessor had: provenance, trusted
+  publishing, the repository, workflow or tag it was built from, its
+  publishing account's email, or its having no install script (or the
+  script changed); and when its registry has withdrawn it, its publisher
+  yanked it, or the provenance served is about another artifact by digest.
+  The predecessor is the greatest earlier version still served and
+  published before it.  It is proven when every package was read and none
+  lost anything, and inconclusive when one could not be read.  The axios
+  releases of 31 March 2026 are refused as they were published (provenance
+  and trusted publishing lost, and an install script added by the new
+  dependency), and today because npm withdrew them.  Publishers'
+  names, emails, repositories and workflows are carried only as sha256
+  digests.  Registries are read through the new network purpose
+  `registry`; `--npm`, `--pypi` and `--goproxy` name mirrors.  The
+  predicate is https://aertun.github.io/proof/continuity/v1.
+
 * `aertun proof coverage --key F` signs, for each technique the rules
   claim, whether the claim holds.  A corpus entry can now carry
   `"techniques"`: the ATT&CK, ATLAS or OWASP ids of what produced it, such

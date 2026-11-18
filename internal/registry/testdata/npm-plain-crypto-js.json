@@ -1,0 +1,40 @@
+{
+ "_id": "plain-crypto-js",
+ "name": "plain-crypto-js",
+ "time": {
+  "created": "2026-03-30T05:57:32.867Z",
+  "modified": "2026-03-30T23:59:12.278Z",
+  "4.2.0": "2026-03-30T05:57:32.867Z",
+  "4.2.1": "2026-03-30T23:59:12.278Z"
+ },
+ "versions": {
+  "4.2.0": {
+   "name": "plain-crypto-js",
+   "version": "4.2.0",
+   "_npmUser": {
+    "name": "nrwise",
+    "email": "nrwise@proton.example"
+   },
+   "scripts": {
+    "test": "echo none"
+   },
+   "dist": {
+    "integrity": "sha512-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=="
+   }
+  },
+  "4.2.1": {
+   "name": "plain-crypto-js",
+   "version": "4.2.1",
+   "_npmUser": {
+    "name": "nrwise",
+    "email": "nrwise@proton.example"
+   },
+   "scripts": {
+    "postinstall": "node setup.js"
+   },
+   "dist": {
+    "integrity": "sha512-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=="
+   }
+  }
+ }
+}

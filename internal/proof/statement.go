@@ -170,6 +170,9 @@ type Predicate struct {
 	// Coverage is set on a coverage proof: each technique the rules claim,
 	// held to the corpus entries labelled with it and those labelled benign.
 	Coverage *CoverageEvidence `json:"coverage,omitempty"`
+	// Continuity is set on a continuity proof: each package of a bill held
+	// to the release before it.
+	Continuity *ContinuityEvidence `json:"continuity,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -294,7 +297,7 @@ func (s *Statement) validateEvidence() error {
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
 		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil,
-		p.PeerLog != nil, p.Coverage != nil} {
+		p.PeerLog != nil, p.Coverage != nil, p.Continuity != nil} {
 		if set {
 			kinds++
 		}
@@ -390,6 +393,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a coverage proof carries each technique's counts and no other evidence")
 		}
 		return p.Coverage.validate(s)
+	case PredicateContinuity:
+		if p.Continuity == nil || kinds != 1 {
+			return fmt.Errorf("a continuity proof carries each package's releases and no other evidence")
+		}
+		return p.Continuity.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

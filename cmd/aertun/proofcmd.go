@@ -264,6 +264,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["peer_log"] = st.Predicate.PeerLog
 	case st.Predicate.Coverage != nil:
 		out["coverage"] = st.Predicate.Coverage
+	case st.Predicate.Continuity != nil:
+		out["continuity"] = st.Predicate.Continuity
 	}
 	return out
 }
@@ -382,6 +384,9 @@ func describe(st *proof.Statement) string {
 	}
 	if v := p.Coverage; v != nil {
 		b.WriteString(describeCoverage(v))
+	}
+	if v := p.Continuity; v != nil {
+		b.WriteString(describeContinuity(v))
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

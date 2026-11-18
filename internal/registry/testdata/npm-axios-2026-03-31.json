@@ -1,0 +1,172 @@
+{
+ "_id": "axios",
+ "name": "axios",
+ "time": {
+  "created": "2014-08-29T23:08:36.810Z",
+  "modified": "2026-03-31T01:00:57.285Z",
+  "0.30.3": "2026-02-18T17:19:20.081Z",
+  "1.14.0": "2026-03-27T19:01:40.915Z",
+  "1.14.1": "2026-03-31T00:21:58.168Z",
+  "0.30.4": "2026-03-31T01:00:57.285Z"
+ },
+ "versions": {
+  "0.30.3": {
+   "name": "axios",
+   "version": "0.30.3",
+   "_npmUser": {
+    "name": "maintainer",
+    "email": "maintainer@example.com"
+   },
+   "scripts": {
+    "fix": "eslint --fix lib/**/*.js",
+    "test": "node bin/ssl_hotfix.js grunt test && node bin/ssl_hotfix.js dtslint --localTs node_modules/typescript/lib",
+    "build": "cross-env NODE_ENV=production grunt build",
+    "start": "node ./sandbox/server.js",
+    "examples": "node ./examples/server.js",
+    "coveralls": "cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
+    "preversion": "grunt version && npm test"
+   },
+   "dist": {
+    "shasum": "ab1be887a2d37dd9ebc219657704180faf2c4920",
+    "tarball": "https://registry.npmjs.org/axios/-/axios-0.30.3.tgz",
+    "fileCount": 72,
+    "integrity": "sha512-5/tmEb6TmE/ax3mdXBc/Mi6YdPGxQsv+0p5YlciXWt3PHIn0VamqCXhRMtScnwY3lbgSXLneOuXAKUhgmSRpwg==",
+    "signatures": [
+     {
+      "sig": "MEQCIAlgqBb4dfMqTANslLk9rqaer/E4wKWxYPbHCOv8mPrDAiB85XCI2Nb+GXGNNvGLPzTJUySVsXrcSMKPjzcF0f804A==",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     }
+    ],
+    "unpackedSize": 874741
+   },
+   "dependencies": {
+    "form-data": "^4.0.4",
+    "proxy-from-env": "^1.1.0",
+    "follow-redirects": "^1.15.4"
+   },
+   "gitHead": "f53bcf6c3747652c9d3811dc0bbcd3674e21567a"
+  },
+  "1.14.0": {
+   "name": "axios",
+   "version": "1.14.0",
+   "_npmUser": {
+    "name": "GitHub Actions",
+    "email": "npm-oidc-no-reply@github.com",
+    "trustedPublisher": {
+     "id": "github",
+     "oidcConfigId": "oidc:9061ef30-3132-49f4-b28c-9338d192a1a9"
+    }
+   },
+   "scripts": {
+    "fix": "eslint --fix lib/**/*.js",
+    "lint": "eslint lib/**/*.js",
+    "test": "npm run test:vitest",
+    "build": "gulp clear && cross-env NODE_ENV=production rollup -c -m",
+    "start": "node ./sandbox/server.js",
+    "prepare": "husky",
+    "version": "npm run build && git add package.json",
+    "examples": "node ./examples/server.js",
+    "preversion": "gulp version",
+    "test:vitest": "vitest run",
+    "test:module:cjs": "npm --prefix tests/module/cjs run test:module:cjs",
+    "test:module:esm": "npm --prefix tests/module/esm run test:module:esm",
+    "test:vitest:unit": "vitest run --project unit",
+    "test:vitest:watch": "vitest",
+    "test:vitest:browser": "vitest run --project browser",
+    "test:smoke:cjs:vitest": "npm --prefix tests/smoke/cjs run test:smoke:cjs:mocha",
+    "test:smoke:esm:vitest": "npm --prefix tests/smoke/esm run test:smoke:esm:vitest",
+    "test:vitest:browser:headless": "vitest run --project browser-headless"
+   },
+   "dist": {
+    "shasum": "7c29f4cf2ea91ef05018d5aa5399bf23ed3120eb",
+    "tarball": "https://registry.npmjs.org/axios/-/axios-1.14.0.tgz",
+    "fileCount": 86,
+    "integrity": "sha512-3Y8yrqLSwjuzpXuZ0oIYZ/XGgLwUIBU3uLvbcpb0pidD9ctpShJd43KSlEEkVQg6DS0G9NKyzOvBfUtDKEyHvQ==",
+    "signatures": [
+     {
+      "sig": "MEUCICrfrHnxo5SHAgrscf3J186Z2EmJ17/Dcx2mnjj1EaInAiEAjLgX56RFOfrWWHOQCuXM35aLCx9yLXn254meREnDj+E=",
+      "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+     }
+    ],
+    "attestations": {
+     "url": "https://registry.npmjs.org/-/npm/v1/attestations/axios@1.14.0",
+     "provenance": {
+      "predicateType": "https://slsa.dev/provenance/v1"
+     }
+    },
+    "unpackedSize": 2408136
+   },
+   "dependencies": {
+    "form-data": "^4.0.5",
+    "proxy-from-env": "^2.1.0",
+    "follow-redirects": "^1.15.11"
+   },
+   "gitHead": "46bee3dea75ef53a8eae49f3b7487e6341de6074"
+  },
+  "1.14.1": {
+   "name": "axios",
+   "version": "1.14.1",
+   "_npmUser": {
+    "name": "maintainer",
+    "email": "account-takeover@proton.example"
+   },
+   "scripts": {
+    "fix": "eslint --fix lib/**/*.js",
+    "lint": "eslint lib/**/*.js",
+    "test": "npm run test:vitest",
+    "build": "gulp clear && cross-env NODE_ENV=production rollup -c -m",
+    "start": "node ./sandbox/server.js",
+    "prepare": "husky",
+    "version": "npm run build && git add package.json",
+    "examples": "node ./examples/server.js",
+    "preversion": "gulp version",
+    "test:vitest": "vitest run",
+    "test:module:cjs": "npm --prefix tests/module/cjs run test:module:cjs",
+    "test:module:esm": "npm --prefix tests/module/esm run test:module:esm",
+    "test:vitest:unit": "vitest run --project unit",
+    "test:vitest:watch": "vitest",
+    "test:vitest:browser": "vitest run --project browser",
+    "test:smoke:cjs:vitest": "npm --prefix tests/smoke/cjs run test:smoke:cjs:mocha",
+    "test:smoke:esm:vitest": "npm --prefix tests/smoke/esm run test:smoke:esm:vitest",
+    "test:vitest:browser:headless": "vitest run --project browser-headless"
+   },
+   "dist": {
+    "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "tarball": "https://registry.npmjs.org/axios/-/axios-1.14.1.tgz"
+   },
+   "dependencies": {
+    "form-data": "^4.0.5",
+    "proxy-from-env": "^2.1.0",
+    "follow-redirects": "^1.15.11",
+    "plain-crypto-js": "^4.2.1"
+   }
+  },
+  "0.30.4": {
+   "name": "axios",
+   "version": "0.30.4",
+   "_npmUser": {
+    "name": "maintainer",
+    "email": "account-takeover@proton.example"
+   },
+   "scripts": {
+    "fix": "eslint --fix lib/**/*.js",
+    "test": "node bin/ssl_hotfix.js grunt test && node bin/ssl_hotfix.js dtslint --localTs node_modules/typescript/lib",
+    "build": "cross-env NODE_ENV=production grunt build",
+    "start": "node ./sandbox/server.js",
+    "examples": "node ./examples/server.js",
+    "coveralls": "cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
+    "preversion": "grunt version && npm test"
+   },
+   "dist": {
+    "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "tarball": "https://registry.npmjs.org/axios/-/axios-0.30.4.tgz"
+   },
+   "dependencies": {
+    "form-data": "^4.0.4",
+    "proxy-from-env": "^1.1.0",
+    "follow-redirects": "^1.15.4",
+    "plain-crypto-js": "^4.2.1"
+   }
+  }
+ }
+}
