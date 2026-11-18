@@ -44,7 +44,10 @@ import (
 // outside. A continuity proof's words are rebuilt from its numbers and
 // closed sets, and every name a publisher chose is in it as a digest; the
 // package URLs it lists are the bill's, strictly shaped, and labelled as
-// written outside.
+// written outside. A referee proof's words are rebuilt from closed sets and
+// numbers, with every path and name the report chose as a digest; the
+// package URL and versions it names are the report's, strictly shaped, and
+// labelled as written outside.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -67,12 +70,13 @@ var proofKinds = map[string]string{
 	proof.PredicatePeerLog:        "peer-log",
 	proof.PredicateCoverage:       "coverage",
 	proof.PredicateContinuity:     "continuity",
+	proof.PredicateReferee:        "referee",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
 	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr",
-	"peer-log", "coverage", "continuity"}
+	"peer-log", "coverage", "continuity", "referee"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -89,7 +93,8 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
 		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
 		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil ||
-		st.Predicate.Coverage != nil || st.Predicate.Continuity != nil {
+		st.Predicate.Coverage != nil || st.Predicate.Continuity != nil ||
+		st.Predicate.Referee != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -457,6 +462,24 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 			if v.Last != nil {
 				evidence.With("last_head", ops.Object().With("size", ops.Ours(v.Last.Size)).
 					With("root", ops.Ours(v.Last.Root)))
+			}
+			row.With("evidence", evidence)
+		case p.Referee != nil:
+			v := p.Referee
+			places := ops.ListOf(v.Locations, func(l proof.RefereeLocation) *ops.Answer {
+				return ops.Object().With("file", ops.Ours(l.File)).With("function", ops.Ours(l.Function)).
+					With("line", ops.Ours(l.Line)).With("language", ops.Ours(l.Language)).
+					With("found", ops.Ours(l.Found))
+			})
+			evidence := ops.Object().With("package", ops.Outside(v.Package)).With("commit", ops.Ours(v.Commit)).
+				With("head", ops.Ours(v.Head)).With("declared", ops.Outside(v.Declared)).
+				With("introduced", ops.Outside(v.Introduced)).With("fixed", ops.Outside(v.Fixed)).
+				With("range", ops.Ours(v.Range)).With("locations", places).With("cwe", ops.Ours(v.CWE)).
+				With("vector", ops.Ours(v.Vector)).With("score", ops.Ours(v.Score)).
+				With("severity", ops.Ours(v.Severity)).With("fingerprint", ops.Ours(v.Fingerprint)).
+				With("duplicates", ops.Ours(len(v.Duplicates))).With("reach", ops.Ours(v.Reach))
+			if c := v.Committed; c != nil {
+				evidence.With("committed_at_entry", ops.Ours(int(c.Seq))).With("committed_at", ops.Ours(c.At))
 			}
 			row.With("evidence", evidence)
 		case p.Continuity != nil:

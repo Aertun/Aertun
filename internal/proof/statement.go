@@ -173,6 +173,9 @@ type Predicate struct {
 	// Continuity is set on a continuity proof: each package of a bill held
 	// to the release before it.
 	Continuity *ContinuityEvidence `json:"continuity,omitempty"`
+	// Referee is set on a referee proof: a vulnerability report's static
+	// claims held to the source it is about.
+	Referee *RefereeEvidence `json:"referee,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -297,7 +300,7 @@ func (s *Statement) validateEvidence() error {
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
 		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil,
-		p.PeerLog != nil, p.Coverage != nil, p.Continuity != nil} {
+		p.PeerLog != nil, p.Coverage != nil, p.Continuity != nil, p.Referee != nil} {
 		if set {
 			kinds++
 		}
@@ -398,6 +401,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a continuity proof carries each package's releases and no other evidence")
 		}
 		return p.Continuity.validate(s)
+	case PredicateReferee:
+		if p.Referee == nil || kinds != 1 {
+			return fmt.Errorf("a referee proof carries what was found of the report's claims and no other evidence")
+		}
+		return p.Referee.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

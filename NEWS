@@ -4,6 +4,26 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun vuln referee REPORT --source DIR --key F` holds a vulnerability
+  report's static claims, usually a model's, to a checkout of the source it
+  is about, and signs what came of it.  The report is JSON in the new
+  format aertun/vuln-report/v1, read strictly.  It is refuted when a cited
+  file is not there, a cited function is not defined in it (Go, JavaScript
+  and TypeScript, Python, C and C++, Rust, Java and Kotlin, Ruby and PHP),
+  or a line is past its end; when the source declares another version, or
+  the version is outside the range the report gives, or the range is
+  inverted; when its CVSS 3 vector scores otherwise or the score is not of
+  the severity given; and when an earlier report of the same flaw was
+  committed or refereed here.  It is inconclusive when the checkout is not
+  at the report's commit, or a claim cannot be checked.  `--asset DIR`
+  asks whether an asset's own Go code references the vulnerable symbol.
+  Proofs of concept are never run.  `aertun vuln commit REPORT` writes the
+  report's digest and its flaw's fingerprint to the audit log, and nothing
+  else of it: a referee proof names that entry as the report's priority,
+  and the moment it was known.  Paths and names the report chose are
+  carried only as digests.  The predicate is
+  https://aertun.github.io/proof/referee/v1.
+
 * `aertun vuln continuity BILL --key F` holds each npm, PyPI and Go package
   in a bill of materials (CycloneDX or SPDX) to the release before it, as
   its registry describes both, and signs what came of it.  A package is

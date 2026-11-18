@@ -331,7 +331,12 @@ var commandNeeds = map[string]need{
 	// registries and signs what they said in the organisation's name: the
 	// command asks for tune itself, as prove-vex does.
 	"vuln continuity": {action: auth.ActAssess},
-	"vuln assets":     {action: auth.ActView},
+	// Committing a report writes its digest to the audit log, the weight of
+	// taking a report in; refereeing it signs what its claims came to in the
+	// organisation's name, and asks for tune itself.
+	"vuln commit":  {action: auth.ActAssess},
+	"vuln referee": {action: auth.ActAssess},
+	"vuln assets":  {action: auth.ActView},
 
 	// Storing a credential for another company's system is the heaviest
 	// thing here, and running a connector is an ordinary write. Reading a
