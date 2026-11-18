@@ -219,3 +219,42 @@ func TestHeadAtRejectsOutOfRange(t *testing.T) {
 		t.Fatal("a proof in a tree larger than the log was returned")
 	}
 }
+
+// One pass gives the root at every size, and each is the root HeadAt
+// computes from the leaves: the same tree, at sizes on and either side of
+// every power of two up to 130, asked for in any order and more than once.
+func TestRootsAtAgreesWithHeadAt(t *testing.T) {
+	l := New()
+	for i := 0; i < 130; i++ {
+		l.Append([]byte(fmt.Sprintf("entry %d", i)))
+	}
+	var sizes []int
+	for n := 130; n >= 0; n-- {
+		sizes = append(sizes, n)
+	}
+	sizes = append(sizes, 64, 1, 130, 0, 127)
+	got, err := l.RootsAt(sizes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, n := range sizes {
+		want, err := l.HeadAt(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got[i] != want.Root {
+			t.Errorf("at size %d: %s, and HeadAt says %s", n, got[i], want.Root)
+		}
+	}
+	if none, err := l.RootsAt(nil); err != nil || len(none) != 0 {
+		t.Errorf("asked for nothing: %v %v", none, err)
+	}
+	for _, bad := range []int{-1, 131} {
+		if _, err := l.RootsAt([]int{3, bad}); err == nil {
+			t.Errorf("a root at size %d of a log of 130 was given", bad)
+		}
+	}
+	if empty, err := New().RootsAt([]int{0}); err != nil || empty[0] != New().Head().Root {
+		t.Errorf("the empty log: %v %v", empty, err)
+	}
+}

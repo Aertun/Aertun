@@ -191,7 +191,9 @@ func TestAChangedOrStrangeBatchIsRefused(t *testing.T) {
 	if err := httpsig.Sign(req, KeyID(pub), httpsig.Ed25519, r.sender.Key, Covered, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.recv.Accept(req, body, now); err == nil || !strings.Contains(err.Error(), "rebuild") {
+	var fork *ErrFork
+	if _, err := r.recv.Accept(req, body, now); !errors.As(err, &fork) || fork.Resent ||
+		fork.Head.Root != b.Head.Root || fork.Held == b.Head.Root || !strings.Contains(err.Error(), "rebuild") {
 		t.Errorf("a dropped record: %v", err)
 	}
 
@@ -262,5 +264,85 @@ func TestABatchProvesItselfOrIsRefused(t *testing.T) {
 	}
 	if r.recv.Holds() != 0 {
 		t.Errorf("something was taken: %d", r.recv.Holds())
+	}
+}
+
+// A sender that signs two histories is caught by whoever holds the first.
+// Records already held and sent again under the same head are only a
+// resend; under another head, signed with the same keys, they are a fork,
+// and the head is handed back as the evidence. Nothing is taken either way.
+func TestASenderThatSignsTwoHistoriesIsCaught(t *testing.T) {
+	r := newRig(t)
+	r.write(t, 3)
+	if n, err := r.sender.Push(context.Background(), now); err != nil || n != 3 {
+		t.Fatalf("first push: %d %v", n, err)
+	}
+	held := r.took[0].Head
+
+	// The same three records again: the receiver says what it holds.
+	events, _ := r.sender.Read()
+	again, err := r.sender.Batch(events, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, body := sign(t, r, again, Covered)
+	var gap *ErrGap
+	if _, err := r.recv.Accept(req, body, now); !errors.As(err, &gap) || gap.Holds != 3 {
+		t.Fatalf("a resend of what is held: %v", err)
+	}
+
+	// Another log, signed with the same keys: its first two records are not
+	// the two held.
+	dir := t.TempDir()
+	pseudonyms, _ := audit.NewKey()
+	other, err := audit.New(audit.Options{Path: filepath.Join(dir, "audit.jsonl"), Source: "test-host", Key: pseudonyms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := other.Append(audit.Record{Action: "auth.grant", Resource: "/", Outcome: audit.Success,
+			Principal: "mallory", Kind: audit.KindHuman, Verified: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rewritten, _ := audit.Read(filepath.Join(dir, "audit.jsonl"))
+	forked, err := r.sender.Batch(rewritten, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, body = sign(t, r, forked, Covered)
+	var fork *ErrFork
+	_, err = r.recv.Accept(req, body, now)
+	if !errors.As(err, &fork) || !fork.Resent || fork.Head.Size != 2 || fork.Head.Root != forked.Head.Root ||
+		fork.Held == forked.Head.Root || !strings.Contains(err.Error(), "two histories") {
+		t.Fatalf("a second history of records already held: %v", err)
+	}
+	if r.recv.Heads.Verify(fork.Head) != nil {
+		t.Error("the head handed back as evidence does not verify")
+	}
+	if r.recv.Holds() != 3 {
+		t.Errorf("the receiver took from a fork: holds %d", r.recv.Holds())
+	}
+
+	// A head signed by somebody else for records already held is not the
+	// sender's word, so it is no evidence against it: only a resend.
+	edSeed, mlSeed, _ := audit.GenerateHeadSeeds()
+	stranger, _ := audit.NewHeadSigner(edSeed, mlSeed)
+	forged := *forked
+	if forged.Head, err = stranger.Sign(forked.Head.Head); err != nil {
+		t.Fatal(err)
+	}
+	req, body = sign(t, r, &forged, Covered)
+	if _, err := r.recv.Accept(req, body, now); !errors.As(err, &gap) {
+		t.Errorf("a head another key signed was taken as the sender's fork: %v", err)
+	}
+
+	// And the log goes on from what is held.
+	r.write(t, 1)
+	if n, err := r.sender.Push(context.Background(), now); err != nil || n != 1 || r.recv.Holds() != 4 {
+		t.Fatalf("after the fork: %d %v, holds %d", n, err, r.recv.Holds())
+	}
+	if held.Size != 3 {
+		t.Errorf("the first head covers %d", held.Size)
 	}
 }

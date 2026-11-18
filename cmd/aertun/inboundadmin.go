@@ -53,6 +53,19 @@ func feedsHooks(root string, inb *inboundServer) *admin.FeedsAdmin {
 				if !f.Verified.IsZero() {
 					v.Verified = f.Verified.UTC().Format("2 Jan 15:04")
 				}
+				if f.Kind == inbound.AuditStream {
+					head, forks, err := peerChainHead(root, n)
+					switch {
+					case err != nil:
+						v.Error = err.Error()
+					case head != nil || forks > 0:
+						v.Peer = &admin.PeerChain{Forks: forks}
+						if head != nil {
+							v.Peer.Records, v.Peer.Root = head.Head.Size, short(head.Head.Root)
+							v.Peer.Received = head.Received.UTC().Format("2 Jan 15:04")
+						}
+					}
+				}
 				if !st.LastAt.IsZero() {
 					v.Last = st.LastAt.UTC().Format("2 Jan 15:04")
 				}

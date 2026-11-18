@@ -97,6 +97,25 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* `aertun inbound prove NAME --key F [--at TIME]` signs whether another
+  site's audit log, received on a stream feed, is complete and unforked up
+  to a time.  A stream feed now keeps every tree head the sender signs
+  with the batch it came in.  A head signed with the sender's own keys
+  that is not the log already held — records it sent before, now under
+  another root — is a fork: answered 409, kept as evidence with its
+  signatures, written once to this deployment's audit log (where the new
+  rule aertun.peer-log-forked reads it, from this log or a peer's), and
+  nothing is taken from it.  The proof rebuilds the log from what was
+  kept and holds every head to it: refuted when a head is not the records
+  held, or the sender forked — even when the evidence was deleted from
+  the feed afterwards, since the audit log still records it; proven when
+  the last batch arrived at or after the time asked about and was smaller
+  than a full batch, so it reached the end of the sender's log; and
+  inconclusive otherwise, because a site with nothing to send is silent
+  and so is one that stopped sending.  The Feeds screen and `inbound
+  status` show each peer's chain head and any fork.  The predicate is
+  https://aertun.github.io/proof/peer-log/v1.
+
 * A Bitcoin timestamp counts only with its block.  An OpenTimestamps
   attestation is a block height and nothing more, and anybody who can
   write the store could append one to back-date a head; so `aertun

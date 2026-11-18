@@ -9,9 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +70,134 @@ const streamBodyLimit = 8 << 20
 
 func streamLeavesPath(root, name string) string {
 	return filepath.Join(inboundDir(root), name+".leaves")
+}
+
+func streamHeadsPath(root, name string) string {
+	return filepath.Join(inboundDir(root), name+".heads")
+}
+
+func streamForksPath(root, name string) string {
+	return filepath.Join(inboundDir(root), name+".forks")
+}
+
+// maxStreamForks bounds the conflicting heads kept for one feed: one is
+// enough to refute, and whoever holds the sender's keys would otherwise
+// choose how large the file grows.
+const maxStreamForks = 64
+
+// peerHead is a tree head a sender signed, kept with the batch it came in:
+// what `aertun inbound prove` holds the records against, and what the Feeds
+// screen shows as the peer's chain head.
+type peerHead struct {
+	// Received is when the batch was taken, by this deployment's clock.
+	Received time.Time `json:"received"`
+	// Records is how many records the batch carried. Fewer than a full
+	// batch means it reached the end of the sender's log as it then was.
+	Records int              `json:"records"`
+	Head    audit.SignedHead `json:"head"`
+}
+
+// peerFork is a tree head a sender signed that is not the log held here.
+type peerFork struct {
+	Received time.Time `json:"received"`
+	// Resent is whether it covered records already held (see
+	// auditstream.ErrFork).
+	Resent bool `json:"resent,omitempty"`
+	// Held is the root this deployment computed over the same number of
+	// records.
+	Held string           `json:"held"`
+	Head audit.SignedHead `json:"head"`
+}
+
+// readJSONLines reads a file of one JSON value a line into out, leaving out
+// a last line that was not finished, as readStreamLeaves does.
+func readJSONLines[T any](path string) ([]T, error) {
+	b, err := readBounded(path, 64<<20)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []T
+	for _, l := range bytes.Split(b[:bytes.LastIndexByte(b, '\n')+1], []byte("\n")) {
+		if len(bytes.TrimSpace(l)) == 0 {
+			continue
+		}
+		var v T
+		if err := json.Unmarshal(l, &v); err != nil {
+			return nil, fmt.Errorf("%s holds a line that does not read: %w", filepath.Base(path), err)
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// appendJSONLine adds one value to a file of JSON lines, synced.
+func appendJSONLine(path string, v any) error {
+	line, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	fh, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	_, werr := fh.Write(append(line, '\n'))
+	serr := fh.Sync()
+	cerr := fh.Close()
+	return errors.Join(werr, serr, cerr)
+}
+
+// peerChainHead is the last tree head a stream feed's sender signed and
+// this deployment took, and how many heads it signed that were not the log
+// held: what the Feeds screen and `inbound status` say of a peer. Read from
+// the end of the heads file, so a page view never rebuilds the log; the
+// proof (`aertun inbound prove`) is what checks every head against it.
+func peerChainHead(root, name string) (*peerHead, int, error) {
+	b, err := readBounded(streamHeadsPath(root, name), 64<<20)
+	var last *peerHead
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
+		return nil, 0, err
+	default:
+		whole := b[:bytes.LastIndexByte(b, '\n')+1]
+		lines := bytes.Split(bytes.TrimRight(whole, "\n"), []byte("\n"))
+		if n := len(lines); n > 0 && len(bytes.TrimSpace(lines[n-1])) > 0 {
+			var h peerHead
+			if err := json.Unmarshal(lines[n-1], &h); err != nil {
+				return nil, 0, fmt.Errorf("the last head kept for %s does not read: %w", name, err)
+			}
+			last = &h
+		}
+	}
+	forks, err := readJSONLines[peerFork](streamForksPath(root, name))
+	if err != nil {
+		return nil, 0, err
+	}
+	return last, len(forks), nil
+}
+
+// keepFork keeps a conflicting head once, and reports whether it was new.
+func keepFork(root, name string, fork peerFork) (bool, error) {
+	path := streamForksPath(root, name)
+	kept, err := readJSONLines[peerFork](path)
+	if err != nil {
+		return false, err
+	}
+	for _, k := range kept {
+		if k.Head.Size == fork.Head.Size && k.Head.Root == fork.Head.Root {
+			return false, nil
+		}
+	}
+	if len(kept) >= maxStreamForks {
+		return false, nil
+	}
+	return true, appendJSONLine(path, fork)
 }
 
 // heldStream is one feed's receiver, and the lock that keeps its batches in
@@ -267,9 +397,34 @@ func (s *inboundServer) auditStream(w http.ResponseWriter, r *http.Request, f in
 	now := s.now().UTC()
 	b, err := h.rc.Accept(r, body, now)
 	var gap *auditstream.ErrGap
+	var fork *auditstream.ErrFork
 	switch {
 	case errors.As(err, &gap):
 		streamAnswer(w, http.StatusConflict, map[string]any{"holds": gap.Holds, "error": gap.Error()})
+		return
+	case errors.As(err, &fork):
+		// The sender's own signatures on a history that is not the one
+		// held. Kept as evidence, once, and written to this deployment's
+		// own log, where a rule reads it; nothing is taken from the batch.
+		fresh, kerr := keepFork(s.root, f.Name, peerFork{Received: now, Resent: fork.Resent,
+			Held: fork.Held, Head: fork.Head})
+		// The sender is who signed it, proved by its keys: the entry is in
+		// its name, as the feed's, like everything else a feed delivers.
+		if kerr == nil && fresh {
+			if err := recordE(s.root, audit.Record{Action: "inbound.fork", Resource: "/feeds/" + f.Name,
+				Outcome: audit.Failure, Principal: "feed:" + f.Name, Kind: audit.KindService, Verified: true,
+				Detail: map[string]string{"feed": f.Name, "records": strconv.Itoa(fork.Head.Size),
+					"signed_root": fork.Head.Root, "held_root": fork.Held,
+					"resent": strconv.FormatBool(fork.Resent)}}); err != nil {
+				s.mu.Lock()
+				s.statusOf(f.Name).Error = err.Error()
+				s.dirty = true
+				s.mu.Unlock()
+			}
+		}
+		s.refused(f.Name, fork.Error())
+		streamAnswer(w, http.StatusConflict, map[string]any{"holds": h.rc.Holds(),
+			"error": "the tree head is not the log held here"})
 		return
 	case err != nil:
 		s.refused(f.Name, err.Error())
@@ -292,6 +447,14 @@ func (s *inboundServer) auditStream(w http.ResponseWriter, r *http.Request, f in
 		return
 	}
 	if err := appendStreamLeaves(streamLeavesPath(s.root, f.Name), b.Leaves); err != nil {
+		h.rc = nil
+		streamAnswer(w, http.StatusServiceUnavailable, map[string]any{"error": "what was sent could not be kept"})
+		return
+	}
+	// The head it signed, kept after the leaves it covers: a head with no
+	// leaves under it would be one nothing here could be held against.
+	if err := appendJSONLine(streamHeadsPath(s.root, f.Name), peerHead{Received: now,
+		Records: len(b.Leaves), Head: b.Head}); err != nil {
 		h.rc = nil
 		streamAnswer(w, http.StatusServiceUnavailable, map[string]any{"error": "what was sent could not be kept"})
 		return

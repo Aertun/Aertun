@@ -115,6 +115,7 @@ Ed25519 and ML-DSA-65.
 | **Chain posture** | a protocol's multisig thresholds, timelock delays and proxy admins are what it declares | the chain itself, read over JSON-RPC at one block named by its hash | `aertun chain posture` |
 | **Sealed alert** | this alert existed by then — a monitor saw it first | the audit log, verified, holding the alert's digest in a batch it sealed (`aertun alert seal`), under a log head anchored in Bitcoin through OpenTimestamps, in a block whose header was checked | `aertun proof sealed` |
 | **MDR** | a managed detection provider, or an AI SOC, notifies within its SLA on all but this share of attacks | emulations run on your estate at random times from a plan whose digest the audit log committed before any ran, each run and notification recorded by a verified person or joined from the provider's alerts | `aertun mdr prove` |
+| **Peer log** | another site's audit log is complete up to a time, and the site has not signed a second history | the site's records as its signed stream delivered them, every tree head it signed with its own keys, and this deployment's log of any head that contradicted them | `aertun inbound prove` |
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:

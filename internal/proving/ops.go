@@ -57,11 +57,13 @@ var proofKinds = map[string]string{
 	proof.PredicateChainPosture:   "chain-posture",
 	proof.PredicateSealed:         "sealed",
 	proof.PredicateMDR:            "mdr",
+	proof.PredicatePeerLog:        "peer-log",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr"}
+	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr",
+	"peer-log"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -77,7 +79,7 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
 		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
-		st.Predicate.Sealed != nil || st.Predicate.MDR != nil {
+		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -427,6 +429,19 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("missed", ops.Object().With("k", ops.Ours(v.Missed.K)).With("n", ops.Ours(v.Missed.N)).
 					With("lower", ops.Ours(v.Missed.Lower)).With("upper", ops.Ours(v.Missed.Upper))).
 				With("median_seconds", ops.Ours(v.Median)).With("p90_seconds", ops.Ours(v.P90)))
+		case p.PeerLog != nil:
+			v := p.PeerLog
+			evidence := ops.Object().With("peer", ops.Ours(v.Peer)).With("head_key", ops.Ours(v.Keys.KeyID)).
+				With("at", ops.Ours(v.At)).With("held", ops.Ours(v.Held)).With("root", ops.Ours(v.Root)).
+				With("heads", ops.Ours(v.Heads)).With("agreeing", ops.Ours(v.Agreeing)).
+				With("disagree", ops.Ours(v.Disagree)).With("forks", ops.Ours(v.ForkCount)).
+				With("last_received", ops.Ours(v.LastReceived)).With("last_records", ops.Ours(v.LastRecords)).
+				With("full_batch", ops.Ours(v.FullBatch))
+			if v.Last != nil {
+				evidence.With("last_head", ops.Object().With("size", ops.Ours(v.Last.Size)).
+					With("root", ops.Ours(v.Last.Root)))
+			}
+			row.With("evidence", evidence)
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

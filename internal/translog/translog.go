@@ -169,6 +169,61 @@ func (l *Log) HeadAt(n int) (Head, error) {
 	return Head{Size: n, Root: hex.EncodeToString(l.root(l.leaves[:n]))}, nil
 }
 
+// RootsAt returns the root the log had at each of the sizes given, in the
+// order given, in one pass over the leaves.
+//
+// HeadAt recomputes a tree from its leaves each time it is asked, which is
+// the cost of one root; holding a log against every head a sender signed is
+// thousands of roots of one log. This keeps the perfect subtrees of the
+// leaves read so far — at most one of each size — and folds them into a
+// root wherever one is asked for: the same tree RFC 6962 defines, which
+// TestRootsAtAgreesWithHeadAt holds it to at every size.
+func (l *Log) RootsAt(sizes []int) ([]string, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	wanted := map[int][]int{}
+	for i, n := range sizes {
+		if n < 0 || n > len(l.leaves) {
+			return nil, fmt.Errorf("size %d is outside a log of %d", n, len(l.leaves))
+		}
+		wanted[n] = append(wanted[n], i)
+	}
+	out := make([]string, len(sizes))
+	type subtree struct {
+		hash []byte
+		n    int
+	}
+	var peaks []subtree
+	fold := func() string {
+		if len(peaks) == 0 {
+			h := sha256.Sum256(nil)
+			return hex.EncodeToString(h[:])
+		}
+		acc := peaks[len(peaks)-1].hash
+		for j := len(peaks) - 2; j >= 0; j-- {
+			acc = HashNode(peaks[j].hash, acc)
+		}
+		return hex.EncodeToString(acc)
+	}
+	for _, i := range wanted[0] {
+		out[i] = fold()
+	}
+	for size, leaf := range l.leaves {
+		peaks = append(peaks, subtree{leaf, 1})
+		for len(peaks) >= 2 && peaks[len(peaks)-1].n == peaks[len(peaks)-2].n {
+			right, left := peaks[len(peaks)-1], peaks[len(peaks)-2]
+			peaks = append(peaks[:len(peaks)-2], subtree{HashNode(left.hash, right.hash), left.n * 2})
+		}
+		if at := wanted[size+1]; len(at) > 0 {
+			root := fold()
+			for _, i := range at {
+				out[i] = root
+			}
+		}
+	}
+	return out, nil
+}
+
 // InclusionProof returns the audit path for leaf index in a tree of size n.
 func (l *Log) InclusionProof(index, n int) ([]string, error) {
 	l.mu.RLock()

@@ -106,6 +106,11 @@ var commandNeeds = map[string]need{
 	"inbound list":   {action: auth.ActView},
 	"inbound status": {action: auth.ActView},
 	"inbound help":   {action: auth.ActView},
+	// A proof that a peer's log is whole and unforked reads what the feed
+	// kept and this deployment's audit log, and signs in the organisation's
+	// name: it asks for tune itself before it reads anything, as the other
+	// proofs signed from the store do, so this row only lets it start.
+	"inbound prove": {action: auth.ActView},
 	// Where sign-ins come from decides which of them are stepped up, so
 	// naming a network is a decision for all of Aertun; reading is a view.
 	"geo":        {action: auth.ActGrant},

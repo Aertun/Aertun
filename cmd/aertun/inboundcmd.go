@@ -26,6 +26,7 @@ func inboundUsage() error {
 		"add ssf NAME --issuer URL --url https://YOUR-ADMIN [--alias okta] | " +
 		streamFeedUsage +
 		"connect NAME --client-id ID [--token-url URL] | verify NAME | " +
+		"prove NAME --key F [--at TIME] [--out F] | " +
 		"rotate NAME | on NAME | off NAME | remove NAME | help")
 }
 
@@ -95,6 +96,8 @@ func cmdInbound(root string, args []string) error {
 			return inboundUsage()
 		}
 		return inboundStatusOf(root, args[1])
+	case "prove":
+		return inboundProve(root, args[1:])
 	case "add":
 		if len(args) < 3 {
 			return inboundUsage()
@@ -546,11 +549,16 @@ func removeFeed(root, name string) (string, error) {
 	}
 	delete(m, name)
 	if f.Kind == inbound.AuditStream {
-		// The chain held for it goes with it: a feed added again under the
-		// name starts from nothing, and its sender is told so by the first
-		// answer and sends everything again.
-		if err := os.Remove(streamLeavesPath(root, name)); err != nil && !os.IsNotExist(err) {
-			return warn, err
+		// The chain held for it goes with it, and the heads signed over
+		// that chain: a feed added again under the name starts from
+		// nothing, and its sender is told so by the first answer and sends
+		// everything again. A fork it was caught in stays in the audit log,
+		// where the entry that recorded it cannot be removed with the feed.
+		for _, path := range []string{streamLeavesPath(root, name), streamHeadsPath(root, name),
+			streamForksPath(root, name)} {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return warn, err
+			}
 		}
 	}
 	return warn, saveFeeds(root, m)
@@ -573,7 +581,14 @@ func inboundStatusOf(root, name string) error {
 	if st == nil {
 		st = &inboundStatus{}
 	}
-	if w.JSON(map[string]any{"feed": f, "status": st}) {
+	var head *peerHead
+	forks := 0
+	if f.Kind == inbound.AuditStream {
+		if head, forks, err = peerChainHead(root, name); err != nil {
+			return err
+		}
+	}
+	if w.JSON(map[string]any{"feed": f, "status": st, "chain_head": head, "forks": forks}) {
 		return nil
 	}
 	w.Human("%s%s%s  %s  /feeds/%s\n", bold, f.Name, reset, f.Kind, f.Name)
@@ -586,6 +601,16 @@ func inboundStatusOf(root, name string) error {
 	}
 	w.Human("  %d deliveries, %d records: %d stored, %d already held, %d did not map; %d signals\n",
 		st.Deliveries, st.Records, st.Stored, st.Known, st.Missed, st.Signals)
+	if f.Kind == inbound.AuditStream {
+		if head != nil {
+			w.Human("  chain head: %d records, root %s, signed by the sender and taken %s\n",
+				head.Head.Size, head.Head.Root, head.Received.UTC().Format("2 Jan 2006 15:04"))
+		}
+		if forks > 0 {
+			w.Human("  %s%d tree head(s) the sender signed are not the log held: it has signed two "+
+				"histories (aertun inbound prove %s)%s\n", red, forks, name, reset)
+		}
+	}
 	if st.Field != "" {
 		w.Human("  %smost often missing: %s%s\n", yellow, st.Field, reset)
 	}

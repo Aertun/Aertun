@@ -28,6 +28,8 @@
   <p><code>{{$.Base}}{{.Path}}</code></p>
   {{if .Issuer}}<p class="hint">From {{.Issuer}}{{if .Stream}}; stream {{.Stream}}{{end}}{{if .Status}}, {{.Status}}{{end}}; {{if .Verified}}verified {{.Verified}}{{else}}not verified yet{{end}}.</p>{{end}}
   {{if .Mapping}}<p class="hint">Records go through the {{.Mapping}} mapping.</p>{{end}}
+  {{with .Peer}}{{if .Forks}}<p class="notice bad" role="alert">This site signed {{.Forks}} tree head{{if ne .Forks 1}}s{{end}} of a log that is not the one held here: it has shown this deployment one history and keeps another. <code>aertun inbound prove {{$.Name}}</code> signs what is held against it.</p>{{end}}
+  {{if .Records}}<p class="hint">Chain head: {{.Records}} record{{if ne .Records 1}}s{{end}}, root <code>{{.Root}}</code>, signed by the site and taken {{.Received}}.</p>{{end}}{{end}}
   <p class="hint">{{.Deliveries}} deliver{{if eq .Deliveries 1}}y{{else}}ies{{end}}{{if .Last}}, last {{.Last}}{{end}}: {{.Stored}} events stored, {{.Known}} already held, {{.Missed}} did not map; {{.Signals}} signal{{if ne .Signals 1}}s{{end}}.</p>
   {{if .Field}}<p class="notice warn">Records are not mapping. The field most often missing is <code>{{.Field}}</code>: the sender may have renamed it.</p>{{end}}
   {{if .Refused}}<p class="hint">{{.Refused}} refused, last {{.LastRefused}}: {{.Why}}</p>{{end}}

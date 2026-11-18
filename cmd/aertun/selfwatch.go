@@ -47,7 +47,7 @@ const AgentSource = "aertun/agent"
 // selfDetail are the audit details a rule about aertun may read. Others are
 // left out: they are either free text somebody typed, or not needed.
 var selfDetail = []string{"role", "surface", "failures", "setting", "to",
-	"autonomy", "agent", "reason", "conversation", "alone"}
+	"autonomy", "agent", "reason", "conversation", "alone", "feed", "records"}
 
 // agentDetail are the audit details a rule about a model may read: what it
 // proposed and where, which tool it called, and the closed words. The

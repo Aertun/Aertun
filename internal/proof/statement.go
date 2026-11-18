@@ -164,6 +164,9 @@ type Predicate struct {
 	// MDR is set on an MDR proof: a provider's notifications on emulations
 	// run blind, from a plan committed before any was run.
 	MDR *MDREvidence `json:"mdr,omitempty"`
+	// PeerLog is set on a peer-log proof: another deployment's audit log as
+	// it was received, held against every tree head that deployment signed.
+	PeerLog *PeerLogEvidence `json:"peer_log,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -287,7 +290,8 @@ func (s *Statement) validateEvidence() error {
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
-		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil} {
+		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil,
+		p.PeerLog != nil} {
 		if set {
 			kinds++
 		}
@@ -373,6 +377,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("an MDR proof carries MDR evidence and no other")
 		}
 		return p.MDR.validate(s)
+	case PredicatePeerLog:
+		if p.PeerLog == nil || kinds != 1 {
+			return fmt.Errorf("a peer-log proof carries what is held of a peer's log and no other evidence")
+		}
+		return p.PeerLog.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

@@ -256,6 +256,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["sealed"] = st.Predicate.Sealed
 	case st.Predicate.MDR != nil:
 		out["mdr"] = st.Predicate.MDR
+	case st.Predicate.PeerLog != nil:
+		out["peer_log"] = st.Predicate.PeerLog
 	}
 	return out
 }
@@ -357,6 +359,11 @@ func describe(st *proof.Statement) string {
 			"time to notify %ds median, %ds at the 90th percentile; test closed: %v",
 			v.Plan, v.Provider, v.Committed.Seq, v.Run, v.Planned, v.Within, v.SLA, v.Late, v.Never,
 			v.Missed.Lower, v.Missed.Upper, v.Tolerance, v.Median, v.P90, v.Closed)
+	}
+	if v := p.PeerLog; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d record(s) of %s held; %d of %d tree head(s) it signed agree, "+
+			"%d fork(s); last batch of %d received %s", v.Held, v.Peer, v.Agreeing, v.Heads, v.ForkCount,
+			v.LastRecords, v.LastReceived)
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

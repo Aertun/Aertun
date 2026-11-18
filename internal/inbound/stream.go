@@ -101,6 +101,7 @@ var streamDetail = map[string]string{
 	"severity": "severity", "signal": "signal", "playbook": "playbook", "rule": "rule",
 	"failures": "failures", "surface": "surface", "setting": "setting", "risk": "risk",
 	"agent": "agent", "autonomy": "autonomy", "tool": "tool", "operation": "operation",
+	"feed": "feed", "records": "records",
 }
 
 // StreamEvents maps a batch's OCSF records into events, in order, each

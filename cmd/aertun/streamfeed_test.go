@@ -70,6 +70,11 @@ func newSendingSite(t *testing.T, n int, headContext string) *sendingSite {
 			rec = audit.Record{Action: "dual.proposed", Resource: "/", Outcome: audit.Success,
 				Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true,
 				Detail: map[string]string{"kind": "owner", "to": "lee@b.example"}}
+		case i == n-4 && n > 4:
+			// As a site that receives a third's stream records a fork in it.
+			rec = audit.Record{Action: "inbound.fork", Resource: "/feeds/site-c", Outcome: audit.Failure,
+				Principal: "feed:site-c", Kind: audit.KindService, Verified: true,
+				Detail: map[string]string{"feed": "site-c", "records": "10", "resent": "true"}}
 		case i == n-3 && n > 3:
 			rec = audit.Record{Action: "config.set", Resource: "/", Outcome: audit.Success,
 				Principal: "dana@b.example", Kind: audit.KindHuman, Verified: true,
@@ -280,7 +285,7 @@ func TestAnotherDeploymentsAuditStreamIsTakenInOrder(t *testing.T) {
 		}
 	}
 	for _, want := range []string{"aertun.privileged-change-alone",
-		"aertun.ownership-transfer-requested", "aertun.setting-weakened"} {
+		"aertun.ownership-transfer-requested", "aertun.setting-weakened", "aertun.peer-log-forked"} {
 		if !fired[want] {
 			t.Errorf("%s did not fire on the peer's record of it (fired: %v)", want, fired)
 		}

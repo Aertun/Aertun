@@ -1,0 +1,100 @@
+{
+  "id": "aertun.peer-log-forked",
+  "title": "Another site signed two histories of its audit log",
+  "why": "a site's audit stream is signed with its own keys, and a tree head it signed that is not the log already held means it showed this deployment one history and keeps another: its log can no longer be relied on, and `aertun inbound prove` refutes it",
+  "blind": "a site that forks its log and never sends the other history here, or to a site whose log comes here",
+  "sources": [
+    "aertun/audit",
+    "stream/audit"
+  ],
+  "severity": 4,
+  "when": {
+    "all": [
+      {
+        "match": {
+          "field": "raw.action",
+          "op": "equals",
+          "values": [
+            "inbound.fork"
+          ]
+        }
+      }
+    ]
+  },
+  "technique": [
+    "T1070"
+  ],
+  "fixtures": [
+    {
+      "name": "a second history from a peer",
+      "match": true,
+      "event": {
+        "source": "aertun/audit",
+        "time": "2026-11-17T09:00:00Z",
+        "received": "2026-11-17T09:00:01Z",
+        "class": 6003,
+        "disposition": 2,
+        "actor": {
+          "issuer": "aertun",
+          "value": "p_7c9d2e"
+        },
+        "message": "inbound.fork",
+        "raw": {
+          "action": "inbound.fork",
+          "outcome": "failure",
+          "resource": "/feeds/site-berlin",
+          "kind": "service",
+          "feed": "site-berlin",
+          "records": "10"
+        }
+      }
+    },
+    {
+      "name": "a fork another site saw, in its log as it streams here",
+      "match": true,
+      "event": {
+        "source": "stream/audit",
+        "time": "2026-11-17T09:00:00Z",
+        "received": "2026-11-17T09:00:01Z",
+        "class": 6003,
+        "disposition": 2,
+        "actor": {
+          "issuer": "site-munich",
+          "value": "feed:site-berlin"
+        },
+        "message": "inbound.fork",
+        "raw": {
+          "action": "inbound.fork",
+          "outcome": "failure",
+          "resource": "/feeds/site-berlin",
+          "kind": "service",
+          "feed": "site-berlin",
+          "records": "10"
+        }
+      }
+    },
+    {
+      "name": "a feed added",
+      "match": false,
+      "event": {
+        "source": "aertun/audit",
+        "time": "2026-11-17T09:00:00Z",
+        "received": "2026-11-17T09:00:01Z",
+        "class": 6003,
+        "disposition": 1,
+        "actor": {
+          "issuer": "aertun",
+          "value": "p_1a2b3c"
+        },
+        "message": "inbound.added",
+        "raw": {
+          "action": "inbound.added",
+          "outcome": "success",
+          "resource": "/feeds/site-berlin",
+          "kind": "human",
+          "feed": "site-berlin"
+        }
+      }
+    }
+  ]
+}
