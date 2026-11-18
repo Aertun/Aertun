@@ -260,18 +260,12 @@ func (s Source) Validate() error {
 	// A path carried into Raw is read: a detection written against the
 	// source's own field name matches on it, so requiring one is not
 	// requiring something nothing uses.
-	kept := map[string]string{}
 	for _, k := range s.Keep {
-		p, name, ok := keepPath(k)
+		p, _, ok := keepPath(k)
 		if !ok {
 			return fmt.Errorf("%s/%s keeps %q, which is not a path, or a path and \" as \" a field "+
 				"name of lowercase letters, digits and underscores", s.Issuer, s.Stream, k)
 		}
-		if other, dup := kept[name]; dup {
-			return fmt.Errorf("%s/%s keeps %q and %q as the same field, %q: one would overwrite the "+
-				"other. Name one of them with \" as \"", s.Issuer, s.Stream, other, p, name)
-		}
-		kept[name] = p
 		wanted[p] = true
 	}
 	for _, r := range s.Require {
@@ -482,6 +476,27 @@ func (s Source) disposition(doc any) telemetry.Disposition {
 }
 
 // leaf is the last segment of a path, used as the Raw key.
+// Strict is Validate, and also refuses two kept paths kept as one field, one
+// overwriting the other. A new mapping, and every one this program ships, is
+// held to it; one installed before the rule existed is still read, as it
+// always was, so an upgrade does not stop every feed over a field that was
+// already being overwritten.
+func (s Source) Strict() error {
+	if err := s.Validate(); err != nil {
+		return err
+	}
+	kept := map[string]string{}
+	for _, k := range s.Keep {
+		p, name, _ := keepPath(k)
+		if other, dup := kept[name]; dup {
+			return fmt.Errorf("%s/%s keeps %q and %q as the same field, %q: one would overwrite the "+
+				"other. Name one of them with \" as \"", s.Issuer, s.Stream, other, p, name)
+		}
+		kept[name] = p
+	}
+	return nil
+}
+
 var keepName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
 // keepPath reads a Keep entry: the path, and the field it is kept under.

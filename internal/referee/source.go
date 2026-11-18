@@ -46,13 +46,20 @@ var languages = map[string]string{
 // that should have failed.
 var definitions = map[string][]string{
 	LangGo:     {`^\s*func\s+(\([^)]*\)\s*)?NAME\s*[\[(]`},
-	LangJS:     {`\bfunction\s*\*?\s*NAME\s*\(`, `\bNAME\s*[:=]\s*(async\s+)?(function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)`, `^\s*((static|async|get|set|public|private|protected|readonly|override)\s+)*\*?NAME\s*(<[^>]*>)?\s*\(`, `[{;]\s*((static|async|get|set)\s+)*\*?NAME\s*\([^)]*\)\s*\{`},
+	LangJS:     {`\bfunction\s*\*?\s*NAME\s*\(`, `(?:^|[^A-Za-z0-9_$])NAME\s*[:=]\s*(async\s+)?(function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)`, `^\s*((static|async|get|set|public|private|protected|readonly|override)\s+)*\*?NAME\s*(<[^>]*>)?\s*\(`, `[{;]\s*((static|async|get|set)\s+)*\*?NAME\s*\([^)]*\)\s*\{`},
 	LangPython: {`^\s*(async\s+)?def\s+NAME\s*\(`},
 	LangC:      {`^[A-Za-z_][\w\s\*&:<>,]*[\s\*&:]NAME\s*\([^;]*$`, `^NAME\s*\(`},
 	LangRust:   {`\bfn\s+NAME\s*[<(]`},
-	LangJava:   {`\b(fun\s+)?NAME\s*(<[^>]*>)?\s*\([^;]*$`},
-	LangRuby:   {`^\s*def\s+(self\.)?NAME\b`},
+	LangJava:   {`(?:^|[^A-Za-z0-9_$])(fun\s+)?NAME\s*(<[^>]*>)?\s*\([^;]*$`},
+	LangRuby:   {`^\s*def\s+(self\.)?NAME(?:[^A-Za-z0-9_$?!]|$)`},
 	LangPHP:    {`\bfunction\s+&?NAME\s*\(`},
+}
+
+// identifier is a pattern for a name standing on its own: not the middle of a
+// longer one. Spelled out rather than \b, which does not stand between a
+// space and a name starting with $.
+func identifier(name string) string {
+	return `(?:^|[^A-Za-z0-9_$])` + regexp.QuoteMeta(name) + `(?:[^A-Za-z0-9_$]|$)`
 }
 
 // Locate finds a cited place in a source tree.
@@ -87,7 +94,7 @@ func Locate(root string, l Location) (language, found string, err error) {
 				last = last[i+len(sep):]
 			}
 		}
-		if !regexp.MustCompile(`\b` + regexp.QuoteMeta(last) + `\b`).Match(body) {
+		if !regexp.MustCompile(identifier(last)).Match(body) {
 			return language, NotDefined, nil
 		}
 	}
@@ -97,7 +104,7 @@ func Locate(root string, l Location) (language, found string, err error) {
 	}
 	found = NotDefined
 	if language == LangUnknown {
-		if regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`).Match(body) {
+		if regexp.MustCompile(identifier(name)).Match(body) {
 			found = Mentioned
 		}
 	} else {

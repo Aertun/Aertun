@@ -21,7 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -87,6 +89,9 @@ type Release struct {
 	claimed   bool
 	integrity string
 	files     map[string]string
+	// attested are the files the PyPI simple index shows with provenance;
+	// nil when it was not read.
+	attested map[string]bool
 }
 
 // RefKind is the kind of ref a release was built from, or "" when nothing
@@ -181,6 +186,62 @@ func Predecessor(all map[string]*Release, version string) (prev *Release, ok boo
 		return c < 0
 	})
 	return all[candidates[len(candidates)-1]], true
+}
+
+// Find is the release a bill names. PyPI writes a version in more than one
+// spelling — 1.0.0-rc1, 1.0.0rc1, 1.0.0.RC1 are one release (PEP 440) — so
+// for PyPI a version is also looked for as PEP 440 normalises it; anywhere
+// else the version is the registry's own string.
+func Find(ecosystem string, all map[string]*Release, version string) (*Release, bool) {
+	if r, ok := all[version]; ok {
+		return r, true
+	}
+	if ecosystem != PyPI {
+		return nil, false
+	}
+	want := pep440(version)
+	for v, r := range all {
+		if pep440(v) == want {
+			return r, true
+		}
+	}
+	return nil, false
+}
+
+var (
+	pepPre  = regexp.MustCompile(`[-_.]?(alpha|beta|preview|pre|rc|c|a|b)[-_.]?([0-9]*)$`)
+	pepPost = regexp.MustCompile(`[-_.]?(post|rev|r)[-_.]?([0-9]*)$`)
+	pepDev  = regexp.MustCompile(`[-_.]?dev[-_.]?([0-9]*)$`)
+)
+
+// pep440 is a version in PEP 440's normal form, as far as the spellings
+// people write go: lower case, no leading v, and a pre-, post- or
+// development release written the one way.
+func pep440(v string) string {
+	v = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(v)), "v")
+	dev := ""
+	if m := pepDev.FindStringSubmatch(v); m != nil {
+		dev = ".dev" + orZero(m[1])
+		v = v[:len(v)-len(m[0])]
+	}
+	post := ""
+	if m := pepPost.FindStringSubmatch(v); m != nil {
+		post = ".post" + orZero(m[2])
+		v = v[:len(v)-len(m[0])]
+	}
+	pre := ""
+	if m := pepPre.FindStringSubmatch(v); m != nil {
+		tag := map[string]string{"alpha": "a", "a": "a", "beta": "b", "b": "b", "c": "rc", "rc": "rc",
+			"pre": "rc", "preview": "rc"}[m[1]]
+		pre = tag + orZero(m[2])
+		v = v[:len(v)-len(m[0])]
+	}
+	return v + pre + post + dev
+}
+
+func orZero(n string) string {
+	v, _ := strconv.Atoi(n)
+	return strconv.Itoa(v)
 }
 
 // Detailed fetches a release's detail once.

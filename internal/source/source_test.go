@@ -43,7 +43,7 @@ const trailRecord = `{
 
 func TestEveryBuiltInMappingValidates(t *testing.T) {
 	for _, s := range Known() {
-		if err := s.Validate(); err != nil {
+		if err := s.Strict(); err != nil {
 			t.Errorf("%s/%s: %v", s.Issuer, s.Stream, err)
 		}
 	}
@@ -391,7 +391,7 @@ func TestTheBreadthIsRealAndConsistent(t *testing.T) {
 	seen := map[string]bool{}
 	classes := map[telemetry.Class]int{}
 	for _, s := range all {
-		if err := s.Validate(); err != nil {
+		if err := s.Strict(); err != nil {
 			t.Errorf("%s/%s: %v", s.Issuer, s.Stream, err)
 			continue
 		}
@@ -817,7 +817,7 @@ func TestAKeptPathCanBeNamedAndCanBeAList(t *testing.T) {
 	} {
 		bad := s
 		bad.Keep = keep
-		if err := bad.Validate(); err == nil {
+		if err := bad.Strict(); err == nil {
 			t.Errorf("%s: %v validates", name, keep)
 		}
 	}

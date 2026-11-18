@@ -111,8 +111,10 @@ func sourcesDir(root string) string { return filepath.Join(root, "sources") }
 func allSources(root string) ([]source.Source, error) {
 	out := source.Known()
 	taken := map[string]bool{}
-	for _, s := range out {
+	shipped := map[string]int{}
+	for i, s := range out {
 		taken[strings.ToLower(s.Issuer+"/"+s.Stream)] = true
+		shipped[strings.ToLower(s.Issuer+"/"+s.Stream)] = i
 	}
 	entries, err := os.ReadDir(sourcesDir(root))
 	if err != nil && !os.IsNotExist(err) {
@@ -134,6 +136,15 @@ func allSources(root string) ([]source.Source, error) {
 			return nil, fmt.Errorf("%s: %w", e.Name(), err)
 		}
 		key := strings.ToLower(s.Issuer + "/" + s.Stream)
+		// A mapping installed here for a source this program has since
+		// come to ship — wazuh/alerts, say, written before 0.2 had one —
+		// is the one this store's events were mapped with, so it stays in
+		// place of the shipped one rather than stopping every lookup.
+		if i, ok := shipped[key]; ok {
+			out[i] = s
+			delete(shipped, key)
+			continue
+		}
 		if taken[key] {
 			return nil, fmt.Errorf("%s defines %s, which already has a "+
 				"mapping", e.Name(), key)
@@ -188,7 +199,7 @@ func sourceAdd(root string, args []string) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return fmt.Errorf("this is not a mapping: %w", err)
 	}
-	if err := s.Validate(); err != nil {
+	if err := s.Strict(); err != nil {
 		return err
 	}
 	for _, part := range []string{s.Issuer, s.Stream} {

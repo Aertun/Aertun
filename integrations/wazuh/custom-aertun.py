@@ -101,10 +101,14 @@ def read_options(args):
 def send(url, secret, body, msg_id, options):
     context = ssl.create_default_context()
     ca_file = options.get("ca_file")
-    if ca_file:
-        context.load_verify_locations(cafile=ca_file)
-    timeout = float(options.get("timeout", 10))
-    retries = max(1, min(int(options.get("retries", 3)), 5))
+    try:
+        if ca_file:
+            context.load_verify_locations(cafile=ca_file)
+        timeout = float(options.get("timeout", 10))
+        retries = max(1, min(int(options.get("retries", 3)), 5))
+    except (OSError, ssl.SSLError, TypeError, ValueError) as e:
+        log("the options do not hold together (ca_file, timeout, retries): %s; the alert is not sent" % e)
+        return False
     for attempt in range(1, retries + 1):
         timestamp = int(time.time())
         request = urllib.request.Request(url, data=body, method="POST", headers={

@@ -59,7 +59,47 @@ func (p *pypi) Releases(ctx context.Context, name string) (map[string]*Release, 
 		r.claimed = r.Listed
 		out[v] = r
 	}
+	// Which files carry provenance, as the simple index says (PEP 740), so
+	// Detail asks one that does rather than guessing which: a release can
+	// attest one file of forty. Without the index, Detail asks the first few.
+	if attested, ok := p.attested(ctx, name); ok {
+		for _, r := range out {
+			r.attested = map[string]bool{}
+			for f := range r.files {
+				if attested[f] {
+					r.attested[f] = true
+				}
+			}
+		}
+	}
 	return out, nil
+}
+
+type pypiSimple struct {
+	Files []struct {
+		Filename   string `json:"filename"`
+		Provenance any    `json:"provenance"`
+	} `json:"files"`
+}
+
+// attested reads the project's simple index for the files with provenance.
+func (p *pypi) attested(ctx context.Context, name string) (map[string]bool, bool) {
+	body, err := fetch(ctx, p.get, p.base+"/simple/"+pathEscape(pypiName(name))+
+		"/?format=application/vnd.pypi.simple.v1+json")
+	if err != nil {
+		return nil, false
+	}
+	var doc pypiSimple
+	if json.Unmarshal(body, &doc) != nil || len(doc.Files) == 0 {
+		return nil, false
+	}
+	out := map[string]bool{}
+	for _, f := range doc.Files {
+		if s, ok := f.Provenance.(string); ok && s != "" {
+			out[f.Filename] = true
+		}
+	}
+	return out, true
 }
 
 type pypiProvenance struct {
@@ -84,12 +124,15 @@ type pypiProvenance struct {
 const maxPyPIFiles = 3
 
 func (p *pypi) Detail(ctx context.Context, name string, r *Release) error {
-	asked := 0
-	for _, file := range sortedKeys(r.files) {
-		if asked == maxPyPIFiles {
-			break
-		}
-		asked++
+	files := sortedKeys(r.files)
+	if r.attested != nil {
+		// The index said which: only those are asked, and a release it
+		// shows none for has none.
+		files = sortedKeys(r.attested)
+	} else if len(files) > maxPyPIFiles {
+		files = files[:maxPyPIFiles]
+	}
+	for _, file := range files {
 		body, err := fetch(ctx, p.get, p.base+"/integrity/"+pathEscape(pypiName(name))+"/"+
 			pathEscape(r.Version)+"/"+pathEscape(file)+"/provenance")
 		if errors.Is(err, ErrNoPackage) {

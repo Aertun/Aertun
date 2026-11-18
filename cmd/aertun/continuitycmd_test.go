@@ -24,6 +24,7 @@ func serveRegistries(t *testing.T, axios string) {
 		"https://registry.npmjs.org/-/npm/v1/attestations/axios@1.14.0":                      "npm-axios-attestations-1.14.0.json",
 		"https://registry.npmjs.org/plain-crypto-js":                                         "npm-plain-crypto-js.json",
 		"https://pypi.org/pypi/urllib3/json":                                                 "pypi-urllib3.json",
+		"https://pypi.org/simple/urllib3/?format=application/vnd.pypi.simple.v1+json":        "pypi-urllib3-simple.json",
 		"https://pypi.org/integrity/urllib3/2.5.0/urllib3-2.5.0-py3-none-any.whl/provenance": "pypi-urllib3-2.5.0-whl.json",
 		"https://pypi.org/integrity/urllib3/2.4.0/urllib3-2.4.0-py3-none-any.whl/provenance": "pypi-urllib3-2.4.0-whl.json",
 		"https://proxy.golang.org/github.com/sirupsen/logrus/@v/list":                        "go-logrus-list.txt",
@@ -216,5 +217,20 @@ func TestABillsPackagesAreReadOnceEachInOneSpelling(t *testing.T) {
 		if _, _, _, ok := purlParts(bad); ok {
 			t.Errorf("%s read as a package of an ecosystem read here", bad)
 		}
+	}
+}
+
+// A PyPI release the bill spells otherwise than PyPI does is the same
+// release, read and held, and named in the proof as the bill names it.
+func TestContinuityFindsAPyPIReleaseUnderAnotherSpelling(t *testing.T) {
+	root := reconcileSite(t)
+	serveRegistries(t, "today")
+	st, err := continuityRun(t, root, billOf(t, "pkg:pypi/urllib3@v2.5.0"))
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	p := st.Predicate.Continuity.Packages[0]
+	if p.Outcome != proof.ContinuityHeld || p.Now.Version != "v2.5.0" || p.Before.Version != "2.4.0" {
+		t.Fatalf("%+v %+v", p, p.Now)
 	}
 }

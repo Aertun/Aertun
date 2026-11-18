@@ -8,9 +8,12 @@ Unreleased
   wazuh/alerts --seal` takes a manager's alerts, signed as Standard Webhooks
   deliveries by `integrations/wazuh/custom-aertun.py`, which Wazuh's
   integrator runs for each alert.  `--seal`, on any webhook feed, commits
-  each delivered record's digest to the audit log in the feed's name, so
+  each delivered record's digest to the audit log in the feed's name, in
+  one entry for each feed's batch within 30 seconds of arrival (at once for
+  a full batch), so
   `aertun proof sealed --alert FILE` later finds the alert as its sender
-  wrote it.  The new `wazuh/alerts` mapping reads alerts as a 4.14 manager
+  wrote it.  A mapping installed here before 0.2 for wazuh/alerts stays in
+  place of the shipped one.  The new `wazuh/alerts` mapping reads alerts as a 4.14 manager
   writes them.  `integrations/wazuh/ruleset/rules/aertun_rules.xml` (IDs
   998000-998017) raises Wazuh alerts from Aertun's audit log.  The rule on a
   seal is level 0, so an alert is never sent back to be sealed again.  All
@@ -19,7 +22,8 @@ Unreleased
 
 * A mapping's `keep` may name the field a path is kept under ("rule.mitre.id
   as mitre"), and keeps a list of plain values joined by spaces.  Two kept
-  paths ending alike are now refused.  That found two shipped mappings
+  paths ending alike are now refused when a mapping is added; one installed
+  before still loads.  That found two shipped mappings
   overwriting a field: azure/activity now keeps `raw.operation`,
   `raw.status` and `raw.category` where it kept one `raw.value`, and
   duo/auth keeps `raw.user_name` and `raw.application` where it kept one

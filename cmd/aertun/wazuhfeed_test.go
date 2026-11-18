@@ -57,13 +57,22 @@ func TestASealingFeedStoresAndSealsEachWazuhAlert(t *testing.T) {
 	if n := storedFrom(t, root, "wazuh/alerts"); n != len(lines) {
 		t.Fatalf("stored %d of %d alerts", n, len(lines))
 	}
+	// Not one entry an alert: they wait, and are sealed together.
+	if events, _ := audit.Read(auditPath(root)); len(seal.Commits(events)) != 0 {
+		t.Fatal("a delivery was sealed on its own, before the batch")
+	}
+	inb.sealPending(true)
+	if events, _ := audit.Read(auditPath(root)); len(seal.Commits(events)) != 0 {
+		t.Fatal("a batch short of full was sealed before the tick")
+	}
+	inb.sealPending(false)
 	events, err := audit.Read(auditPath(root))
 	if err != nil {
 		t.Fatal(err)
 	}
 	commits := seal.Commits(events)
-	if len(commits) != len(lines) {
-		t.Fatalf("%d sealing entries for %d deliveries", len(commits), len(lines))
+	if len(commits) != 1 || commits[0].Count != len(lines) {
+		t.Fatalf("%d sealing entries for %d deliveries: %+v", len(commits), len(lines), commits)
 	}
 	for _, e := range events {
 		if e.Action == seal.ActionSealed && (e.Kind != audit.KindService || !e.Verified || e.Detail["feed"] != "wazuh") {
@@ -154,7 +163,19 @@ func TestTheWazuhScriptDeliversAnAlertAsIntegratorRunsIt(t *testing.T) {
 	if code := run(alert, secret, url); code != 1 {
 		t.Errorf("an untrusted certificate exited %d", code)
 	}
+	bad := filepath.Join(dir, "bad.options")
+	for _, body := range []string{`{"retries":"three"}`, `{"timeout":null}`, `{"ca_file":"/nowhere/ca.pem"}`} {
+		if err := os.WriteFile(bad, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command(python, script, alert, secret, url, bad)
+		out, err := cmd.CombinedOutput()
+		if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 1 || strings.Contains(string(out), "Traceback") {
+			t.Errorf("options %s: %v\n%s", body, err, out)
+		}
+	}
 	inb.process()
+	inb.sealPending(false)
 	if n := storedFrom(t, root, "wazuh/alerts"); n != 1 {
 		t.Fatalf("stored %d events", n)
 	}
@@ -166,5 +187,44 @@ func TestTheWazuhScriptDeliversAnAlertAsIntegratorRunsIt(t *testing.T) {
 	}
 	if st := inb.snapshot()["wazuh"]; st.Refused != 1 {
 		t.Errorf("refusals %+v", st)
+	}
+}
+
+// An upgrade does not stop the feeds: a mapping installed before 0.2 for a
+// source 0.2 ships (wazuh/alerts) stays in place of the shipped one, and one
+// keeping two paths under one field, which 0.2 refuses to add, still loads.
+func TestMappingsInstalledBeforeAnUpgradeStillLoad(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(sourcesDir(root), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	theirs := `{"issuer":"wazuh","tool":"Wazuh, as we mapped it","stream":"alerts","class":2004,"activity":1,` +
+		`"time":"timestamp","layout":"2006-01-02T15:04:05.000-0700","require":["timestamp"],"lateness":60000000000}`
+	old := `{"issuer":"billing","tool":"Billing","stream":"admin","class":6003,"activity":1,"time":"at",` +
+		`"layout":"2006-01-02T15:04:05Z07:00","require":["at"],"keep":["actor.name","target.name"],"lateness":60000000000}`
+	for name, body := range map[string]string{"wazuh-alerts.json": theirs, "billing-admin.json": old} {
+		if err := os.WriteFile(filepath.Join(sourcesDir(root), name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w, err := findSource(root, "wazuh/alerts")
+	if err != nil || w.Tool != "Wazuh, as we mapped it" {
+		t.Fatalf("the store's own wazuh/alerts: %+v %v", w, err)
+	}
+	if _, err := findSource(root, "okta/system"); err != nil {
+		t.Fatalf("the shipped mappings stopped loading: %v", err)
+	}
+	if _, err := findSource(root, "billing/admin"); err != nil {
+		t.Fatalf("a mapping from before the keep rule: %v", err)
+	}
+	all, _ := allSources(root)
+	n := 0
+	for _, s := range all {
+		if s.Issuer == "wazuh" && s.Stream == "alerts" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("wazuh/alerts is mapped %d times", n)
 	}
 }

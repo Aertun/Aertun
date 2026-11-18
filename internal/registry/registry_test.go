@@ -252,3 +252,65 @@ func TestAPredecessorWasPublishedBefore(t *testing.T) {
 		t.Fatalf("before 24.0.0 without times: %v", got)
 	}
 }
+
+// A PyPI release is found however the bill spells it; an npm one only as
+// the registry does.
+func TestAReleaseIsFoundAsTheRegistrySpellsIt(t *testing.T) {
+	all := map[string]*Release{"1.0.0rc1": {Version: "1.0.0rc1", Listed: true},
+		"2.1.post2": {Version: "2.1.post2", Listed: true}, "3.0.dev0": {Version: "3.0.dev0", Listed: true}}
+	for _, v := range []string{"1.0.0rc1", "1.0.0-rc1", "1.0.0.RC1", "v1.0.0rc01", "1.0.0c1"} {
+		if r, ok := Find(PyPI, all, v); !ok || r.Version != "1.0.0rc1" {
+			t.Errorf("%s: %v", v, r)
+		}
+	}
+	for v, want := range map[string]string{"2.1-post2": "2.1.post2", "2.1.r2": "2.1.post2", "3.0-dev": "3.0.dev0"} {
+		if r, ok := Find(PyPI, all, v); !ok || r.Version != want {
+			t.Errorf("%s: %v", v, r)
+		}
+	}
+	if _, ok := Find(NPM, all, "1.0.0-rc1"); ok {
+		t.Error("an npm version was found under another spelling")
+	}
+	if _, ok := Find(PyPI, all, "1.0.0rc2"); ok {
+		t.Error("another release was found")
+	}
+}
+
+// The simple index says which files carry provenance: one attested file of
+// many is found wherever it sorts, and a release it shows none for is asked
+// nothing.
+func TestTheSimpleIndexSaysWhichPyPIFilesAreAttested(t *testing.T) {
+	routes := Routes("today")
+	b, err := os.ReadFile(filepath.Join("testdata", "pypi-urllib3-simple.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	_ = json.Unmarshal(b, &doc)
+	for _, f := range doc["files"].([]any) {
+		file := f.(map[string]any)
+		if !strings.HasSuffix(file["filename"].(string), ".tar.gz") || strings.Contains(file["filename"].(string), "2.4.0") {
+			file["provenance"] = nil
+		}
+	}
+	edited, _ := json.Marshal(doc)
+	routes["https://pypi.org/simple/urllib3/?format=application/vnd.pypi.simple.v1+json"] = string(edited)
+	// Only the sdist of 2.5.0 is attested: its provenance is served, and
+	// nothing else is.
+	routes["https://pypi.org/integrity/urllib3/2.5.0/urllib3-2.5.0.tar.gz/provenance"] = "pypi-urllib3-2.5.0-whl.json"
+	delete(routes, "https://pypi.org/integrity/urllib3/2.5.0/urllib3-2.5.0-py3-none-any.whl/provenance")
+	reg, all := read(t, PyPI, "urllib3", routes)
+	got := all["2.5.0"]
+	if err := Detailed(context.Background(), reg, "urllib3", got); err != nil {
+		t.Fatal(err)
+	}
+	// The wheel's statement is about the wheel, so served for the sdist it
+	// is a mismatch: the sdist was asked, and the wheel was not.
+	if got.Provenance || !got.Mismatch {
+		t.Fatalf("2.5.0: %+v", got)
+	}
+	none := all["2.4.0"]
+	if err := Detailed(context.Background(), reg, "urllib3", none); err != nil || none.Provenance || none.Mismatch {
+		t.Fatalf("2.4.0, shown with no provenance: %+v %v", none, err)
+	}
+}

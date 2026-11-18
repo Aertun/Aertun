@@ -9,6 +9,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -45,20 +47,44 @@ const continuityWorkers = 8
 
 // registryGetter is the door to the network continuity uses; a test serves
 // the registries' answers from files through it.
-var registryGetter registry.Getter = func(ctx context.Context, raw string) ([]byte, int, error) {
-	c := fetch.For("registry")
-	// A popular package's document lists every release it ever had.
-	c.Limits = fetch.Limits{MaxBytes: 96 << 20, Timeout: time.Minute}
-	// Do, not Get: a 404 is an answer — the registry has no such package —
-	// and a redirect is not followed anywhere.
-	r, err := c.Do(ctx, "GET", raw, nil, map[string]string{"Accept": "application/json"})
-	if err != nil {
-		return nil, 0, err
+var registryGetter registry.Getter = registryClient()
+
+// maxRegistryAnswer bounds one answer: a popular package's document lists
+// every release it ever had.
+const maxRegistryAnswer = 96 << 20
+
+// registryClient is one client for a whole bill, so the registries'
+// connections are reused across the packages rather than each request
+// opening its own. Every connection is checked against the public address
+// rule and the deployment's network mode as it is dialled, and no redirect
+// is followed: a 404 is an answer — the registry has no such package — and
+// an answer from somewhere else is not the registry's.
+func registryClient() registry.Getter {
+	client := fetch.Speaking("registry", fetch.Public, time.Minute)
+	return func(ctx context.Context, raw string) ([]byte, int, error) {
+		if _, err := fetch.ValidateURL(raw); err != nil {
+			return nil, 0, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
+		if err != nil {
+			return nil, 0, err
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "aertun/1 (+registry)")
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxRegistryAnswer+1))
+		if err != nil {
+			return nil, resp.StatusCode, err
+		}
+		if len(body) > maxRegistryAnswer {
+			return nil, resp.StatusCode, fmt.Errorf("the registry's answer is larger than this reads")
+		}
+		return body, resp.StatusCode, nil
 	}
-	if r.Truncated {
-		return nil, r.Status, fmt.Errorf("the registry's answer is larger than this reads")
-	}
-	return r.Body, r.Status, nil
 }
 
 func vulnContinuity(root string, args []string) error {
@@ -271,7 +297,7 @@ func inspect(ctx context.Context, bases registry.Bases, bp billPackage) (proof.C
 		p.Unread = proof.UnreadRegistry
 		return p, err.Error()
 	}
-	now := all[bp.version]
+	now, _ := registry.Find(bp.ecosystem, all, bp.version)
 	if now == nil {
 		if bp.ecosystem == registry.Go {
 			p.Unread = proof.UnreadAbsent
@@ -281,13 +307,22 @@ func inspect(ctx context.Context, bases registry.Bases, bp billPackage) (proof.C
 		// registry no longer says when.
 		now = &registry.Release{Version: bp.version}
 	}
-	before, ordered := registry.Predecessor(all, bp.version)
+	// Ordered by the registry's own spelling of the release, when it has
+	// the release under another.
+	version := bp.version
+	if now.Version != "" {
+		version = now.Version
+	}
+	before, ordered := registry.Predecessor(all, version)
 	if err := registry.Detailed(ctx, reg, bp.name, now); err != nil {
-		p.Now, p.Unread = summarise(&registry.Release{Version: now.Version, Published: now.Published,
+		p.Now, p.Unread = summarise(&registry.Release{Version: bp.version, Published: now.Published,
 			Listed: now.Listed, Yanked: now.Yanked}), proof.UnreadProvenance
 		return p, err.Error()
 	}
 	p.Now = summarise(now)
+	// The proof names the release as the bill does, which is the same
+	// release whatever spelling the registry keeps it under.
+	p.Now.Version = bp.version
 	if !ordered {
 		p.Unread = proof.UnreadVersionOrder
 		return p, "its version does not order, so no release is before it"

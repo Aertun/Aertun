@@ -31,7 +31,8 @@ This integration connects it to Wazuh in both directions.
    [Standard Webhooks](https://www.standardwebhooks.com) delivery. Aertun
    stores it through its `wazuh/alerts` mapping, beside its other sources. On
    a feed added with `--seal`, it also commits the alert's digest to its
-   hash-chained audit log. Later, `aertun proof sealed --alert FILE` signs that
+   hash-chained audit log, within 30 seconds of arrival, in one entry for each
+   batch of alerts. Later, `aertun proof sealed --alert FILE` signs that
    the alert, exactly as Wazuh wrote it, existed by then. Once a log head that
    covers it is anchored in Bitcoin, that time is no longer anybody's word.
    This matters when somebody later asks when you knew.
@@ -81,8 +82,9 @@ its Owner, a token for the command line and the TLS proxy, follow
 
 #### Initial Aertun Configuration
 
-Add a feed for Wazuh's alerts. `--seal` commits each one to the audit log as
-it arrives:
+Add a feed for Wazuh's alerts. `--seal` commits each one's digest to the
+audit log within 30 seconds of its arrival, in one entry for each batch
+(a full batch at once):
 
 ```bash
 aertun config set admin.base_url https://aertun.example.com
@@ -200,7 +202,7 @@ approval does ("make lee@example.com admin on /").
 | 998017 | 8 | a new key's proofs were trusted |
 
 **Rule 998015 must stay below the integration's level.** Wazuh sends its
-alerts to Aertun, and Aertun writes an `alert.sealed` entry for each. If a
+alerts to Aertun, and Aertun writes `alert.sealed` entries for them. If a
 Wazuh alert were raised on that entry, it would be sent back, sealed again,
 and so on without end. At level 0, the entry is decoded and nothing is sent.
 Other Aertun alerts that reach the integration's level go to Aertun once: they
@@ -216,8 +218,8 @@ by the integrator to a temporary file. The integrator then runs
 `custom-aertun.py FILE API_KEY HOOK_URL [OPTIONS_FILE]`. The script posts the
 alert unchanged, with `webhook-id`, `webhook-timestamp` and `webhook-signature`
 headers. Aertun checks the signature and refuses a timestamp more than five
-minutes off. It stores the alert and, on a sealing feed, writes one
-`alert.sealed` entry in the feed's name. `aertun inbound status wazuh` shows
+minutes off. It stores the alert. On a sealing feed, it commits the alert's digest within
+30 seconds, in one `alert.sealed` entry for each batch, in the feed's name. `aertun inbound status wazuh` shows
 deliveries, refusals and the last error.
 
 A real alert as Aertun stored it (rule 40112, raised by Wazuh 4.14.10 on
@@ -307,7 +309,8 @@ echo "$(date '+%b %e %H:%M:%S') host sshd[99]: Accepted password for root from 1
 ```
 
 Within seconds, `aertun inbound list` shows the deliveries, and
-`aertun alert seal --list` shows an `alert.sealed` entry for each. A wrong
+within 30 seconds `aertun alert seal --list` shows an `alert.sealed` entry
+holding them. A wrong
 `api_key` appears as `refused by Aertun (401)` in
 `/var/ossec/logs/integrations.log`, and as a refusal in
 `aertun inbound status wazuh`.
@@ -318,10 +321,11 @@ Within seconds, `aertun inbound list` shows the deliveries, and
   testing, from rules 502, 5403, 5710, 5712, 40112, 19003, 19007, 19008 and
   19009. They are kept as `internal/source/testdata/wazuh-alerts.jsonl` in
   Aertun's repository.
-* Integratord enables `custom-aertun.py` by name. Eleven live alerts arrived
-  over TLS, were stored, and each was sealed. Alert 40112, taken from the
-  manager's `alerts.json`, was found by `aertun proof sealed` in the batch
-  that sealed it, with its Merkle path reaching the root.
+* Integratord enables `custom-aertun.py` by name. Live alerts arrived over
+  TLS and were stored; ten raised together were sealed in one audit entry, a
+  batch of ten. An alert taken from the manager's `alerts.json` was found by
+  `aertun proof sealed` in the batch that sealed it, with its Merkle path
+  reaching the root.
 * Aertun's test suite runs the script, as the integrator does, against the
   feed over TLS. The alert is delivered and sealed. Sent twice, it is taken
   once. A wrong secret exits 1, plain http exits 2, and an untrusted

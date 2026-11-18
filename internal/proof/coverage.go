@@ -345,15 +345,22 @@ func ProveCoverage(in CoverageInput) (*Statement, error) {
 	for i, l := range in.Entries {
 		fields[i] = l.Event.Fields()
 	}
-	type key struct{ rule, entry int }
-	fired := map[key]bool{}
+	// One byte an entry for each rule asked about it — unknown, quiet or
+	// fired — so a rule is asked of an entry once, in memory that grows with
+	// the rules asked and not with every pair.
+	answers := make([][]int8, len(progs))
 	fires := func(ri, ei int) bool {
-		k := key{ri, ei}
-		if v, ok := fired[k]; ok {
-			return v
+		if answers[ri] == nil {
+			answers[ri] = make([]int8, len(in.Entries))
+		}
+		switch answers[ri][ei] {
+		case 1:
+			return false
+		case 2:
+			return true
 		}
 		v := progs[ri].MatchesFields(in.Entries[ei].Event.Source, fields[ei])
-		fired[k] = v
+		answers[ri][ei] = map[bool]int8{false: 1, true: 2}[v]
 		return v
 	}
 	var now map[string]map[string]bool

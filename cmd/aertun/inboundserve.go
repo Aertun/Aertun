@@ -245,6 +245,17 @@ type inboundServer struct {
 	// fresh is that events were stored since the rules last ran, by the
 	// worker or by a delivery that found the store free.
 	fresh bool
+	// sealing are the digests of records delivered on sealing feeds and not
+	// yet committed, by feed: committed together, one audit entry for each
+	// feed every tick, rather than one for every delivery.
+	sealing map[string]*sealQueue
+}
+
+// sealQueue is one feed's records waiting to be sealed.
+type sealQueue struct {
+	feed    inbound.Feed
+	digests []string
+	seen    map[string]bool
 }
 
 type cachedReceiver struct {
@@ -296,6 +307,7 @@ func (s *inboundServer) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.process()
+			s.sealPending(false)
 			s.flush()
 			return
 		case <-s.work:
@@ -305,8 +317,11 @@ func (s *inboundServer) run(ctx context.Context) {
 			case <-time.After(300 * time.Millisecond):
 			}
 			s.process()
+			// A full batch is sealed at once; the rest wait for the tick.
+			s.sealPending(true)
 			s.flush()
 		case <-tick.C:
+			s.sealPending(false)
 			s.flush()
 		}
 	}
@@ -437,7 +452,7 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	// Sealed whether or not every record mapped: what is sealed is that the
 	// record arrived, which does not depend on reading it.
 	if p.feed.Seal && serr == nil {
-		serr = s.seal(p.feed, p.docs)
+		serr = s.queueSeal(p.feed, p.docs)
 	}
 	s.mu.Lock()
 	st.Stored += stored
@@ -460,13 +475,11 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	return stored, learned
 }
 
-// seal commits a delivery's records to the audit log by their digests, in
-// one batch, in the feed's name: the sender proved itself to the feed, and
-// the entry says only that these records arrived now. A record that is not
-// one JSON object is no alert and is not sealed.
-func (s *inboundServer) seal(f inbound.Feed, docs []any) error {
+// queueSeal takes a delivery's records' digests to be sealed with the feed's
+// others. A record that is not one JSON object is no alert and is not
+// sealed; one delivered twice is sealed once.
+func (s *inboundServer) queueSeal(f inbound.Feed, docs []any) error {
 	var digests []string
-	seen := map[string]bool{}
 	for _, d := range docs {
 		if _, ok := d.(map[string]any); !ok {
 			continue
@@ -479,11 +492,55 @@ func (s *inboundServer) seal(f inbound.Feed, docs []any) error {
 		if err != nil {
 			return err
 		}
-		if !seen[digest] {
-			seen[digest] = true
-			digests = append(digests, digest)
+		digests = append(digests, digest)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sealing == nil {
+		s.sealing = map[string]*sealQueue{}
+	}
+	q := s.sealing[f.Name]
+	if q == nil {
+		q = &sealQueue{feed: f, seen: map[string]bool{}}
+		s.sealing[f.Name] = q
+	}
+	for _, d := range digests {
+		if !q.seen[d] {
+			q.seen[d] = true
+			q.digests = append(q.digests, d)
 		}
 	}
+	return nil
+}
+
+// sealPending commits what waits to be sealed, one audit entry for each
+// feed and each full batch, in the feed's name: the sender proved itself to
+// the feed, and the entry says only that these records arrived by now. With
+// onlyFull, only a feed holding a full batch is sealed, so a burst does not
+// wait for the tick and a trickle is not an entry an alert.
+func (s *inboundServer) sealPending(onlyFull bool) {
+	s.mu.Lock()
+	var ready []*sealQueue
+	for name, q := range s.sealing {
+		if len(q.digests) == 0 || (onlyFull && len(q.digests) < seal.MaxBatch) {
+			continue
+		}
+		ready = append(ready, q)
+		delete(s.sealing, name)
+	}
+	s.mu.Unlock()
+	for _, q := range ready {
+		if err := s.seal(q.feed, q.digests); err != nil {
+			s.mu.Lock()
+			s.statusOf(q.feed.Name).Error = "sealing: " + err.Error()
+			s.dirty = true
+			s.mu.Unlock()
+		}
+	}
+}
+
+// seal commits digests in batches of at most seal.MaxBatch.
+func (s *inboundServer) seal(f inbound.Feed, digests []string) error {
 	for len(digests) > 0 {
 		n := min(len(digests), seal.MaxBatch)
 		b, err := seal.NewBatch(digests[:n])

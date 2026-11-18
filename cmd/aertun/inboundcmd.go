@@ -165,7 +165,7 @@ func inboundHelp() error {
     aertun inbound add webhook billing --mapping billing/admin
     aertun inbound add webhook github --mapping github/audit --github
 
-  Wazuh alerts, each sealed in the audit log as it arrives
+  Wazuh alerts, each sealed in the audit log within 30 seconds
     aertun inbound add webhook wazuh --mapping wazuh/alerts --seal
     Then on the manager, custom-aertun.py from integrations/wazuh in the
     repository, and an <integration> block naming this feed's URL and its
