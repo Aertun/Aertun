@@ -61,7 +61,9 @@ runs:
         esac
         asset="aertun-$os-$arch"
         [ "$os" = windows ] && asset="$asset.exe"
-        dir="$RUNNER_TEMP/aertun-$AERTUN_VERSION"
+        # A fixed directory: what is added to PATH depends on nothing an
+        # input can say.
+        dir="$RUNNER_TEMP/aertun-bin"
         mkdir -p "$dir"
         base="https://github.com/Aertun/Aertun/releases/download/v$AERTUN_VERSION"
         curl -fsSL --proto '=https' -o "$dir/$asset" "$base/$asset"
