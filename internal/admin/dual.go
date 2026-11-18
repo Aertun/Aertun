@@ -175,6 +175,14 @@ func (s *Server) handlePeoplePending(w http.ResponseWriter, r *http.Request) {
 		if do == "approve" && !s.ownApprovalProved(w, r, p, id, now) {
 			return
 		}
+		if do == "approve" {
+			if pending, gerr := s.Dual.Store.Get(id); gerr == nil {
+				if uerr := dual.UnclaimedEnrolment(pending, s.waitingEnrolments(now)); uerr != nil {
+					s.peopleBack(w, r, uerr.Error())
+					return
+				}
+			}
+		}
 		req, err = s.Dual.Store.Decide(id, p.Name, do == "approve", s.onlyAdministrator(p.Name), now)
 		if err == nil && do == "approve" {
 			if aerr := s.applyDual(req, p.Name); aerr != nil {
@@ -237,4 +245,21 @@ func (s *Server) ownApprovalProved(w http.ResponseWriter, r *http.Request, p pri
 	s.audit("session.stepup-required", "/", map[string]string{"by": p.Name, "session": p.TokenID, "request": req.ID})
 	http.Redirect(w, r, "/signin/verify", http.StatusSeeOther)
 	return false
+}
+
+// waitingEnrolments are the people a live link to add a passkey is waiting
+// for (dual.UnclaimedEnrolment).
+func (s *Server) waitingEnrolments(now time.Time) []string {
+	if s.Enrol == nil {
+		return nil
+	}
+	links, err := s.Enrol.Waiting(now)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(links))
+	for _, l := range links {
+		out = append(out, l.Principal)
+	}
+	return out
 }

@@ -104,6 +104,15 @@ Unreleased
   else administers the whole store.  A store made before Owners could
   lock itself out from the command line; it no longer can.
 
+* An administrator is not made while their link to add a passkey waits
+  unused: whoever opens a link first adds theirs, so until the person has
+  used it, approving the grant would make an administrator of whoever had
+  the link.  The approval waits, on the command line and the People
+  screen, and goes through once the link has been used or ended.  A
+  second administrator is still set up in either order — the grant or
+  the passkey first, or both at once with `aertun auth invite NAME
+  admin` — and the grant now takes effect only after the passkey.
+
 * A token is issued at most at its holder's role: `aertun token issue
   NAME --principal WHO --role R` refuses a role above what WHO holds now,
   naming the grant to make first.  A token's power was already the lesser

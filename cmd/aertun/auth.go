@@ -239,6 +239,10 @@ func authInvite(root string, args []string) error {
 		w.Human("  %s%s holds nothing until that request is approved: the link "+
 			"below adds their passkey now, and signing in with it reaches "+
 			"nothing until then%s\n", dim, who, reset)
+		if len(args) > 1 && auth.Role(args[1]) == auth.RoleAdmin {
+			w.Human("  %san administrator is made only once the link has been used, so "+
+				"the request is approved after %s has added their passkey%s\n", dim, who, reset)
+		}
 	}
 	return issueEnrolment(root, who, caller.Name, enrol.MaxLife, caller)
 }
