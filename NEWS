@@ -97,6 +97,20 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* The last administrator cannot take their own administration away, on a
+  store with an Owner or without one: revoking it, denying it, narrowing
+  it to one area, giving it an end date, from the command line, the
+  console or an identity provider's provisioning, is refused while nobody
+  else administers the whole store.  A store made before Owners could
+  lock itself out from the command line; it no longer can.
+
+* A token is issued at most at its holder's role: `aertun token issue
+  NAME --principal WHO --role R` refuses a role above what WHO holds now,
+  naming the grant to make first.  A token's power was already the lesser
+  of its role and its holder's when used; one labelled higher waited, and
+  became that much stronger the day its holder was granted more, with
+  nobody looking at it.  So the grant comes first and the token after.
+
 * LiteLLM, and any model gateway, is read two ways.  Its logging
   callback (`generic_api`) posts every call to a new bearer feed, `aertun
   inbound add webhook litellm --mapping litellm/requests --bearer`: a

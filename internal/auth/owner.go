@@ -3,7 +3,10 @@
 
 package auth
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // The Owner.
 //
@@ -54,6 +57,45 @@ func (p *Policy) CheckOwner() error {
 			"auth owner transfer NAME), never by revoking it", p.Owner)
 	}
 	return nil
+}
+
+// Administrators are the principals who administer the whole store with no
+// end date and nothing denying it: who could still let somebody in if
+// everybody else lost access.
+func (p *Policy) Administrators() []string {
+	var out []string
+	for _, who := range p.Principals() {
+		if !p.Evaluate(who, ActGrant, "/").Allowed {
+			continue
+		}
+		p.mu.RLock()
+		unending := false
+		for _, b := range p.Bindings {
+			if b.Principal == who && !b.Deny && b.Role == RoleAdmin && normalise(b.Resource) == "/" && b.Expires == 0 {
+				unending = true
+			}
+		}
+		p.mu.RUnlock()
+		if unending {
+			out = append(out, who)
+		}
+	}
+	return out
+}
+
+// CheckAdministered refuses a policy left with nobody to administer it by a
+// change to one that had somebody: the last administrator revoking their own
+// role, denying it to themselves, narrowing it to one area or giving it an
+// end date, from whichever surface. A store nobody administers can be
+// recovered only by break-glass (aertun auth recover), which is deliberately
+// unpleasant, and nobody should reach it by removing a binding.
+func (p *Policy) CheckAdministered(before []string) error {
+	if len(before) == 0 || len(p.Administrators()) > 0 {
+		return nil
+	}
+	return fmt.Errorf("%s is the last administrator of the whole store, and this change would leave "+
+		"nobody able to administer it; make somebody else an administrator first (aertun auth grant "+
+		"NAME admin)", strings.Join(before, " and "))
 }
 
 // SetOwner names the Owner, refusing anybody the policy does not already

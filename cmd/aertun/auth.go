@@ -693,6 +693,27 @@ func tokenIssueAs(root string, args []string, approved bool) error {
 		}
 	}
 
+	// A token carries at most its holder's role. Its power is always the
+	// lesser of the two when it is used, so one labelled above its holder
+	// acted no further; but it waited, and the day its holder was granted
+	// more — a job for a week, a group the identity provider added them to
+	// — every such token became that much stronger with nobody looking at
+	// it. So the role is checked against what the holder holds now, and a
+	// token is issued after the grant, never in place of one. A store
+	// nobody has been granted anything in has no holder to check against:
+	// the bootstrap that makes its first token.
+	if pol, perr := loadPolicy(root); perr == nil && len(pol.Snapshot()) > 0 {
+		if held := pol.Highest(*principal); !held.AtLeast(auth.Role(*role)) {
+			holds := "no role"
+			if held != auth.RoleNone {
+				holds = string(held)
+			}
+			return fmt.Errorf("%s holds %s, and a token carries at most its holder's role, so a %s "+
+				"token for them is not issued; grant the role first (aertun auth grant %s %s), then "+
+				"issue the token", *principal, holds, *role, *principal, *role)
+		}
+	}
+
 	cfg, err := loadConfig(root)
 	if err != nil {
 		return err
