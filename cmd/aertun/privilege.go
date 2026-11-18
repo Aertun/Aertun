@@ -271,6 +271,12 @@ var commandNeeds = map[string]need{
 	// artifact passed, and a policy engine admits it on that: it asks for
 	// tune itself before it reads the proof, as signing a proof does.
 	"proof svr": {action: auth.ActView},
+	// A coverage proof checks rule files and a corpus the caller named, the
+	// weight of a detection proof; with --telemetry it also reads the event
+	// store and signs what it showed in the organisation's name, and asks
+	// for tune itself before it reads anything, as the other proofs signed
+	// from the store do.
+	"proof coverage": {action: auth.ActView},
 	// Sealing alerts is evidence brought into the security area — the
 	// weight of importing another vendor's verdicts or intelligence, so an
 	// analyst's: it decides nothing about anybody and changes no control,

@@ -339,3 +339,17 @@ func hasFailure(st *Statement, want string) bool {
 	}
 	return false
 }
+
+// An entry labelled as an attack is not one a rule must stay quiet on.
+func TestAnAttackLabelledByTechniqueIsNotANegative(t *testing.T) {
+	st := prove(t, corpusOf(t,
+		detect.Labelled{Name: "reset by helpdesk impostor", Event: oktaEvent("user.mfa.factor.reset_all"),
+			Expect: []string{"okta.mfa-reset"}},
+		detect.Labelled{Name: "self-service enrolment", Event: oktaEvent("user.mfa.factor.activate")},
+		detect.Labelled{Name: "atomic T1556.006 run", Event: oktaEvent("user.mfa.factor.deactivate"),
+			Techniques: []string{"T1556.006"}},
+	))
+	if st.Predicate.Verdict != Proven || st.Predicate.Detection.Negatives != 1 {
+		t.Fatalf("verdict %s, negatives %d", st.Predicate.Verdict, st.Predicate.Detection.Negatives)
+	}
+}

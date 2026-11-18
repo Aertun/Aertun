@@ -42,11 +42,13 @@ import (
 // interface run: they read and add to the proofs kept in the store.
 func cmdProof(root string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust")
+		return fmt.Errorf("proof needs detection, coverage, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust")
 	}
 	switch args[0] {
 	case "detection":
 		return proofDetection(args[1:])
+	case "coverage":
+		return proofCoverage(root, args[1:])
 	case "analyst":
 		return proofAnalyst(root, args[1:])
 	case "evidence":
@@ -78,7 +80,7 @@ func cmdProof(root string, args []string) error {
 	case "untrust":
 		return proofUntrust(root, args[1:])
 	default:
-		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust", args[0])
+		return fmt.Errorf("unknown proof command %q; try detection, coverage, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust", args[0])
 	}
 }
 
@@ -260,6 +262,8 @@ func summary(st *proof.Statement) map[string]any {
 		out["mdr"] = st.Predicate.MDR
 	case st.Predicate.PeerLog != nil:
 		out["peer_log"] = st.Predicate.PeerLog
+	case st.Predicate.Coverage != nil:
+		out["coverage"] = st.Predicate.Coverage
 	}
 	return out
 }
@@ -375,6 +379,9 @@ func describe(st *proof.Statement) string {
 		fmt.Fprintf(&b, "  evidence: %d record(s) of %s held; %d of %d tree head(s) it signed agree, "+
 			"%d fork(s); last batch of %d received %s", v.Held, v.Peer, v.Agreeing, v.Heads, v.ForkCount,
 			v.LastRecords, v.LastReceived)
+	}
+	if v := p.Coverage; v != nil {
+		b.WriteString(describeCoverage(v))
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

@@ -62,6 +62,7 @@ func usage() {
 
 Proving AI security work: checked against evidence the AI did not write, then signed
   aertun proof detection --rule F [--corpus F] --key F | verify FILE --key F   a rule checked against evidence its author did not write, signed; verify is the CI gate
+  aertun proof coverage --key F [--rules DIR] [--corpus F] [--technique T]... [--min-positives N] [--min-benign N] [--telemetry 7d] [--navigator F] [--out F]   each technique the rules claim, held to entries labelled with it and benign ones, with decay against what sources send now; signed, and as an ATT&CK Navigator layer
   aertun proof analyst --key F [--k 3] [--tolerance 0.05] [--out F]   your AI analyst on the labelled corpus, asked k times with planted instructions, signed
   aertun proof evidence --report F --key F [--source S --since D --until D] [--out F]   an AI's investigation with every citation run again against the event store, signed
   aertun proof revocation --agent NAME | --identity ISSUER:VALUE --at TIME --key F [--grace 5m] [--stretch 1h] [--out F]   after a kill switch or a revocation elsewhere, whether anything still acted as it, by sources shown to be listening, signed

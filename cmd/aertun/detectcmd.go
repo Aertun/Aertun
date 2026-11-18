@@ -71,6 +71,27 @@ func cmdDetect(root string, args []string) error {
 
 // rulesIn loads every rule under a directory, or one file.
 func rulesIn(path string) ([]detect.Rule, error) {
+	files, err := ruleFilesIn(path)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]detect.Rule, len(files))
+	for i, f := range files {
+		out[i] = f.Rule
+	}
+	return out, nil
+}
+
+// ruleFile is a rule with the file it was read from and that file's exact
+// bytes, for a proof that names what it read by digest.
+type ruleFile struct {
+	Path string
+	Body []byte
+	Rule detect.Rule
+}
+
+// ruleFilesIn is rulesIn keeping each file's bytes.
+func ruleFilesIn(path string) ([]ruleFile, error) {
 	if path == "" {
 		path = "detections"
 	}
@@ -105,7 +126,7 @@ func rulesIn(path string) ([]detect.Rule, error) {
 		files = []string{path}
 	}
 
-	var out []detect.Rule
+	var out []ruleFile
 	seen := map[string]string{}
 	for _, f := range files {
 		fi, serr := os.Stat(f)
@@ -131,7 +152,7 @@ func rulesIn(path string) ([]detect.Rule, error) {
 				"%s and %s are both called %q", where, f, r.ID)
 		}
 		seen[r.ID] = f
-		out = append(out, r)
+		out = append(out, ruleFile{Path: f, Body: body, Rule: r})
 	}
 	return out, nil
 }

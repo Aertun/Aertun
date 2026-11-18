@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -50,7 +51,26 @@ type Labelled struct {
 	From string `json:"from,omitempty"`
 	// Pending marks a false positive the rule is known still to raise.
 	Pending bool `json:"pending,omitempty"`
+	// Techniques are what was done, as whoever did it says: the ATT&CK,
+	// ATLAS or OWASP ids an emulation that produced this event ran — an
+	// Atomic Red Team test's technique, a red team's plan — and never a
+	// rule's own claim. A coverage proof (internal/proof/coverage.go) holds
+	// the rules that claim a technique to the entries labelled with it, so
+	// the label has to come from somewhere the rules' authors did not.
+	Techniques []string `json:"techniques,omitempty"`
 }
+
+// TechniqueShape is the shape of a technique id a rule claims or an entry is
+// labelled with: ATT&CK (T1098, T1098.004), ATLAS (AML.T0051, AML.T0051.001),
+// the OWASP agentic top ten (ASI01) and the OWASP LLM top ten (LLM10).
+var TechniqueShape = regexp.MustCompile(`^(T[0-9]{4}(\.[0-9]{3})?|AML\.T[0-9]{4}(\.[0-9]{3})?|ASI[0-9]{2}|LLM[0-9]{2})$`)
+
+// MaxTechniques bounds the techniques one entry is labelled with.
+const MaxTechniques = 32
+
+// Benign reports whether an entry is labelled as nothing happening: no rule
+// may fire on it and it is an instance of no technique.
+func (l Labelled) Benign() bool { return len(l.Expect) == 0 && len(l.Techniques) == 0 }
 
 // Validate refuses an entry nobody could act on.
 func (l Labelled) Validate() error {
@@ -65,6 +85,25 @@ func (l Labelled) Validate() error {
 	if l.Pending && len(l.Expect) > 0 {
 		return fmt.Errorf("%s is pending and expects a rule to fire; "+
 			"pending is for a false positive not yet fixed", l.Name)
+	}
+	if l.Pending && len(l.Techniques) > 0 {
+		return fmt.Errorf("%s is pending and labelled as a technique; "+
+			"pending is for a false positive, and an attack is not one", l.Name)
+	}
+	if len(l.Techniques) > MaxTechniques {
+		return fmt.Errorf("%s is labelled with %d techniques; an event is an "+
+			"instance of a few at most", l.Name, len(l.Techniques))
+	}
+	seen := map[string]bool{}
+	for _, t := range l.Techniques {
+		if !TechniqueShape.MatchString(t) {
+			return fmt.Errorf("%s is labelled %q, which is not an ATT&CK, ATLAS "+
+				"or OWASP id (T1098, T1098.004, AML.T0051, ASI01, LLM10)", l.Name, t)
+		}
+		if seen[t] {
+			return fmt.Errorf("%s is labelled %s twice", l.Name, t)
+		}
+		seen[t] = true
 	}
 	return nil
 }
@@ -152,6 +191,10 @@ func Replay(rules []Rule, corpus []Labelled) ([]Outcome, error) {
 				o.Missed = append(o.Missed, l.Name)
 			case fired && l.Pending:
 				o.Known = append(o.Known, l.Name)
+			case fired && len(l.Techniques) > 0:
+				// An attack, labelled by what was done rather than by which
+				// rule should see it: a rule firing on one is not a false
+				// positive, and Expect still says which rules must.
 			case fired:
 				o.Wrong = append(o.Wrong, l.Name)
 			case l.Pending && pendingFor(l, r):

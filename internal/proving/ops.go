@@ -37,7 +37,11 @@ import (
 // the author's choice, so they are labelled as written outside as well. An
 // MDR proof's words are rebuilt from its numbers, and the emulation ids a
 // refutation names come from the operator's own list, strictly parsed and
-// never the provider's, so they are this program's.
+// never the provider's, so they are this program's. A coverage proof's
+// words are rebuilt from its numbers and from technique ids of a fixed
+// shape, so they are this program's; the rule ids its evidence lists are
+// the rules' authors' choice, strictly shaped, and labelled as written
+// outside.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -58,12 +62,13 @@ var proofKinds = map[string]string{
 	proof.PredicateSealed:         "sealed",
 	proof.PredicateMDR:            "mdr",
 	proof.PredicatePeerLog:        "peer-log",
+	proof.PredicateCoverage:       "coverage",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
 	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr",
-	"peer-log"}
+	"peer-log", "coverage"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -79,7 +84,8 @@ func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
 		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
 		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
-		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil {
+		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil ||
+		st.Predicate.Coverage != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -447,6 +453,38 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 			if v.Last != nil {
 				evidence.With("last_head", ops.Object().With("size", ops.Ours(v.Last.Size)).
 					With("root", ops.Ours(v.Last.Root)))
+			}
+			row.With("evidence", evidence)
+		case p.Coverage != nil:
+			v := p.Coverage
+			techniques := ops.ListOf(v.Techniques, func(t proof.TechniqueCoverage) *ops.Answer {
+				return ops.Object().With("technique", ops.Ours(t.Technique)).
+					With("verdict", ops.Ours(string(t.Verdict))).
+					With("rules", ops.ListOf(t.Rules, ops.Outside)).
+					With("positives", ops.Ours(t.Positives)).With("caught", ops.Ours(t.Caught)).
+					With("quiet_only", ops.Ours(t.QuietOnly)).With("missed", ops.Ours(t.Missed)).
+					With("benign", ops.Ours(t.Benign)).With("false_fires", ops.Ours(t.FalseFires)).
+					With("recall_low", ops.Ours(t.RecallLow)).With("decayed", ops.Ours(t.Decayed))
+			})
+			unclaimed := ops.ListOf(v.Unclaimed, func(u proof.UnclaimedTechnique) *ops.Answer {
+				return ops.Object().With("technique", ops.Ours(u.Technique)).
+					With("positives", ops.Ours(u.Positives)).With("caught_by_other", ops.Ours(u.CaughtByOther))
+			})
+			dark := ops.ListOf(v.Dark, func(d proof.DarkRule) *ops.Answer {
+				return ops.Object().With("rule", ops.Outside(d.Rule)).With("silent", ops.Ours(d.Silent)).
+					With("missing", ops.ListOf(d.Missing, ops.Outside))
+			})
+			evidence := ops.Object().With("rules", ops.Ours(len(v.Rules))).
+				With("entries", ops.Ours(v.Entries)).With("labelled", ops.Ours(v.Labelled)).
+				With("benign", ops.Ours(v.Benign)).With("min_positives", ops.Ours(v.MinPositives)).
+				With("min_benign", ops.Ours(v.MinBenign)).With("asked", ops.Ours(v.Asked)).
+				With("unrecognised", ops.Ours(v.Unrecognised)).With("techniques", techniques).
+				With("unclaimed", unclaimed).With("dark_count", ops.Ours(v.DarkCount)).With("dark", dark)
+			if w := v.Telemetry; w != nil {
+				evidence.With("telemetry", ops.Object().With("since", ops.Ours(w.Since)).
+					With("until", ops.Ours(w.Until)).With("sources", ops.Ours(w.Sources)).
+					With("silent", ops.Ours(w.Silent)).With("events", ops.Ours(w.Events)).
+					With("capped", ops.Ours(w.Capped)).With("fields", ops.Ours(w.Fields)))
 			}
 			row.With("evidence", evidence)
 		case p.Verdicts != nil:

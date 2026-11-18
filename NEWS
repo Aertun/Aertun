@@ -4,6 +4,32 @@ Aertun NEWS
 Unreleased
 ==========
 
+* `aertun proof coverage --key F` signs, for each technique the rules
+  claim, whether the claim holds.  A corpus entry can now carry
+  `"techniques"`: the ATT&CK, ATLAS or OWASP ids of what produced it, such
+  as the Atomic Red Team test that was run, never a rule's own tag.  A
+  technique is refuted when an entry labelled with it is caught by no rule
+  claiming it, or when a rule claiming it that raises an alert fires on an
+  entry labelled benign.  It is proven when every instance is caught on at
+  least `--min-positives` instances and `--min-benign` benign entries, and
+  inconclusive when an instance is seen only by a rule that raises nothing
+  on its own, or the evidence is too thin.  A sub-technique is an instance
+  of its parent and not the reverse.  With `--telemetry 7d` each instance
+  caught is asked again with only the fields its source sent in that window,
+  read from the store (which takes tune): one no longer caught keeps its
+  technique from being proven, and a rule catching none of its own examples
+  that way is listed as dark, with the fields its sources stopped sending.
+  Techniques the corpus labels and no rule claims are listed.  There is no
+  percentage anywhere.  `--navigator FILE` draws the result as an ATT&CK
+  Navigator layer (format 4.5): each technique coloured by its verdict and
+  saying it in words, with no score.  The predicate is
+  https://aertun.github.io/proof/coverage/v1.
+
+* `detect replay` no longer counts a rule firing on an entry labelled with
+  a technique as a false positive, and a detection proof no longer counts
+  one as an entry the rule must stay quiet on.  The detection verifier's
+  version is now 2.
+
 * `aertun vendor check-breach FILE` holds a vendor's disclosure of its own
   breach — its window, the indicators it published and what it told you —
   against your own events, and signs a breach-scope proof.  An indicator

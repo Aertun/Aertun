@@ -4,6 +4,7 @@
 package detect
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -98,4 +99,62 @@ func TestACorpusThatNamesARuleNobodyHasIsAnError(t *testing.T) {
 			t.Errorf("an entry with %s was accepted", name)
 		}
 	}
+}
+
+// An entry labelled as an attack is not a false positive for a rule that
+// fires on it, though the entry names no rule; a rule it does name must
+// still fire.
+func TestAnAttackLabelledByTechniqueIsNoFalsePositive(t *testing.T) {
+	rule := adminFails("auth.privileged-failed", "admin-")
+	corpus := []Labelled{
+		{Name: "atomic T1110.003 spray", Techniques: []string{"T1110.003"},
+			Event: replayEvent("admin-dana", telemetry.DispositionFailed)},
+		{Name: "atomic T1110.001 guess, named", Techniques: []string{"T1110.001"}, Expect: []string{rule.ID},
+			Event: replayEvent("root", telemetry.DispositionFailed)},
+		{Name: "benign", Event: replayEvent("admin-lee", telemetry.DispositionFailed)},
+	}
+	out, err := Replay([]Rule{rule}, corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o := out[0]
+	if o.Caught != 0 || len(o.Missed) != 1 || len(o.Wrong) != 1 || o.Wrong[0] != "benign" {
+		t.Fatalf("outcome %+v", o)
+	}
+}
+
+func TestATechniqueLabelIsAnIDOfAKnownShape(t *testing.T) {
+	ev := replayEvent("admin-dana", telemetry.DispositionFailed)
+	for name, l := range map[string]Labelled{
+		"made up":         {Name: "x", Event: ev, Techniques: []string{"credential-access"}},
+		"a tactic":        {Name: "x", Event: ev, Techniques: []string{"TA0006"}},
+		"lower case":      {Name: "x", Event: ev, Techniques: []string{"t1110"}},
+		"twice":           {Name: "x", Event: ev, Techniques: []string{"T1110", "T1110"}},
+		"pending":         {Name: "x", Event: ev, Techniques: []string{"T1110"}, Pending: true},
+		"too many labels": {Name: "x", Event: ev, Techniques: manyTechniques(MaxTechniques + 1)},
+	} {
+		if err := l.Validate(); err == nil {
+			t.Errorf("%s: %v validates", name, l.Techniques)
+		}
+	}
+	for _, ok := range []string{"T1110", "T1110.003", "AML.T0051", "AML.T0051.001", "ASI01", "LLM10"} {
+		l := Labelled{Name: "x", Event: ev, Techniques: []string{ok}}
+		if err := l.Validate(); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+		if l.Benign() {
+			t.Errorf("an entry labelled %s is benign", ok)
+		}
+	}
+	if !(Labelled{Name: "x", Event: ev}).Benign() {
+		t.Error("an entry labelled with nothing is not benign")
+	}
+}
+
+func manyTechniques(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("T1%03d", i)
+	}
+	return out
 }

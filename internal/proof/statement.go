@@ -167,6 +167,9 @@ type Predicate struct {
 	// PeerLog is set on a peer-log proof: another deployment's audit log as
 	// it was received, held against every tree head that deployment signed.
 	PeerLog *PeerLogEvidence `json:"peer_log,omitempty"`
+	// Coverage is set on a coverage proof: each technique the rules claim,
+	// held to the corpus entries labelled with it and those labelled benign.
+	Coverage *CoverageEvidence `json:"coverage,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -291,7 +294,7 @@ func (s *Statement) validateEvidence() error {
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
 		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
 		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil,
-		p.PeerLog != nil} {
+		p.PeerLog != nil, p.Coverage != nil} {
 		if set {
 			kinds++
 		}
@@ -382,6 +385,11 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("a peer-log proof carries what is held of a peer's log and no other evidence")
 		}
 		return p.PeerLog.validate(s)
+	case PredicateCoverage:
+		if p.Coverage == nil || kinds != 1 {
+			return fmt.Errorf("a coverage proof carries each technique's counts and no other evidence")
+		}
+		return p.Coverage.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}
