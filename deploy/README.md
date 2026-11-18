@@ -67,3 +67,38 @@ sudo -u aertun aertun --root /srv/aertun/store vault enable
 
 It prints the key once. Put it in a file only root reads, and point
 `AERTUN_KEY_FILE` at it in `/etc/aertun/env`.
+
+## On Kubernetes
+
+`kubernetes/aertun.yaml` is a namespace, a one-replica StatefulSet with its
+volume, a Service and a NetworkPolicy; `helm/aertun` is the same as a chart.
+One replica, because the store has one writer. The pod runs as the image's
+nonroot user with a read-only root filesystem, no capabilities and the
+default seccomp profile, under the namespace's `restricted` Pod Security
+level. `/healthz` says it is serving; `/readyz` says the audit log can take
+a record, and nothing more to whoever asks.
+
+```bash
+kubectl apply -f kubernetes/aertun.yaml
+```
+
+or
+
+```bash
+helm install aertun helm/aertun --namespace aertun --create-namespace \
+    --set ingress.enabled=true --set ingress.host=aertun.example.com --set ingress.tlsSecret=aertun-tls
+```
+
+Then claim the store once, which prints the one-time link that adds your
+passkey, and set the address people reach it at:
+
+```bash
+kubectl -n aertun exec -it aertun-0 -- aertun --root /srv/store init --owner you@example.com
+```
+
+```bash
+kubectl -n aertun exec aertun-0 -- aertun --root /srv/store config set admin.base_url https://aertun.example.com
+```
+
+Run `init --owner` once: each run makes a new link, and a link is a key to
+the Owner's account until it is used.

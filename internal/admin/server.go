@@ -81,6 +81,10 @@ var assets embed.FS
 
 // Server holds everything a request needs.
 type Server struct {
+	// Ready reports whether the console can do its work now — the audit
+	// log can take a record — for /readyz. Nil is ready.
+	Ready func() error
+
 	// flashKey signs the messages this server puts in a redirect, so a link
 	// from anywhere else cannot make a screen say something. See flash.go.
 	flashKey []byte
@@ -951,11 +955,40 @@ func (s *Server) readOnlyTokens(next http.Handler) http.Handler {
 	})
 }
 
+// handleHealthz answers that the process is serving, and nothing else.
+// For an orchestrator's liveness probe, so unauthenticated, and saying
+// nothing a stranger could use.
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("ok\n"))
+}
+
+// handleReadyz answers whether this console can do its work: the access
+// policy reads, and the audit log can take a record (Server.Ready). Not
+// ready is 503 and the word "not ready", never why: the reason is the
+// operator's to read in `aertun auditlog verify` and the logs, not a
+// stranger's to learn from a probe.
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if s.Policy == nil || (s.Ready != nil && s.Ready() != nil) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("not ready\n"))
+		return
+	}
+	_, _ = w.Write([]byte("ready\n"))
+}
+
 // Handler is the console: the screens, the sign-in that guards them, and
 // the endpoints identity providers and collectors call.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleHome)
+
+	// What an orchestrator asks: is it serving, and can it do its work.
+	mux.HandleFunc("/healthz", s.handleHealthz)
+	mux.HandleFunc("/readyz", s.handleReadyz)
 
 	// Signing in, and the person's own account.
 	mux.HandleFunc("/signin", s.handleSignIn)

@@ -97,6 +97,19 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* Running it where enterprises run things.  A GitHub Action
+  (`uses: Aertun/Aertun@v0.2.0`) fetches the release for the runner,
+  checks it against SHA256SUMS and its build attestation, and runs the
+  command given, one argument a line, never written into a script; a
+  proof command fails the job unless it is proven.  `deploy/kubernetes`
+  and the Helm chart `deploy/helm/aertun` run one replica with its
+  volume, as the image's nonroot user, with a read-only root filesystem,
+  no capabilities, the default seccomp profile, the restricted Pod
+  Security level and a NetworkPolicy; checked with helm lint --strict,
+  kubeconform and the image run that way.  The console answers /healthz
+  (serving) and /readyz (the audit log can take a record) with a word and
+  nothing more.
+
 * `aertun proof svr ID|FILE --key F` sums a proven proof up as an in-toto
   Simple Verification Result (https://in-toto.io/attestation/svr/v0.2),
   the predicate policy engines admit artifacts on: about the same

@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -498,5 +499,31 @@ func TestTheSessionRoleComesFromThePolicy(t *testing.T) {
 	srv.Policy.Grant(auth.Binding{Principal: "res", Role: auth.RoleResponder, Resource: auth.AreaSecurity, Deny: true})
 	if got := srv.roleFor("res"); got != auth.RoleViewer {
 		t.Errorf("a denied grant still raised the session to %q", got)
+	}
+}
+
+// The probes answer without a session and say nothing but a word: ready
+// only while the audit log can take a record, and never why it cannot.
+func TestTheProbesAnswerAWordAndNoMore(t *testing.T) {
+	srv, _ := setup(t)
+	h := srv.Handler()
+	probe := func(path string) (int, string) {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		return w.Code, w.Body.String()
+	}
+	if code, body := probe("/healthz"); code != http.StatusOK || body != "ok\n" {
+		t.Errorf("/healthz: %d %q", code, body)
+	}
+	if code, body := probe("/readyz"); code != http.StatusOK || body != "ready\n" {
+		t.Errorf("/readyz: %d %q", code, body)
+	}
+	srv.Ready = func() error { return errors.New("the disk under /srv/store is full") }
+	code, body := probe("/readyz")
+	if code != http.StatusServiceUnavailable || body != "not ready\n" {
+		t.Errorf("/readyz while the log cannot take a record: %d %q", code, body)
+	}
+	if strings.Contains(body, "disk") {
+		t.Error("the probe told a stranger why")
 	}
 }

@@ -117,6 +117,23 @@ Ed25519 and ML-DSA-65.
 | **MDR** | a managed detection provider, or an AI SOC, notifies within its SLA on all but this share of attacks | emulations run on your estate at random times from a plan whose digest the audit log committed before any ran, each run and notification recorded by a verified person or joined from the provider's alerts | `aertun mdr prove` |
 | **Peer log** | another site's audit log is complete up to a time, and the site has not signed a second history | the site's records as its signed stream delivered them, every tree head it signed with its own keys, and this deployment's log of any head that contradicted them | `aertun inbound prove` |
 
+In CI, the action runs any of these and fails the job unless the proof is
+proven:
+
+```yaml
+- uses: Aertun/Aertun@v0.2.0
+  with:
+    args: |
+      proof
+      verify
+      draft.proof.json
+      --key
+      release.pub.json
+```
+
+On Kubernetes, `deploy/kubernetes/aertun.yaml` or the Helm chart in
+`deploy/helm/aertun` (see `deploy/README.md`).
+
 A proven proof is also a verification result a policy engine reads:
 `aertun proof svr ID --key F` writes the in-toto Simple Verification Result
 for it, with one property to gate on, such as `AERTUN_DETECTION_PROVEN`.

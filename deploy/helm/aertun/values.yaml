@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Rashik Adhikari
+# SPDX-License-Identifier: Apache-2.0
+#
+# One replica: the store is a directory with one writer, and two pods
+# writing one audit log would each hold a log the other cannot verify.
+
+image:
+  repository: ghcr.io/aertun/aertun
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+store:
+  size: 10Gi
+  # Empty uses the cluster's default storage class.
+  storageClass: ""
+
+service:
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Only the namespace named here reaches the console; set to "" to leave
+# ingress open within the cluster. Egress is DNS and HTTPS.
+networkPolicy:
+  enabled: true
+  ingressNamespace: ingress-nginx
+
+ingress:
+  enabled: false
+  className: ""
+  host: aertun.example.com
+  # A TLS secret the ingress terminates with. Aertun's passkeys and
+  # sign-in need https.
+  tlsSecret: ""
+  annotations: {}

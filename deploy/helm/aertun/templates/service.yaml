@@ -1,0 +1,15 @@
+{{/* SPDX-FileCopyrightText: 2026 Rashik Adhikari */}}
+{{/* SPDX-License-Identifier: Apache-2.0 */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "aertun.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "aertun.selector" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
