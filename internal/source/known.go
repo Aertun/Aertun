@@ -44,6 +44,9 @@ func Known() []Source {
 		// The AI stack: agents observed as telemetry, and the two audit
 		// trails every startup's model usage runs through.
 		otelGenAI(), openaiAudit(), anthropicAudit(),
+		// The model gateway agents call through, which knows whose key
+		// each call came on.
+		litellmRequests(),
 	}
 }
 
@@ -552,7 +555,8 @@ func otelGenAI() Source {
 		Keep: []string{"operation", "tool", "model", "status", "tokens_in",
 			"tokens_out", "conversation", "trace_id", "span_id", "span_name",
 			"service", "agent_name", "system", "duration_ms", "prompt_bytes",
-			"completion_bytes", "content_events", "content_bytes"},
+			"completion_bytes", "content_events", "content_bytes", "via",
+			"gateway_key", "team"},
 		// SDKs batch (five seconds by default) and a collector adds its own
 		// queue, so a couple of minutes covers the push without pretending
 		// the stream is a batch import.
@@ -652,5 +656,46 @@ func anthropicAudit() Source {
 		// Activities are queryable within a minute of occurring; the read
 		// is scheduled, so two minutes covers it.
 		Lateness: 2 * time.Minute,
+	}
+}
+
+// litellmRequests is a LiteLLM proxy's record of each call made through it:
+// the StandardLoggingPayload its generic_api logger sends, one object per
+// call (docs.litellm.ai, proxy/logging_spec).
+//
+// The actor is the virtual key the call came on, by its hash: the gateway
+// authenticated it, so it is the one identity here that the agent did not
+// state about itself, and a hash is not reused when a key is renamed. Its
+// alias, team and owner are kept beside it for whoever reads the event.
+// What was asked and answered — messages and response — is never read:
+// it is somebody's data, and a prompt is written by whoever talks to the
+// agent, including whoever attacks it.
+func litellmRequests() Source {
+	return Source{
+		Issuer: "litellm", Tool: "LiteLLM", Stream: "requests",
+		Class: telemetry.ClassAPIActivity, Activity: 1,
+		Time: "startTime", Layout: LayoutEpochFraction,
+		Actor:   "metadata.user_api_key_hash",
+		Person:  "metadata.user_api_key_user_email",
+		Target:  "model",
+		Message: "call_type",
+		Outcome: "status", Succeeded: []string{"success"},
+		Observables: map[telemetry.ObservableKind]string{
+			telemetry.ObservableIP:    "metadata.requester_ip_address",
+			telemetry.ObservableEmail: "metadata.user_api_key_user_email",
+		},
+		Require: []string{"startTime", "id", "call_type", "status", "metadata.user_api_key_hash"},
+		Keep: []string{"id", "trace_id", "call_type", "status", "model", "model_group", "api_base",
+			"response_cost", "total_tokens", "prompt_tokens", "completion_tokens", "cache_hit",
+			"end_user", "metadata.user_api_key_alias", "metadata.user_api_key_team_id",
+			"metadata.user_api_key_team_alias", "metadata.user_api_key_user_id",
+			"metadata.user_api_key_org_id", "metadata.user_api_key_request_route",
+			"metadata.mcp_tool_call_metadata.namespaced_tool_name",
+			"metadata.mcp_tool_call_metadata.mcp_server_name",
+			"status_fields.llm_api_status", "status_fields.guardrail_status",
+			"error_information.error_class", "error_information.error_code"},
+		// The logger batches and flushes every five seconds by default
+		// (DEFAULT_FLUSH_INTERVAL_SECONDS); a minute covers a slow flush.
+		Lateness: time.Minute,
 	}
 }

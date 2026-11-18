@@ -97,6 +97,25 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* LiteLLM, and any model gateway, is read two ways.  Its logging
+  callback (`generic_api`) posts every call to a new bearer feed, `aertun
+  inbound add webhook litellm --mapping litellm/requests --bearer`: a
+  static secret in Authorization, for senders that can set a header and
+  cannot sign (also Alertmanager, falcosidekick, SIEM and SOAR webhook
+  actions), as a JSON array or one object a line, the same body twice
+  taken once.  The shipped litellm/requests mapping reads the call's key
+  by its hash as the actor, its alias, team and owner, the model, cost,
+  tokens, MCP tool and guardrail status, and never what was asked or
+  answered.  Its OpenTelemetry spans arrive at /v1/traces, which now reads
+  OTLP protobuf as well as JSON — most SDKs send nothing else — and a span
+  with no agent id is the key the gateway authenticated (raw.via names the
+  gateway) rather than the gateway itself.  The current GenAI content
+  attributes (gen_ai.input.messages, gen_ai.output.messages,
+  gen_ai.system_instructions) are measured and dropped like the older
+  ones.  Checked against a running LiteLLM proxy; its header must be
+  written with a space, not %20, which it does not decode.  A new time
+  layout, epoch-s-frac, reads seconds with a fraction exactly.
+
 * `aertun inbound add stream NAME --keys FILE --head-context C` receives
   another program's signed audit stream when it signs its tree heads in a
   context of its own and its keys file does not say which.  The head

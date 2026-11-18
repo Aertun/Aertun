@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -639,6 +641,10 @@ func (s *inboundServer) webhook(w http.ResponseWriter, r *http.Request, f inboun
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+	if f.Kind == inbound.Webhook && f.TokenHash != "" && f.Secret == "" {
+		s.bearerWebhook(w, r, f, body)
+		return
+	}
 	secrets, err := loadSecrets(s.root)
 	secret := secrets[f.Secret]
 	if err != nil || secret == "" {
@@ -669,6 +675,39 @@ func (s *inboundServer) webhook(w http.ResponseWriter, r *http.Request, f inboun
 	}
 	if err := s.accept(pushed{feed: f, docs: docs, at: s.now().UTC()}); err != nil {
 		s.seen.Forget(f.Name + ":" + id)
+		http.Error(w, "busy", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// bearerWebhook takes a delivery from a sender that sets a static secret in
+// Authorization and signs nothing. The delivery is named by its body's
+// digest, so the same body sent again inside the replay window is answered
+// as taken and not stored twice; what a bearer secret cannot show — that the
+// body is the one its sender sent — is why such a feed is given out only
+// over https.
+func (s *inboundServer) bearerWebhook(w http.ResponseWriter, r *http.Request, f inbound.Feed, body []byte) {
+	if !inbound.StaticMatches(inbound.BearerOrRaw(r.Header.Get("Authorization")), f.TokenHash) {
+		s.refused(f.Name, "the Authorization header does not hold this feed's secret")
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	sum := sha256.Sum256(body)
+	id := f.Name + ":" + hex.EncodeToString(sum[:])
+	if !s.seen.First(id, s.now()) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	docs, err := inbound.RecordLines(body)
+	if err != nil {
+		s.seen.Forget(id)
+		s.refused(f.Name, err.Error())
+		http.Error(w, "the body is not JSON records", http.StatusBadRequest)
+		return
+	}
+	if err := s.accept(pushed{feed: f, docs: docs, at: s.now().UTC()}); err != nil {
+		s.seen.Forget(id)
 		http.Error(w, "busy", http.StatusServiceUnavailable)
 		return
 	}

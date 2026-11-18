@@ -145,7 +145,28 @@ const (
 	LayoutEpochSecond = "epoch-s"
 	// LayoutEpochMilli is milliseconds. GitHub writes this.
 	LayoutEpochMilli = "epoch-ms"
+	// LayoutEpochFraction is seconds with a decimal fraction, as Python's
+	// time.time() writes it. LiteLLM writes this.
+	LayoutEpochFraction = "epoch-s-frac"
 )
+
+// epochFraction reads seconds and up to nine decimal places exactly, as
+// text: through a float, 1790040506.278482 is a few hundred nanoseconds
+// off, and two events in one second could change order.
+func epochFraction(raw string) (time.Time, error) {
+	whole, frac, _ := strings.Cut(raw, ".")
+	sec, err := strconv.ParseInt(whole, 10, 64)
+	if err != nil || len(frac) > 9 || strings.Trim(frac, "0123456789") != "" {
+		return time.Time{}, fmt.Errorf("%q is not seconds since the epoch with a decimal "+
+			"fraction, and this source writes its time as that", raw)
+	}
+	nanos := int64(0)
+	if frac != "" {
+		n, _ := strconv.ParseInt(frac+strings.Repeat("0", 9-len(frac)), 10, 64)
+		nanos = n
+	}
+	return time.Unix(sec, nanos).UTC(), nil
+}
 
 // MaxLateness caps a source's declared delay.
 //
@@ -369,6 +390,8 @@ func (s Source) when(raw string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("the time field is empty")
 	}
 	switch s.Layout {
+	case LayoutEpochFraction:
+		return epochFraction(raw)
 	case LayoutEpochSecond, LayoutEpochMilli:
 		n, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {

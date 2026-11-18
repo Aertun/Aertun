@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -209,7 +210,7 @@ func (h *Handler) sweep(at time.Time) {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodPost {
-		h.fail(w, http.StatusMethodNotAllowed, codeUnimplemented,
+		h.fail(w, r, http.StatusMethodNotAllowed, codeUnimplemented,
 			"the OTLP traces endpoint takes POST only")
 		return
 	}
@@ -223,32 +224,39 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.allow() {
 		w.Header().Set("Retry-After", "60")
-		h.fail(w, http.StatusTooManyRequests, codeExhausted,
+		h.fail(w, r, http.StatusTooManyRequests, codeExhausted,
 			"too many pushes; retry after the window")
 		return
 	}
-	ct := strings.ToLower(strings.TrimSpace(strings.Split(
-		r.Header.Get("Content-Type"), ";")[0]))
-	if ct != "application/json" {
-		h.fail(w, http.StatusUnsupportedMediaType, codeInvalid,
-			"this endpoint reads OTLP/HTTP JSON (application/json). It "+
-				"carries no protobuf runtime and will not half-read one")
+	if ct := contentType(r); ct != "application/json" && !isProtobuf(r) {
+		h.fail(w, r, http.StatusUnsupportedMediaType, codeInvalid,
+			"this endpoint reads OTLP/HTTP, as JSON (application/json) or "+
+				"protobuf (application/x-protobuf), and nothing else")
 		return
 	}
 	body, code, msg := h.read(r)
 	if code != 0 {
-		h.fail(w, code, codeInvalid, msg)
+		h.fail(w, r, code, codeInvalid, msg)
 		return
 	}
-	req, err := parse(body)
+	var req exportRequest
+	var err error
+	if isProtobuf(r) {
+		req, err = decodeProtobuf(body)
+		if err == nil && len(req.ResourceSpans) == 0 && len(body) > 0 {
+			err = errors.New("the protobuf body holds no resource spans, so it is not a traces export")
+		}
+	} else {
+		req, err = parse(body)
+	}
 	if err != nil {
 		// Nothing of a request that did not parse is stored: half of a
 		// malformed batch is a shape nobody sent.
 		h.refused(err.Error())
-		h.fail(w, http.StatusBadRequest, codeInvalid, err.Error())
+		h.fail(w, r, http.StatusBadRequest, codeInvalid, err.Error())
 		return
 	}
-	h.deliver(w, req)
+	h.deliver(w, r, req)
 }
 
 // authenticate proves the push, in constant time against a digest, before
@@ -260,7 +268,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 	if err != nil || strings.TrimSpace(want) == "" {
 		h.refused("the endpoint has no push credential to check against " +
 			"(aertun connect secret " + SecretName + ")")
-		h.fail(w, http.StatusServiceUnavailable, codeUnavailable,
+		h.fail(w, r, http.StatusServiceUnavailable, codeUnavailable,
 			"this endpoint has no push credential to check against")
 		return false
 	}
@@ -275,7 +283,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 	if subtle.ConstantTimeCompare(got[:], need[:]) != 1 {
 		h.refused("the Authorization header does not hold this endpoint's " +
 			"credential")
-		h.fail(w, http.StatusUnauthorized, codeUnauthenticated,
+		h.fail(w, r, http.StatusUnauthorized, codeUnauthenticated,
 			"the push did not carry this endpoint's authorization")
 		return false
 	}
@@ -316,11 +324,11 @@ func (h *Handler) read(r *http.Request) ([]byte, int, string) {
 
 // deliver maps, stores and answers. One lock around the counting is enough:
 // the store itself serialises writers the way every writer to it does.
-func (h *Handler) deliver(w http.ResponseWriter, req exportRequest) {
+func (h *Handler) deliver(w http.ResponseWriter, r *http.Request, req exportRequest) {
 	now := h.now()
 	mapping, err := h.Mapping()
 	if err != nil {
-		h.fail(w, http.StatusServiceUnavailable, codeUnavailable,
+		h.fail(w, r, http.StatusServiceUnavailable, codeUnavailable,
 			"the GenAI mapping cannot be loaded right now")
 		return
 	}
@@ -387,7 +395,7 @@ func (h *Handler) deliver(w http.ResponseWriter, req exportRequest) {
 			h.mu.Unlock()
 			// Nothing is remembered: the exporter is told to send the
 			// batch again and every span in it must be free to arrive.
-			h.fail(w, http.StatusServiceUnavailable, codeUnavailable,
+			h.fail(w, r, http.StatusServiceUnavailable, codeUnavailable,
 				"the event store did not take the batch; send it again")
 			return
 		}
@@ -402,6 +410,12 @@ func (h *Handler) deliver(w http.ResponseWriter, req exportRequest) {
 	// The honest answer: a full success is an empty partial success, and
 	// nothing else is invented into the shape. Non-GenAI spans are not
 	// rejections — they are on the status, not in the protocol's mouth.
+	if isProtobuf(r) {
+		w.Header().Set("Content-Type", protobufType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(protobufResponse(rejected, rejectionMessage(rejected, worst)))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(exportResponse{PartialSuccess: partialSuccess{
@@ -425,8 +439,30 @@ func rejectionMessage(rejected int64, worst string) string {
 		"needs; nothing without it was stored"
 }
 
-func (h *Handler) fail(w http.ResponseWriter, status, code int, msg string) {
+// fail answers with a google.rpc.Status, in the encoding the request came
+// in: protobuf to a protobuf sender, JSON to everybody else.
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request, status, code int, msg string) {
+	if isProtobuf(r) {
+		w.Header().Set("Content-Type", protobufType)
+		w.WriteHeader(status)
+		_, _ = w.Write(protobufStatus(code, msg))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(rpcStatus{Code: code, Message: msg})
+}
+
+// protobufType is the media type of OTLP/HTTP protobuf.
+const protobufType = "application/x-protobuf"
+
+// contentType is a request's media type, without its parameters.
+func contentType(r *http.Request) string {
+	return strings.ToLower(strings.TrimSpace(strings.Split(r.Header.Get("Content-Type"), ";")[0]))
+}
+
+// isProtobuf reports whether a request is OTLP/HTTP protobuf.
+func isProtobuf(r *http.Request) bool {
+	ct := contentType(r)
+	return ct == protobufType || ct == "application/protobuf"
 }

@@ -137,7 +137,18 @@ const (
 	attrSystem       = "gen_ai.system"
 	attrPrompt       = "gen_ai.prompt"
 	attrCompletion   = "gen_ai.completion"
-	attrServiceName  = "service.name"
+	// The names the conventions gave content later, which current SDKs and
+	// gateways write: the messages in and out, and the system instructions.
+	attrInputMessages  = "gen_ai.input.messages"
+	attrOutputMessages = "gen_ai.output.messages"
+	attrInstructions   = "gen_ai.system_instructions"
+	attrServiceName    = "service.name"
+	// The caller a model gateway authenticated, as LiteLLM puts it on the
+	// spans it exports: the virtual key's alias and its hash, and the team
+	// it belongs to.
+	attrGatewayKeyAlias = "metadata.user_api_key_alias"
+	attrGatewayKeyHash  = "metadata.user_api_key_hash"
+	attrGatewayTeam     = "metadata.user_api_key_team_alias"
 )
 
 // record flattens one span into the fields the otel/genai mapping reads,
@@ -162,13 +173,17 @@ func record(rs *resourceSpans, sp *span) (map[string]any, bool) {
 	// are never copied into the record. Measured in bytes as read; a prompt
 	// that never crossed this boundary has no length to report.
 	promptBytes, completionBytes := 0, 0
-	if v, ok := attrs[attrPrompt]; ok {
-		promptBytes = len(v)
-		delete(attrs, attrPrompt)
+	for _, k := range []string{attrPrompt, attrInputMessages, attrInstructions} {
+		if v, ok := attrs[k]; ok {
+			promptBytes += len(v)
+			delete(attrs, k)
+		}
 	}
-	if v, ok := attrs[attrCompletion]; ok {
-		completionBytes = len(v)
-		delete(attrs, attrCompletion)
+	for _, k := range []string{attrCompletion, attrOutputMessages} {
+		if v, ok := attrs[k]; ok {
+			completionBytes += len(v)
+			delete(attrs, k)
+		}
 	}
 	// Span events named for GenAI content (gen_ai.content.prompt,
 	// gen_ai.user.message, gen_ai.assistant.message, …) are counted and
@@ -196,12 +211,23 @@ func record(rs *resourceSpans, sp *span) (map[string]any, bool) {
 	}
 
 	// The agent identity, in order of what it is worth: the id the
-	// platform gave the agent, its name, and failing both the service that
-	// emitted the span — which is a process rather than an agent, and
+	// platform gave the agent, its name, then the key a model gateway
+	// authenticated the call on — which the agent did not state about
+	// itself, and which a gateway exporting the span names where the
+	// service is only the gateway — and failing all of those the service
+	// that emitted the span, which is a process rather than an agent, and
 	// better than attributing the actions to nobody.
 	agent := attrs[attrAgentID]
 	if agent == "" {
 		agent = attrs[attrAgentName]
+	}
+	via := ""
+	if agent == "" {
+		if k := attrs[attrGatewayKeyAlias]; k != "" {
+			agent, via = k, service
+		} else if k := attrs[attrGatewayKeyHash]; k != "" {
+			agent, via = "key:"+k, service
+		}
 	}
 	if agent == "" {
 		agent = service
@@ -263,6 +289,15 @@ func record(rs *resourceSpans, sp *span) (map[string]any, bool) {
 	}
 	if service != "" {
 		out["service"] = service
+	}
+	if via != "" {
+		out["via"] = via
+	}
+	if h := attrs[attrGatewayKeyHash]; h != "" {
+		out["gateway_key"] = h
+	}
+	if t := attrs[attrGatewayTeam]; t != "" {
+		out["team"] = t
 	}
 	if start, err := sp.StartTimeUnixNano.Int64(); err == nil && start > 0 {
 		if end, err := sp.EndTimeUnixNano.Int64(); err == nil && end >= start {

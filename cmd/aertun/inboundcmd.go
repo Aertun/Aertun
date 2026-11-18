@@ -22,7 +22,7 @@ import (
 
 func inboundUsage() error {
 	return fmt.Errorf("usage: aertun inbound list | status NAME | add okta NAME | " +
-		"add webhook NAME --mapping ISSUER/STREAM [--github] | " +
+		"add webhook NAME --mapping ISSUER/STREAM [--github | --bearer] | " +
 		"add ssf NAME --issuer URL --url https://YOUR-ADMIN [--alias okta] | " +
 		streamFeedUsage +
 		"connect NAME --client-id ID [--token-url URL] | verify NAME | " +
@@ -190,6 +190,8 @@ func inboundAdd(root string, caller *Caller, kind, name string, rest []string,
 		switch rest[i] {
 		case "--github":
 			opts["github"] = "yes"
+		case "--bearer":
+			opts["bearer"] = "yes"
 		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys", "--head-context":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("%s needs a value", rest[i])
@@ -265,6 +267,26 @@ func makeFeed(root, kind, name string, opts map[string]string, by string) (inbou
 			return f, nil, err
 		}
 		f.Mapping = opts["mapping"]
+		// A sender that can set a header and cannot sign: a static secret
+		// in Authorization, as Okta sends it, checked in constant time
+		// against a digest and kept nowhere here in the clear. It proves
+		// who sent a delivery and not that its body is the one sent, so
+		// the feed is for a sender on a path this deployment trusts (TLS
+		// end to end), and an exact replay is refused by the body's digest.
+		if opts["bearer"] != "" {
+			if f.Kind == inbound.GitHub {
+				return f, nil, fmt.Errorf("a GitHub webhook signs its deliveries; --bearer is for a sender that cannot")
+			}
+			secret, digest, err := inbound.NewSecret()
+			if err != nil {
+				return f, nil, err
+			}
+			f.TokenHash = digest
+			shown = append(shown, "Authorization header value: Bearer "+secret,
+				"the secret proves who sent a delivery, not that the body is the one sent: "+
+					"give this address only over https")
+			break
+		}
 		var secret string
 		var err error
 		if f.Kind == inbound.GitHub {
