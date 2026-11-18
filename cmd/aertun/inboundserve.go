@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aertun/aertun/internal/seal"
 	"io"
 	"net/http"
 	"os"
@@ -433,6 +434,11 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	} else {
 		stored = len(events)
 	}
+	// Sealed whether or not every record mapped: what is sealed is that the
+	// record arrived, which does not depend on reading it.
+	if p.feed.Seal && serr == nil {
+		serr = s.seal(p.feed, p.docs)
+	}
 	s.mu.Lock()
 	st.Stored += stored
 	if serr != nil {
@@ -452,6 +458,56 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	s.dirty = true
 	s.mu.Unlock()
 	return stored, learned
+}
+
+// seal commits a delivery's records to the audit log by their digests, in
+// one batch, in the feed's name: the sender proved itself to the feed, and
+// the entry says only that these records arrived now. A record that is not
+// one JSON object is no alert and is not sealed.
+func (s *inboundServer) seal(f inbound.Feed, docs []any) error {
+	var digests []string
+	seen := map[string]bool{}
+	for _, d := range docs {
+		if _, ok := d.(map[string]any); !ok {
+			continue
+		}
+		b, err := json.Marshal(d)
+		if err != nil {
+			return err
+		}
+		digest, err := seal.Digest(b)
+		if err != nil {
+			return err
+		}
+		if !seen[digest] {
+			seen[digest] = true
+			digests = append(digests, digest)
+		}
+	}
+	for len(digests) > 0 {
+		n := min(len(digests), seal.MaxBatch)
+		b, err := seal.NewBatch(digests[:n])
+		if err != nil {
+			return err
+		}
+		digests = digests[n:]
+		dir := seal.Dir(s.root)
+		existed, err := seal.Save(dir, b)
+		if err != nil {
+			return err
+		}
+		detail := seal.Detail(b)
+		detail["feed"] = f.Name
+		if err := recordE(s.root, audit.Record{Action: seal.ActionSealed, Resource: "/feeds/" + f.Name,
+			Outcome: audit.Success, Principal: "feed:" + f.Name, Kind: audit.KindService, Verified: true,
+			Detail: detail}); err != nil {
+			if !existed {
+				_ = seal.Remove(dir, b.Root)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // mapping is the source mapping a feed's records go through.

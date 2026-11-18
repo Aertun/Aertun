@@ -4,6 +4,27 @@ Aertun NEWS
 Unreleased
 ==========
 
+* Wazuh, both ways.  `aertun inbound add webhook wazuh --mapping
+  wazuh/alerts --seal` takes a manager's alerts, signed as Standard Webhooks
+  deliveries by `integrations/wazuh/custom-aertun.py`, which Wazuh's
+  integrator runs for each alert.  `--seal`, on any webhook feed, commits
+  each delivered record's digest to the audit log in the feed's name, so
+  `aertun proof sealed --alert FILE` later finds the alert as its sender
+  wrote it.  The new `wazuh/alerts` mapping reads alerts as a 4.14 manager
+  writes them.  `integrations/wazuh/ruleset/rules/aertun_rules.xml` (IDs
+  998000-998017) raises Wazuh alerts from Aertun's audit log.  The rule on a
+  seal is level 0, so an alert is never sent back to be sealed again.  All
+  of it was tested against a live 4.14.10 manager; the README says what was
+  and was not.
+
+* A mapping's `keep` may name the field a path is kept under ("rule.mitre.id
+  as mitre"), and keeps a list of plain values joined by spaces.  Two kept
+  paths ending alike are now refused.  That found two shipped mappings
+  overwriting a field: azure/activity now keeps `raw.operation`,
+  `raw.status` and `raw.category` where it kept one `raw.value`, and
+  duo/auth keeps `raw.user_name` and `raw.application` where it kept one
+  `raw.name`.
+
 * `aertun vuln referee REPORT --source DIR --key F` holds a vulnerability
   report's static claims, usually a model's, to a checkout of the source it
   is about, and signs what came of it.  The report is JSON in the new

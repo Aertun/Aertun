@@ -40,6 +40,32 @@ func At(doc any, path string) string {
 	return asString(v)
 }
 
+// AtList is the values at a path that holds a list of plain values — strings,
+// numbers, booleans — in order; nothing for anything else, and nothing for a
+// list holding an object, which no single field can stand for.
+func AtList(doc any, path string) []string {
+	v, ok := lookup(doc, path)
+	if !ok {
+		return nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		switch item.(type) {
+		case string, bool, float64, json.Number:
+			if s := asString(item); s != "" {
+				out = append(out, s)
+			}
+		default:
+			return nil
+		}
+	}
+	return out
+}
+
 // Has reports whether a path exists, which is different from being empty.
 func Has(doc any, path string) bool {
 	_, ok := lookup(doc, path)

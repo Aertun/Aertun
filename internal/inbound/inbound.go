@@ -84,10 +84,14 @@ type Feed struct {
 	Status string `json:"status,omitempty"`
 	// Stream holds the keys an audit stream's sender publishes, which its
 	// batches and tree heads are checked against (see AuditStream).
-	Stream  *StreamKeys `json:"stream,omitempty"`
-	Off     bool        `json:"off,omitempty"`
-	Created time.Time   `json:"created"`
-	By      string      `json:"by,omitempty"`
+	Stream *StreamKeys `json:"stream,omitempty"`
+	// Seal says each record a webhook delivers is sealed as it arrives:
+	// its digest committed to the audit log in a batch, so a sealed-alert
+	// proof can later show it existed by then (internal/seal).
+	Seal    bool      `json:"seal,omitempty"`
+	Off     bool      `json:"off,omitempty"`
+	Created time.Time `json:"created"`
+	By      string    `json:"by,omitempty"`
 }
 
 // ValidName keeps feed names to what can sit in a URL path and a file name.

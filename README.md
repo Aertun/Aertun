@@ -421,10 +421,16 @@ Plus, Vanta, and the OpenAI and Anthropic organisation audit logs.
 
 **Log sources** mapped to one event shape: AWS CloudTrail, Microsoft Entra ID,
 Microsoft Azure, Google Workspace, Google Cloud, Okta, Duo, CrowdStrike Falcon,
-Jamf Pro, GitHub, Kubernetes, Cloudflare, Salesforce, Slack, Snowflake, Linux
+Jamf Pro, GitHub, Kubernetes, Cloudflare, Salesforce, Slack, Snowflake, Wazuh, Linux
 auditd, EVM chains, the OpenAI and Anthropic audit logs, and GenAI agent
 telemetry over OTLP (agent, tool and model calls, with prompts read for size
 and never stored).
+
+**Wazuh**, both ways (`integrations/wazuh`): its alerts arrive on a signed
+webhook feed, mapped as `wazuh/alerts` and sealed in the audit log as they
+arrive; Aertun's audit log goes to Wazuh, with 18 rules for the kill switch,
+refuted proofs, forked peer logs, refusals, privilege and legal holds. Tested
+against a live Wazuh 4.14.10 manager.
 
 **Another vendor's AI verdicts** arrive as a file: JSON lines or CSV with the
 columns `alert`, `verdict`, `at` and optionally `confidence`, `disposition`,

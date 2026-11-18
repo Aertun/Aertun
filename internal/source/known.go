@@ -47,6 +47,9 @@ func Known() []Source {
 		// The model gateway agents call through, which knows whose key
 		// each call came on.
 		litellmRequests(),
+		// The open-source SIEM and XDR many already run, whose alerts are
+		// brought here to be kept, sealed and measured.
+		wazuhAlerts(),
 	}
 }
 
@@ -177,8 +180,8 @@ func azureActivity() Source {
 		},
 		Require: []string{"eventTimestamp", "caller", "resourceId",
 			"status.value"},
-		Keep: []string{"operationName.value", "status.value", "level",
-			"resourceGroupName", "subscriptionId", "category.value"},
+		Keep: []string{"operationName.value as operation", "status.value as status", "level",
+			"resourceGroupName", "subscriptionId", "category.value as category"},
 		Lateness: 20 * time.Minute,
 	}
 }
@@ -280,8 +283,8 @@ func duoAuth() Source {
 			telemetry.ObservableIP: "access_device.ip.address",
 		},
 		Require: []string{"isotimestamp", "user.key", "result"},
-		Keep: []string{"result", "reason", "factor", "user.name",
-			"application.name", "access_device.location.country"},
+		Keep: []string{"result", "reason", "factor", "user.name as user_name",
+			"application.name as application", "access_device.location.country"},
 		Lateness: 5 * time.Minute,
 	}
 }
@@ -697,5 +700,39 @@ func litellmRequests() Source {
 		// The logger batches and flushes every five seconds by default
 		// (DEFAULT_FLUSH_INTERVAL_SECONDS); a minute covers a slow flush.
 		Lateness: time.Minute,
+	}
+}
+
+// wazuhAlerts is a Wazuh manager's alerts, one object each, as alerts.json
+// holds them and as its integrator hands each to a script
+// (integrations/wazuh). Tested on alerts a 4.14.10 manager raised.
+//
+// A detection rather than an activity: Wazuh has already decided each is
+// worth raising, at a level from 0 to 15 carried as raw.level for a rule to
+// read. The actor is the user a decoder found acting, the target the one
+// acted on, and the device the agent that saw it. The full log line is kept:
+// it is the evidence, and it is whatever was written to the log, so a rule
+// reads it as text and never as an instruction.
+func wazuhAlerts() Source {
+	return Source{
+		Issuer: "wazuh", Tool: "Wazuh", Stream: "alerts",
+		Class: telemetry.ClassDetection, Activity: 1,
+		Time: "timestamp", Layout: "2006-01-02T15:04:05.000-0700",
+		Actor: "data.srcuser", Target: "data.dstuser", Device: "agent.name",
+		Alert:   "id",
+		Message: "rule.description",
+		Observables: map[telemetry.ObservableKind]string{
+			telemetry.ObservableIP:   "data.srcip",
+			telemetry.ObservableHash: "syscheck.sha256_after",
+			telemetry.ObservableFile: "syscheck.path",
+		},
+		Require: []string{"timestamp", "id", "rule.id", "rule.level", "rule.description", "agent.name"},
+		Keep: []string{"rule.id as rule", "rule.level as level", "rule.groups as groups",
+			"rule.mitre.id as mitre", "rule.firedtimes as fired", "agent.id as agent_id",
+			"agent.ip as agent_ip", "manager.name as manager", "decoder.name as decoder", "location",
+			"data.srcport as srcport", "data.dstip as dstip", "syscheck.event as fim_event", "full_log"},
+		// The integrator hands an alert over as it is written; alerts.json
+		// collected by file is as late as the collection.
+		Lateness: 2 * time.Minute,
 	}
 }

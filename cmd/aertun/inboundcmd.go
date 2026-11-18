@@ -22,7 +22,7 @@ import (
 
 func inboundUsage() error {
 	return fmt.Errorf("usage: aertun inbound list | status NAME | add okta NAME | " +
-		"add webhook NAME --mapping ISSUER/STREAM [--github | --bearer] | " +
+		"add webhook NAME --mapping ISSUER/STREAM [--github | --bearer] [--seal] | " +
 		"add ssf NAME --issuer URL --url https://YOUR-ADMIN [--alias okta] | " +
 		streamFeedUsage +
 		"connect NAME --client-id ID [--token-url URL] | verify NAME | " +
@@ -165,6 +165,12 @@ func inboundHelp() error {
     aertun inbound add webhook billing --mapping billing/admin
     aertun inbound add webhook github --mapping github/audit --github
 
+  Wazuh alerts, each sealed in the audit log as it arrives
+    aertun inbound add webhook wazuh --mapping wazuh/alerts --seal
+    Then on the manager, custom-aertun.py from integrations/wazuh in the
+    repository, and an <integration> block naming this feed's URL and its
+    signing secret (integrations/wazuh/README.md).
+
   OpenID Shared Signals (Okta, Google, Jamf, any SSF 1.0 transmitter)
     aertun inbound add ssf okta-signals --issuer https://acme.okta.com \
         --url https://admin.acme.example --alias okta
@@ -192,6 +198,8 @@ func inboundAdd(root string, caller *Caller, kind, name string, rest []string,
 			opts["github"] = "yes"
 		case "--bearer":
 			opts["bearer"] = "yes"
+		case "--seal":
+			opts["seal"] = "yes"
 		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys", "--head-context":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("%s needs a value", rest[i])
@@ -267,6 +275,9 @@ func makeFeed(root, kind, name string, opts map[string]string, by string) (inbou
 			return f, nil, err
 		}
 		f.Mapping = opts["mapping"]
+		// Sealed as it arrives: each record's digest committed to the
+		// audit log, in the feed's name, with the batch kept beside it.
+		f.Seal = opts["seal"] != ""
 		// A sender that can set a header and cannot sign: a static secret
 		// in Authorization, as Okta sends it, checked in constant time
 		// against a digest and kept nowhere here in the clear. It proves
