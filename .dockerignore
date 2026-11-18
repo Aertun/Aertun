@@ -1,5 +1,10 @@
 .git
 .github
+.claude
+bin
+/aertun
+/aertun-collector
+*.exe
 *.md
 !internal/admin/assets/fonts/README.md
 !internal/admin/assets/icons/README.md

@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	rpID   = "cms.example"
-	origin = "https://cms.example"
+	rpID   = "aertun.example"
+	origin = "https://aertun.example"
 )
 
 func party() webauthn.Party {
@@ -173,10 +173,10 @@ func TestAnAssertionFromAnotherOriginIsRefused(t *testing.T) {
 	a.count++
 
 	for _, bad := range []string{
-		"https://cms.example.evil.test", // suffix confusion
+		"https://aertun.example.evil.test", // suffix confusion
 		"https://evil.test",
-		"http://cms.example", // scheme
-		"https://cms.example:8443",
+		"http://aertun.example", // scheme
+		"https://aertun.example:8443",
 	} {
 		_, err := party().Verify(cred, ch, a.assertAs(t, "webauthn.get", ch, bad))
 		if err == nil {

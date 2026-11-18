@@ -58,7 +58,6 @@ import (
 	"github.com/aertun/aertun/internal/clientip"
 	"github.com/aertun/aertun/internal/dpop"
 	"github.com/aertun/aertun/internal/enrol"
-	"github.com/aertun/aertun/internal/icons"
 	"github.com/aertun/aertun/internal/lockout"
 	"github.com/aertun/aertun/internal/oauthas"
 	"github.com/aertun/aertun/internal/throttle"
@@ -82,6 +81,10 @@ var assets embed.FS
 
 // Server holds everything a request needs.
 type Server struct {
+	// Ready reports whether the console can do its work now — the audit
+	// log can take a record — for /readyz. Nil is ready.
+	Ready func() error
+
 	// flashKey signs the messages this server puts in a redirect, so a link
 	// from anywhere else cannot make a screen say something. See flash.go.
 	flashKey []byte
@@ -301,16 +304,13 @@ func (s *Server) refresh() {
 
 // New builds the server and parses the admin templates once.
 //
-// html/template rather than Aertun's own engine, and the distinction matters.
-// aertun's language is deliberately powerless because *users* write in it and
-// user templates are an injection surface. These templates are ours, shipped in
-// the binary, and never author-supplied — so the stdlib's contextual escaping is
-// exactly right and there is no surface to remove.
+// html/template, whose contextual escaping is exactly right here: these
+// templates are ours, shipped in the binary and never written by anybody
+// who signs in.
 func New(p *auth.Policy, ts *auth.TokenStore) (*Server, error) {
 	t, err := template.New("").Funcs(template.FuncMap{
-		"icon":      uiIcon,
-		"toneicon":  toneIcon,
-		"iconNames": icons.Names,
+		"icon":     uiIcon,
+		"toneicon": toneIcon,
 		// signedOutIcon is the mark in the built-in colours, inline, for the
 		// pages somebody sees before signing in: /icon.svg carries the
 		// operator's colour and is served only to the signed in, so without
@@ -659,34 +659,6 @@ func (s *Server) allows(p principal, act auth.Action, resource string) bool {
 // package's source and fails when a handler reads a page name and authorises
 // "/", because this is a convention and the convention is what did not hold.
 
-// canAnywhere is the gate for a screen that lists things it has not named yet.
-//
-// It asks whether the caller may do this anywhere at all, and the screen then
-// asks the per-page question for every row it is about to show. Weak on
-// purpose: it decides whether the screen opens, not what is on it.
-func (s *Server) canAnywhere(w http.ResponseWriter, r *http.Request,
-	p principal, act auth.Action) bool {
-
-	if s.Policy == nil {
-		return s.can(w, r, p, act, "/")
-	}
-	// The credential's own limits still apply. Its role cap and its read-only
-	// and type dimensions are site-wide by nature — a read-only token is
-	// read-only everywhere — so they are asked here in full. Only its path
-	// dimension is asked about itself rather than about "/", because a token
-	// scoped to /blog failing to cover "/" is the same wrong question this
-	// function exists to stop asking.
-	within := strings.TrimSpace(p.Scope)
-	if within == "" {
-		within = "/"
-	}
-	if s.Policy.Anywhere(p.Name, act) &&
-		auth.CheckCredential(p.Role, p.Scope, p.Limits, act, within) == nil {
-		return true
-	}
-	return s.can(w, r, p, act, "/")
-}
-
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
 	data map[string]any) {
 
@@ -983,11 +955,40 @@ func (s *Server) readOnlyTokens(next http.Handler) http.Handler {
 	})
 }
 
+// handleHealthz answers that the process is serving, and nothing else.
+// For an orchestrator's liveness probe, so unauthenticated, and saying
+// nothing a stranger could use.
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("ok\n"))
+}
+
+// handleReadyz answers whether this console can do its work: the access
+// policy reads, and the audit log can take a record (Server.Ready). Not
+// ready is 503 and the word "not ready", never why: the reason is the
+// operator's to read in `aertun auditlog verify` and the logs, not a
+// stranger's to learn from a probe.
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if s.Policy == nil || (s.Ready != nil && s.Ready() != nil) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("not ready\n"))
+		return
+	}
+	_, _ = w.Write([]byte("ready\n"))
+}
+
 // Handler is the console: the screens, the sign-in that guards them, and
 // the endpoints identity providers and collectors call.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleHome)
+
+	// What an orchestrator asks: is it serving, and can it do its work.
+	mux.HandleFunc("/healthz", s.handleHealthz)
+	mux.HandleFunc("/readyz", s.handleReadyz)
 
 	// Signing in, and the person's own account.
 	mux.HandleFunc("/signin", s.handleSignIn)

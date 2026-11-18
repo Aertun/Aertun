@@ -185,25 +185,6 @@ type ShadowResult struct {
 // Held reports whether the budget held: the install may proceed.
 func (r *ShadowResult) Held() bool { return len(r.Refused) == 0 }
 
-// Noisiest names the id with the most would-have-fired, for the one-line
-// audit detail and the top of a refusal.
-func (r *ShadowResult) Noisiest() string {
-	best := ""
-	var bestN int
-	for _, rows := range [][]ShadowCount{r.Rules, r.Correlations} {
-		for _, c := range rows {
-			if c.Fired > bestN || (c.Fired == bestN && c.Fired > 0 &&
-				c.ID < best) {
-				best, bestN = c.ID, c.Fired
-			}
-		}
-	}
-	if bestN == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%s=%d", best, bestN)
-}
-
 // PerRuleBudget is the computed ceiling for one id against its installed
 // equivalent: the floor when there is nothing to compare against, three
 // times the equivalent when there is and that is louder.

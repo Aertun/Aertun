@@ -251,3 +251,101 @@ func TestTheCallsAnAgentMakesAreTheOnesReconciled(t *testing.T) {
 		t.Errorf("another agent was credited with the call: %+v", ev)
 	}
 }
+
+// gatewayCall is a call a LiteLLM proxy logged on a key, as the
+// litellm/requests mapping stores it; tool is empty for a model call.
+func gatewayCall(at time.Time, key, tool string) telemetry.Event {
+	raw := map[string]string{"call_type": "acompletion", "status": "success"}
+	if tool != "" {
+		raw["call_type"], raw["namespaced_tool_name"] = "call_mcp_tool", tool
+	}
+	return telemetry.Event{Time: at, Received: at, Source: "litellm/requests", Class: telemetry.ClassAPIActivity,
+		Actor: telemetry.ID{Issuer: "litellm", Value: key}, Raw: raw}
+}
+
+func modelSpan(at time.Time) telemetry.Event {
+	return telemetry.Event{Time: at, Received: at, Source: otelSource, Class: telemetry.ClassAPIActivity,
+		Actor: telemetry.ID{Issuer: "otel", Value: "triage-bot"}, Raw: map[string]string{"operation": "chat"}}
+}
+
+// githubAction is something GitHub's audit log recorded of an actor.
+func githubAction(at time.Time, actor, action string) telemetry.Event {
+	return telemetry.Event{Time: at, Received: at, Source: "github/audit", Class: telemetry.ClassAPIActivity,
+		Actor: telemetry.ID{Issuer: "github", Value: actor}, Message: action,
+		Raw: map[string]string{"action": action}}
+}
+
+// Three ways: the agent's own account, the model gateway it calls through,
+// and the system it acts on. Every call the gateway saw on its key, and
+// everything GitHub recorded of its login, is accounted for — proven; then
+// the key used for a call the agent never reported, and the login used for
+// an action with nothing of the agent near, refute, named by kind, source
+// and time and nothing the caller chose.
+func TestAnAgentIsHeldToItsGatewayAndTheSystemsItActsOn(t *testing.T) {
+	root := reconcileSite(t)
+	key := "88dc28d0f030c55ed4ab77ed8faf098196cb1c05df778539800c9f1243fe6b4b"
+	now := time.Now().UTC().Add(-30 * time.Minute)
+	var evs []telemetry.Event
+	for i := range 12 {
+		at := now.Add(time.Duration(i) * 90 * time.Second)
+		evs = append(evs, modelSpan(at), gatewayCall(at.Add(2*time.Second), key, ""))
+	}
+	at := now.Add(20 * time.Minute)
+	evs = append(evs, span(at, "mcp__github__create_issue"),
+		gatewayCall(at.Add(time.Second), key, "github-create_issue"),
+		githubAction(at.Add(3*time.Second), "triage-bot", "issues.opened"),
+		// Somebody else's login and somebody else's key are not the agent's.
+		githubAction(now.Add(25*time.Minute), "dana", "repo.destroy"),
+		gatewayCall(now.Add(25*time.Minute), "a-different-key", ""))
+	appendAgentEvents(t, root, evs...)
+	args := []string{"--gateway", "litellm/requests:" + key, "--gateway-only", "--identity", "github/audit:triage-bot"}
+	st, err := reconcileProof(t, root, args...)
+	ev := st.Predicate.Reconciliation
+	if err != nil || st.Predicate.Verdict != proof.Proven || ev.GatewayCalls != 13 || ev.GatewayMatched != 13 ||
+		ev.ModelSpans != 12 || ev.Changes != 1 || ev.UnexplainedChanges != 0 || len(st.Predicate.Checks) != 5 {
+		t.Fatalf("everything accounted for: %v: %s %+v %+v", err, st.Predicate.Verdict, ev, st.Predicate.Checks)
+	}
+
+	// The key used for a call the agent never reported, a model call the
+	// agent reported that never went through the gateway, and the login
+	// used with nothing of the agent near.
+	later := now.Add(28 * time.Minute)
+	appendAgentEvents(t, root, gatewayCall(later, key, ""), modelSpan(later.Add(-10*time.Minute)),
+		githubAction(now.Add(-10*time.Minute), "triage-bot", "repo.add_member"))
+	st, err = reconcileProof(t, root, args...)
+	ev = st.Predicate.Reconciliation
+	if err == nil || st.Predicate.Verdict != proof.Refuted || ev.GatewayUnreported != 1 ||
+		ev.ModelUnseen != 1 || ev.UnexplainedChanges != 1 {
+		t.Fatalf("refuted three ways: %v: %s %+v", err, st.Predicate.Verdict, ev)
+	}
+	failures := strings.Join(st.Predicate.Checks[3].Failures, "|") + "|" +
+		strings.Join(st.Predicate.Checks[4].Failures, "|")
+	for _, want := range []string{"at the gateway, not in its account: a model call at ",
+		"in its account, never at the gateway: a model call at ", "acted as it with nothing of it near: github/audit at "} {
+		if !strings.Contains(failures, want) {
+			t.Errorf("not named: %q in %s", want, failures)
+		}
+	}
+	for _, chosen := range []string{"repo.add_member", "acompletion", "create_issue"} {
+		if strings.Contains(failures, chosen) {
+			t.Errorf("a name the caller chose is in the proof: %q", chosen)
+		}
+	}
+
+	for _, bad := range [][]string{{"--gateway", "LiteLLM"}, {"--gateway-only"}, {"--identity", "the bot"}} {
+		if _, err := reconcileProofArgs(t, root, bad...); err == nil {
+			t.Errorf("%v was taken", bad)
+		}
+	}
+}
+
+// reconcileProofArgs runs a reconciliation expected to be refused before
+// anything is written.
+func reconcileProofArgs(t *testing.T, root string, args ...string) (string, error) {
+	t.Helper()
+	key, pub := signingFiles(t)
+	base := []string{"reconcile", "triage-bot", "--since",
+		time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), "--key", key, "--public-key", pub,
+		"--out", filepath.Join(t.TempDir(), "r.json")}
+	return "", cmdAgent(root, append(base, args...))
+}

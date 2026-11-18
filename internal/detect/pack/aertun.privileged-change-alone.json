@@ -4,7 +4,8 @@
   "why": "a lone administrator's request waits before they may approve it themselves, so the owner of that account has time to see it and decline it; a stolen session starts a takeover exactly this way",
   "blind": "changes made on the machine itself, outside aertun, and requests by a second administrator, which another person has to approve",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 3,
   "when": {
@@ -51,9 +52,10 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant",
           "alone": "true",
-          "not_before": "2026-11-06T10:00:00Z"
+          "not_before": "2026-11-06T10:00:00Z",
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     },
@@ -75,7 +77,8 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant"
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     },
@@ -97,8 +100,9 @@
           "action": "dual.approved",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant",
-          "alone": "true"
+          "alone": "true",
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     }

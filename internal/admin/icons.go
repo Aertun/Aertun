@@ -24,22 +24,14 @@ import (
 // iconSymbol is which Material Symbol stands for which screen, for whoever
 // adds a screen and needs to fetch its icon.
 var iconSymbol = map[string]string{
-	"today": "today", "pages": "description", "records": "database", "types": "category",
-	"structure": "account_tree", "listings": "view_list", "forms": "assignment",
-	"media": "photo_library", "design": "palette", "sections": "dashboard_customize",
-	"languages": "translate", "assist": "edit_note", "assistants": "smart_toy",
-	"inbox": "inbox", "approvals": "pending_actions", "make": "extension", "research": "biotech", "decisions": "rule", "notes": "sticky_note_2",
-	"review": "rate_review", "publishing": "publish", "history": "history",
-	"analytics": "analytics", "experiments": "science", "personalise": "tune",
-	"transfer": "swap_horiz", "decentralised": "hub", "provenance": "verified",
-	"security": "shield", "logs": "receipt_long", "findings": "flag",
-	"risk": "warning", "cases": "cases", "events": "list_alt",
+	"today": "today", "approvals": "pending_actions", "logs": "receipt_long",
+	"findings": "flag", "risk": "warning", "cases": "cases", "events": "list_alt",
 	"hunt": "travel_explore", "detections": "radar", "indicators": "fingerprint",
-	"vulns": "bug_report", "workforce": "groups", "automations": "bolt", "shield": "security", "signins": "login", "feeds": "sensors", "agents": "robot_2", "egress": "arrows_output",
-	"people": "person", "members": "group", "boards": "forum", "provisioning": "sync", "sso": "badge", "access": "key", "passkeys": "passkey", "apps": "apps", "memory": "psychology", "fleet": "lan",
-	"integrations": "extension", "models": "memory", "settings": "settings",
-	"find": "search", "start": "rocket_launch", "playground": "api",
-	"profile": "account_circle", "proofs": "verified", "adjudication": "gavel", "claims": "fact_check",
+	"vulns": "bug_report", "workforce": "groups", "automations": "bolt", "signins": "login",
+	"feeds": "sensors", "agents": "robot_2", "egress": "arrows_output", "people": "person",
+	"provisioning": "sync", "sso": "badge", "passkeys": "passkey", "settings": "settings",
+	"find": "search", "start": "rocket_launch", "profile": "account_circle",
+	"proofs": "verified", "adjudication": "gavel", "claims": "fact_check",
 }
 
 var iconPath = func() map[string]string {

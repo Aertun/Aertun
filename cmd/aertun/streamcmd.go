@@ -120,7 +120,7 @@ func cmdSiemStream(root string, args []string) error {
 		out := map[string]string{"key_id": auditstream.KeyID(pub), "alg": "ed25519",
 			"public_key":  base64.StdEncoding.EncodeToString(pub),
 			"head_key_id": heads.Verifier().KeyID(), "head_ed25519": base64.StdEncoding.EncodeToString(ed),
-			"head_mldsa": base64.StdEncoding.EncodeToString(ml)}
+			"head_mldsa": base64.StdEncoding.EncodeToString(ml), "head_context": audit.HeadContext}
 		if w.JSON(out) {
 			return nil
 		}

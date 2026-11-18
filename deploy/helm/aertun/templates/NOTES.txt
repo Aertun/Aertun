@@ -1,0 +1,11 @@
+{{/* SPDX-FileCopyrightText: 2026 Rashik Adhikari */}}
+{{/* SPDX-License-Identifier: Apache-2.0 */}}
+Aertun is starting as {{ .Release.Name }}-0 in {{ .Release.Namespace }}.
+
+Claim the store once; it prints a one-time link that adds your passkey:
+
+  kubectl -n {{ .Release.Namespace }} exec -it {{ .Release.Name }}-0 -- aertun --root /srv/store init --owner you@example.com
+
+Set the address people reach it at (https, behind your ingress):
+
+  kubectl -n {{ .Release.Namespace }} exec {{ .Release.Name }}-0 -- aertun --root /srv/store config set admin.base_url https://{{ .Values.ingress.host }}

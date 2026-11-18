@@ -196,16 +196,6 @@ func (b *Board) Wait(id string, w Waiting, at time.Time) error {
 	return nil
 }
 
-// Unblock records that whatever was holding an item up has arrived.
-func (b *Board) Unblock(id string) error {
-	it, ok := b.Item(id)
-	if !ok {
-		return fmt.Errorf("no item %s", id)
-	}
-	it.Waiting = nil
-	return nil
-}
-
 // Meet records that a requirement is satisfied.
 func (b *Board) Meet(id, requirement string) error {
 	it, ok := b.Item(id)

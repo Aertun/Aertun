@@ -1,0 +1,148 @@
+# SPDX-FileCopyrightText: 2026 Rashik Adhikari
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aertun on Kubernetes: one replica, one volume, nothing else.
+#
+# One replica, because the store is a directory with one writer: two pods
+# writing one audit log would each be a log the other cannot verify. A
+# StatefulSet, so the volume follows the pod across nodes and a restart
+# finds the store it left. The container runs as the image's nonroot user
+# with a read-only root filesystem, no capabilities and the runtime's
+# default seccomp profile; it writes only to the store and to /tmp.
+#
+# After the first start, claim the store once (it prints a one-time link
+# that adds your passkey):
+#
+#   kubectl -n aertun exec -it aertun-0 -- aertun --root /srv/store init --owner you@example.com
+#
+# and set the address people reach it at, behind your ingress and TLS:
+#
+#   kubectl -n aertun exec aertun-0 -- aertun --root /srv/store config set admin.base_url https://aertun.example.com
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aertun
+  labels:
+    app.kubernetes.io/name: aertun
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aertun
+  namespace: aertun
+  labels:
+    app.kubernetes.io/name: aertun
+spec:
+  selector:
+    app.kubernetes.io/name: aertun
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: aertun
+  namespace: aertun
+  labels:
+    app.kubernetes.io/name: aertun
+spec:
+  serviceName: aertun
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aertun
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aertun
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: aertun
+          image: ghcr.io/aertun/aertun:0.2.0
+          imagePullPolicy: IfNotPresent
+          args: ["--root", "/srv/store", "serve", "--addr", "0.0.0.0:8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: store
+              mountPath: /srv/store
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: store
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Only the ingress controller reaches it, and it reaches out only for what
+# it is configured to do: DNS, and HTTPS to the systems it collects from,
+# the model it asks, and the anchors it sends to. Narrow the egress to your
+# own destinations if you know them; `aertun network` lists the purposes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aertun
+  namespace: aertun
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aertun
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443
+          protocol: TCP

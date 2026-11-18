@@ -27,7 +27,27 @@ import (
 // written outside, as anything that could be either is. An evidence proof's
 // words are rebuilt from closed sets too, but they carry the ids and
 // observables the investigation's author cited, strictly parsed and still
-// the author's choice, so they are labelled as written outside as well.
+// the author's choice, so they are labelled as written outside as well. So
+// are a chain-posture proof's: its words are rebuilt from numbers and closed
+// sets, but its subject carries the name the posture file gives and its
+// settings the addresses the file declares, which are the claimant's.
+// the author's choice, so they are labelled as written outside as well. A
+// sealed-alert proof's words are rebuilt from digests and numbers alone —
+// the alert itself is never in it — so they are this program's.
+// the author's choice, so they are labelled as written outside as well. An
+// MDR proof's words are rebuilt from its numbers, and the emulation ids a
+// refutation names come from the operator's own list, strictly parsed and
+// never the provider's, so they are this program's. A coverage proof's
+// words are rebuilt from its numbers and from technique ids of a fixed
+// shape, so they are this program's; the rule ids its evidence lists are
+// the rules' authors' choice, strictly shaped, and labelled as written
+// outside. A continuity proof's words are rebuilt from its numbers and
+// closed sets, and every name a publisher chose is in it as a digest; the
+// package URLs it lists are the bill's, strictly shaped, and labelled as
+// written outside. A referee proof's words are rebuilt from closed sets and
+// numbers, with every path and name the report chose as a digest; the
+// package URL and versions it names are the report's, strictly shaped, and
+// labelled as written outside.
 
 // proofKinds names each predicate by the word every face shows.
 var proofKinds = map[string]string{
@@ -40,11 +60,23 @@ var proofKinds = map[string]string{
 	proof.PredicateNotAffected:    "not-affected",
 	proof.PredicateTriage:         "triage",
 	proof.PredicateEvidence:       "evidence",
+	proof.PredicateRevocation:     "revocation",
+	proof.PredicateClock:          "clock",
+	proof.PredicateBreachScope:    "breach-scope",
+	proof.PredicateVEXRecord:      "vex-record",
+	proof.PredicateChainPosture:   "chain-posture",
+	proof.PredicateSealed:         "sealed",
+	proof.PredicateMDR:            "mdr",
+	proof.PredicatePeerLog:        "peer-log",
+	proof.PredicateCoverage:       "coverage",
+	proof.PredicateContinuity:     "continuity",
+	proof.PredicateReferee:        "referee",
 }
 
 // kindWords are the kinds a listing can be narrowed to.
 var kindWords = []string{"detection", "triage", "calibration", "verdicts", "reconciliation", "adjudication", "claim",
-	"not-affected", "evidence"}
+	"not-affected", "evidence", "revocation", "clock", "breach-scope", "vex-record", "chain-posture", "sealed", "mdr",
+	"peer-log", "coverage", "continuity", "referee"}
 
 func proofKind(st *proof.Statement) string {
 	if k, ok := proofKinds[st.PredicateType]; ok {
@@ -58,7 +90,11 @@ func proofKind(st *proof.Statement) string {
 func wordsFrom(st *proof.Statement) func(string) *ops.Answer {
 	if st.Predicate.Calibration != nil || st.Predicate.Verdicts != nil ||
 		st.Predicate.Reconciliation != nil || st.Predicate.Adjudication != nil ||
-		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil {
+		st.Predicate.ClaimTest != nil || st.Predicate.NotAffected != nil || st.Predicate.Triage != nil ||
+		st.Predicate.Revocation != nil || st.Predicate.Clock != nil || st.Predicate.VEXRecord != nil ||
+		st.Predicate.Sealed != nil || st.Predicate.MDR != nil || st.Predicate.PeerLog != nil ||
+		st.Predicate.Coverage != nil || st.Predicate.Continuity != nil ||
+		st.Predicate.Referee != nil {
 		return ops.OursText
 	}
 	return ops.Outside
@@ -306,7 +342,199 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("matched", ops.Ours(v.Matched)).With("unreported", ops.Ours(v.Unreported)).
 				With("unreceived", ops.Ours(v.Unreceived)).With("connections", ops.Ours(v.Connects)).
 				With("unexplained", ops.Ours(v.Unexplained)).
-				With("shared_skipped", ops.Ours(v.SharedSkipped)))
+				With("shared_skipped", ops.Ours(v.SharedSkipped)).
+				With("gateway", ops.Ours(v.Gateway)).With("gateway_only", ops.Ours(v.GatewayOnly)).
+				With("gateway_calls", ops.Ours(v.GatewayCalls)).
+				With("gateway_unreported", ops.Ours(v.GatewayUnreported)).
+				With("model_spans", ops.Ours(v.ModelSpans)).With("model_unseen", ops.Ours(v.ModelUnseen)).
+				With("identities", ops.ListOf(v.Identities, func(s string) *ops.Answer { return ops.Ours(s) })).
+				With("actions", ops.Ours(v.Changes)).
+				With("unexplained_actions", ops.Ours(v.UnexplainedChanges)))
+		case p.Revocation != nil:
+			v := p.Revocation
+			sources := ops.ListOf(v.Sources, func(s proof.RevocationSource) *ops.Answer {
+				return ops.Object().With("source", ops.Ours(s.Source)).
+					With("seen_before", ops.Ours(s.Before)).With("uses", ops.Ours(s.Uses)).
+					With("refused", ops.Ours(s.Refused)).With("quiet_stretches", ops.Ours(s.Quiet)).
+					With("complete", ops.Ours(s.Complete)).With("own_account", ops.Ours(s.Account))
+			})
+			identities := ops.ListOf(v.Identities, func(s string) *ops.Answer { return ops.Ours(s) })
+			row.With("evidence", ops.Object().With("kind", ops.Ours(v.Kind)).
+				With("name", ops.Ours(v.Name)).With("identities", identities).
+				With("revoked", ops.Ours(v.Revoked)).With("revoked_entry", ops.Ours(v.RevokedEntry)).
+				With("grace_seconds", ops.Ours(v.Grace)).With("until", ops.Ours(v.Until)).
+				With("lookback_seconds", ops.Ours(v.Lookback)).With("stretch_seconds", ops.Ours(v.Stretch)).
+				With("stretches", ops.Ours(v.Stretches)).With("uses", ops.Ours(v.Uses)).
+				With("refused", ops.Ours(v.Refused)).With("sources", sources))
+		case p.BreachScope != nil:
+			v := p.BreachScope
+			indicators := ops.ListOf(v.Indicators, func(b proof.BreachIndicator) *ops.Answer {
+				return ops.Object().With("type", ops.Ours(b.Type)).With("value", ops.Outside(b.Value)).
+					With("before", ops.Ours(b.Before)).With("during", ops.Ours(b.During)).
+					With("after", ops.Ours(b.After))
+			})
+			row.With("evidence", ops.Object().With("vendor", ops.Ours(v.Vendor)).
+				With("reference", ops.Outside(v.Reference)).With("since", ops.Ours(v.Since)).
+				With("until", ops.Ours(v.Until)).With("margin_seconds", ops.Ours(v.Margin)).
+				With("told", ops.Ours(v.Told)).With("held_before", ops.Ours(v.HeldBefore)).
+				With("held_during", ops.Ours(v.HeldDuring)).With("held_after", ops.Ours(v.HeldAfter)).
+				With("events", ops.Ours(v.Events)).With("indicators", indicators))
+		case p.Clock != nil:
+			v := p.Clock
+			duties := ops.ListOf(v.Duties, func(d proof.ClockDuty) *ops.Answer {
+				return ops.Object().With("regime", ops.Ours(d.Regime)).With("due", ops.Ours(d.Due)).
+					With("done", ops.Ours(d.Done)).With("waived", ops.Ours(d.Waived)).
+					With("moved", ops.Ours(d.Moved)).With("outcome", ops.Ours(d.Outcome))
+			})
+			evidence := ops.Object().With("incident", ops.Ours(v.Incident)).
+				With("trigger", ops.Ours(v.Trigger)).With("entry", ops.Ours(v.Entry)).
+				With("decided", ops.Ours(v.Decided)).With("recorded", ops.Ours(v.Recorded)).
+				With("verified", ops.Ours(v.Verified)).With("linked", ops.Ours(v.Linked)).
+				With("lead_seconds", ops.Ours(v.Lead)).With("broken_anchors", ops.Ours(len(v.Broken))).
+				With("duties", duties)
+			if a := v.Anchor; a != nil {
+				evidence.With("anchor", ops.Object().With("size", ops.Ours(a.Size)).
+					With("block", ops.Ours(int(a.Block))).With("block_hash", ops.Ours(a.Hash)).
+					With("mined", ops.Ours(a.Mined)).With("calendar", ops.Ours(a.Calendar)))
+			}
+			row.With("evidence", evidence)
+		case p.VEXRecord != nil:
+			v := p.VEXRecord
+			row.With("evidence", ops.Object().With("source", ops.Ours(v.Source)).
+				With("since", ops.Ours(v.Since)).With("until", ops.Ours(v.Until)).
+				With("tolerance", ops.Ours(v.Tolerance)).With("read", ops.Ours(v.Read)).
+				With("left_out", ops.Ours(v.LeftOut)).With("superseded", ops.Ours(v.Superseded)).
+				With("used", ops.Ours(v.Used)).With("signed_by_trusted", ops.Ours(v.Trusted)).
+				With("signed_by_untrusted", ops.Ours(v.Untrusted)).With("assets", ops.Ours(v.Assets)).
+				With("statements", ops.Ours(v.Statements)).With("not_affected", ops.Ours(v.NotAffected)).
+				With("supported", ops.Ours(v.Supported)).With("contradicted", ops.Ours(v.Contradicted)).
+				With("uncheckable", ops.Ours(v.Uncheckable)).
+				With("contradicting_proofs", ops.Ours(v.ContradictingProofs)).
+				With("contradicted_share", boundAnswer(v.Share)))
+		case p.ChainPosture != nil:
+			v := p.ChainPosture
+			settings := ops.ListOf(v.Settings, func(s proof.PostureSetting) *ops.Answer {
+				return ops.Object().With("address", ops.Outside(s.Address)).
+					With("setting", ops.Ours(s.Setting)).With("declared", ops.Outside(s.Declared)).
+					With("found", ops.Outside(s.Found)).With("outcome", ops.Ours(s.Outcome)).
+					With("reason", ops.Ours(s.Reason))
+			})
+			row.With("evidence", ops.Object().With("name", ops.Outside(v.Name)).
+				With("chain_id", ops.Ours(v.ChainID)).With("block", ops.Ours(v.Block)).
+				With("block_hash", ops.Ours(v.BlockHash)).With("finalized", ops.Ours(v.Finalized)).
+				With("held", ops.Ours(v.Held)).With("regressed", ops.Ours(v.Regressed)).
+				With("unread", ops.Ours(v.Unread)).With("settings", settings))
+		case p.Sealed != nil:
+			v := p.Sealed
+			hashes := func(h string) *ops.Answer { return ops.Ours(h) }
+			row.With("evidence", ops.Object().With("digest", ops.Ours(v.Digest)).
+				With("log_entries", ops.Ours(v.LogEntries)).With("log_break", ops.Ours(v.LogBreak)).
+				With("rewritten", ops.Ours(v.Rewritten)).With("batches", ops.Ours(v.Batches)).
+				With("unkept", ops.Ours(v.Unkept)).With("entry", ops.Ours(v.Entry)).
+				With("sealed", ops.Ours(v.Sealed)).With("batch_root", ops.Ours(v.BatchRoot)).
+				With("batch_size", ops.Ours(v.BatchSize)).With("batch_index", ops.Ours(v.BatchIndex)).
+				With("batch_path", ops.ListOf(v.BatchPath, hashes)).
+				With("entry_leaf", ops.Ours(v.EntryLeaf)).With("head_size", ops.Ours(v.HeadSize)).
+				With("head_root", ops.Ours(v.HeadRoot)).With("head_path", ops.ListOf(v.HeadPath, hashes)).
+				With("anchor", ops.Ours(v.Anchor)).With("height", ops.Ours(v.Height)).
+				With("block_hash", ops.Ours(v.BlockHash)).With("mined", ops.Ours(v.Mined)))
+		case p.MDR != nil:
+			v := p.MDR
+			row.With("evidence", ops.Object().With("plan", ops.Ours(v.Plan)).
+				With("provider", ops.Ours(v.Provider)).
+				With("committed_at_entry", ops.Ours(int(v.Committed.Seq))).
+				With("window_start", ops.Ours(v.WindowStart)).With("window_end", ops.Ours(v.WindowEnd)).
+				With("window_closed", ops.Ours(v.Closed)).With("sla_seconds", ops.Ours(v.SLA)).
+				With("tolerance", ops.Ours(v.Tolerance)).With("planned", ops.Ours(v.Planned)).
+				With("run", ops.Ours(v.Run)).With("within_sla", ops.Ours(v.Within)).
+				With("late", ops.Ours(v.Late)).With("not_notified", ops.Ours(v.Never)).
+				With("missed", ops.Object().With("k", ops.Ours(v.Missed.K)).With("n", ops.Ours(v.Missed.N)).
+					With("lower", ops.Ours(v.Missed.Lower)).With("upper", ops.Ours(v.Missed.Upper))).
+				With("median_seconds", ops.Ours(v.Median)).With("p90_seconds", ops.Ours(v.P90)))
+		case p.PeerLog != nil:
+			v := p.PeerLog
+			evidence := ops.Object().With("peer", ops.Ours(v.Peer)).With("head_key", ops.Ours(v.Keys.KeyID)).
+				With("at", ops.Ours(v.At)).With("held", ops.Ours(v.Held)).With("root", ops.Ours(v.Root)).
+				With("heads", ops.Ours(v.Heads)).With("agreeing", ops.Ours(v.Agreeing)).
+				With("disagree", ops.Ours(v.Disagree)).With("forks", ops.Ours(v.ForkCount)).
+				With("last_received", ops.Ours(v.LastReceived)).With("last_records", ops.Ours(v.LastRecords)).
+				With("full_batch", ops.Ours(v.FullBatch))
+			if v.Last != nil {
+				evidence.With("last_head", ops.Object().With("size", ops.Ours(v.Last.Size)).
+					With("root", ops.Ours(v.Last.Root)))
+			}
+			row.With("evidence", evidence)
+		case p.Referee != nil:
+			v := p.Referee
+			places := ops.ListOf(v.Locations, func(l proof.RefereeLocation) *ops.Answer {
+				return ops.Object().With("file", ops.Ours(l.File)).With("function", ops.Ours(l.Function)).
+					With("line", ops.Ours(l.Line)).With("language", ops.Ours(l.Language)).
+					With("found", ops.Ours(l.Found))
+			})
+			evidence := ops.Object().With("package", ops.Outside(v.Package)).With("commit", ops.Ours(v.Commit)).
+				With("head", ops.Ours(v.Head)).With("declared", ops.Outside(v.Declared)).
+				With("introduced", ops.Outside(v.Introduced)).With("fixed", ops.Outside(v.Fixed)).
+				With("range", ops.Ours(v.Range)).With("locations", places).With("cwe", ops.Ours(v.CWE)).
+				With("vector", ops.Ours(v.Vector)).With("score", ops.Ours(v.Score)).
+				With("severity", ops.Ours(v.Severity)).With("fingerprint", ops.Ours(v.Fingerprint)).
+				With("duplicates", ops.Ours(len(v.Duplicates))).With("reach", ops.Ours(v.Reach))
+			if c := v.Committed; c != nil {
+				evidence.With("committed_at_entry", ops.Ours(int(c.Seq))).With("committed_at", ops.Ours(c.At))
+			}
+			row.With("evidence", evidence)
+		case p.Continuity != nil:
+			v := p.Continuity
+			release := func(r *proof.ContinuityRelease) *ops.Answer {
+				if r == nil {
+					return ops.Ours(nil)
+				}
+				return ops.Object().With("version", ops.Outside(r.Version)).
+					With("published", ops.Ours(r.Published)).With("listed", ops.Ours(r.Listed)).
+					With("yanked", ops.Ours(r.Yanked)).With("provenance", ops.Ours(r.Provenance)).
+					With("trusted_publishing", ops.Ours(r.Trusted)).With("ref", ops.Ours(r.Ref)).
+					With("commit", ops.Ours(r.Commit)).With("attestation", ops.Ours(r.Attestation))
+			}
+			packages := ops.ListOf(v.Packages, func(p proof.ContinuityPackage) *ops.Answer {
+				return ops.Object().With("purl", ops.Outside(p.Purl)).With("outcome", ops.Ours(p.Outcome)).
+					With("unread", ops.Ours(p.Unread)).With("lost", ops.ListOf(p.Lost, func(l string) *ops.Answer { return ops.Ours(l) })).
+					With("now", release(p.Now)).With("before", release(p.Before))
+			})
+			row.With("evidence", ops.Object().With("held", ops.Ours(v.Held)).
+				With("regressed", ops.Ours(v.Regressed)).With("first", ops.Ours(v.First)).
+				With("unread", ops.Ours(v.Unread)).With("outside", ops.Ours(v.Outside)).
+				With("public_registries", ops.Ours(v.PublicRegistries)).With("packages", packages))
+		case p.Coverage != nil:
+			v := p.Coverage
+			techniques := ops.ListOf(v.Techniques, func(t proof.TechniqueCoverage) *ops.Answer {
+				return ops.Object().With("technique", ops.Ours(t.Technique)).
+					With("verdict", ops.Ours(string(t.Verdict))).
+					With("rules", ops.ListOf(t.Rules, ops.Outside)).
+					With("positives", ops.Ours(t.Positives)).With("caught", ops.Ours(t.Caught)).
+					With("quiet_only", ops.Ours(t.QuietOnly)).With("missed", ops.Ours(t.Missed)).
+					With("benign", ops.Ours(t.Benign)).With("false_fires", ops.Ours(t.FalseFires)).
+					With("recall_low", ops.Ours(t.RecallLow)).With("decayed", ops.Ours(t.Decayed))
+			})
+			unclaimed := ops.ListOf(v.Unclaimed, func(u proof.UnclaimedTechnique) *ops.Answer {
+				return ops.Object().With("technique", ops.Ours(u.Technique)).
+					With("positives", ops.Ours(u.Positives)).With("caught_by_other", ops.Ours(u.CaughtByOther))
+			})
+			dark := ops.ListOf(v.Dark, func(d proof.DarkRule) *ops.Answer {
+				return ops.Object().With("rule", ops.Outside(d.Rule)).With("silent", ops.Ours(d.Silent)).
+					With("missing", ops.ListOf(d.Missing, ops.Outside))
+			})
+			evidence := ops.Object().With("rules", ops.Ours(len(v.Rules))).
+				With("entries", ops.Ours(v.Entries)).With("labelled", ops.Ours(v.Labelled)).
+				With("benign", ops.Ours(v.Benign)).With("min_positives", ops.Ours(v.MinPositives)).
+				With("min_benign", ops.Ours(v.MinBenign)).With("asked", ops.Ours(v.Asked)).
+				With("unrecognised", ops.Ours(v.Unrecognised)).With("techniques", techniques).
+				With("unclaimed", unclaimed).With("dark_count", ops.Ours(v.DarkCount)).With("dark", dark)
+			if w := v.Telemetry; w != nil {
+				evidence.With("telemetry", ops.Object().With("since", ops.Ours(w.Since)).
+					With("until", ops.Ours(w.Until)).With("sources", ops.Ours(w.Sources)).
+					With("silent", ops.Ours(w.Silent)).With("events", ops.Ours(w.Events)).
+					With("capped", ops.Ours(w.Capped)).With("fields", ops.Ours(w.Fields)))
+			}
+			row.With("evidence", evidence)
 		case p.Verdicts != nil:
 			v := p.Verdicts
 			count := func(k, n int) *ops.Answer { return ops.Object().With("k", ops.Ours(k)).With("n", ops.Ours(n)) }

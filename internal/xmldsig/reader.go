@@ -185,12 +185,6 @@ func (e *Element) name() string {
 	return e.Prefix + ":" + e.Local
 }
 
-// InScope is the namespace bound to a prefix here ("" for the default).
-func (e *Element) InScope(prefix string) (string, bool) {
-	v, ok := e.scope[prefix]
-	return v, ok
-}
-
 // Read parses a document, refusing anything outside the subset above.
 func Read(b []byte) (*Document, error) {
 	if len(b) > MaxDocument {

@@ -46,6 +46,7 @@ package source
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -122,7 +123,11 @@ type Source struct {
 	// miss rather than an event with a hole in it.
 	Require []string `json:"require"`
 	// Keep are extra paths carried into Raw, where a detection written
-	// against the source's own field names can read them.
+	// against the source's own field names can read them, under the path's
+	// last segment — or under the name after " as ", for two paths that end
+	// alike ("rule.mitre.id as mitre"). A path holding a list of plain
+	// values carries them joined by spaces, as an observable of a kind that
+	// occurs more than once is.
 	Keep []string `json:"keep,omitempty"`
 
 	// Lateness is how far behind this source runs, for the correlation
@@ -145,7 +150,28 @@ const (
 	LayoutEpochSecond = "epoch-s"
 	// LayoutEpochMilli is milliseconds. GitHub writes this.
 	LayoutEpochMilli = "epoch-ms"
+	// LayoutEpochFraction is seconds with a decimal fraction, as Python's
+	// time.time() writes it. LiteLLM writes this.
+	LayoutEpochFraction = "epoch-s-frac"
 )
+
+// epochFraction reads seconds and up to nine decimal places exactly, as
+// text: through a float, 1790040506.278482 is a few hundred nanoseconds
+// off, and two events in one second could change order.
+func epochFraction(raw string) (time.Time, error) {
+	whole, frac, _ := strings.Cut(raw, ".")
+	sec, err := strconv.ParseInt(whole, 10, 64)
+	if err != nil || len(frac) > 9 || strings.Trim(frac, "0123456789") != "" {
+		return time.Time{}, fmt.Errorf("%q is not seconds since the epoch with a decimal "+
+			"fraction, and this source writes its time as that", raw)
+	}
+	nanos := int64(0)
+	if frac != "" {
+		n, _ := strconv.ParseInt(frac+strings.Repeat("0", 9-len(frac)), 10, 64)
+		nanos = n
+	}
+	return time.Unix(sec, nanos).UTC(), nil
+}
 
 // MaxLateness caps a source's declared delay.
 //
@@ -234,7 +260,12 @@ func (s Source) Validate() error {
 	// A path carried into Raw is read: a detection written against the
 	// source's own field name matches on it, so requiring one is not
 	// requiring something nothing uses.
-	for _, p := range s.Keep {
+	for _, k := range s.Keep {
+		p, _, ok := keepPath(k)
+		if !ok {
+			return fmt.Errorf("%s/%s keeps %q, which is not a path, or a path and \" as \" a field "+
+				"name of lowercase letters, digits and underscores", s.Issuer, s.Stream, k)
+		}
 		wanted[p] = true
 	}
 	for _, r := range s.Require {
@@ -334,9 +365,14 @@ func (s Source) Map(doc any) (telemetry.Event, []Miss) {
 		}
 	}
 
-	for _, p := range s.Keep {
-		if v := connector.At(doc, p); v != "" {
-			e.Raw[leaf(p)] = v
+	for _, k := range s.Keep {
+		p, name, _ := keepPath(k)
+		v := connector.At(doc, p)
+		if v == "" {
+			v = strings.Join(connector.AtList(doc, p), " ")
+		}
+		if v != "" {
+			e.Raw[name] = v
 		}
 	}
 	// Whatever a kept field called person said is not the acting person's
@@ -369,6 +405,8 @@ func (s Source) when(raw string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("the time field is empty")
 	}
 	switch s.Layout {
+	case LayoutEpochFraction:
+		return epochFraction(raw)
 	case LayoutEpochSecond, LayoutEpochMilli:
 		n, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
@@ -438,6 +476,43 @@ func (s Source) disposition(doc any) telemetry.Disposition {
 }
 
 // leaf is the last segment of a path, used as the Raw key.
+// Strict is Validate, and also refuses two kept paths kept as one field, one
+// overwriting the other. A new mapping, and every one this program ships, is
+// held to it; one installed before the rule existed is still read, as it
+// always was, so an upgrade does not stop every feed over a field that was
+// already being overwritten.
+func (s Source) Strict() error {
+	if err := s.Validate(); err != nil {
+		return err
+	}
+	kept := map[string]string{}
+	for _, k := range s.Keep {
+		p, name, _ := keepPath(k)
+		if other, dup := kept[name]; dup {
+			return fmt.Errorf("%s/%s keeps %q and %q as the same field, %q: one would overwrite the "+
+				"other. Name one of them with \" as \"", s.Issuer, s.Stream, other, p, name)
+		}
+		kept[name] = p
+	}
+	return nil
+}
+
+var keepName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+// keepPath reads a Keep entry: the path, and the field it is kept under.
+func keepPath(k string) (path, name string, ok bool) {
+	path, name, renamed := strings.Cut(k, " as ")
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", "", false
+	}
+	if !renamed {
+		return path, leaf(path), true
+	}
+	name = strings.TrimSpace(name)
+	return path, name, keepName.MatchString(name)
+}
+
 func leaf(p string) string {
 	if i := strings.LastIndexAny(p, "."); i >= 0 && i+1 < len(p) {
 		return p[i+1:]

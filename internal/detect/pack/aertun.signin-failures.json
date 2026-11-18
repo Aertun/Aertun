@@ -4,7 +4,8 @@
   "why": "somebody is guessing credentials for the admin or the API",
   "blind": "a slow guess that never crosses the failure threshold",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 3,
   "when": {

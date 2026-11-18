@@ -185,6 +185,16 @@ func cmdPending(root string, args []string) error {
 					"which asks for your passkey", id, int(dual.OwnProof/time.Minute))
 			}
 		}
+		// Not while a link to add the new administrator's passkey waits
+		// unused: checked before the request is decided, so a refusal
+		// leaves it waiting to be approved once the link has been used.
+		if approve {
+			if pending, gerr := store.Get(id); gerr == nil {
+				if err := dual.UnclaimedEnrolment(pending, waitingEnrolments(root, now)); err != nil {
+					return err
+				}
+			}
+		}
 		r, err := store.Decide(id, c.Name, approve, onlyAdministrator(root, c.Name), now)
 		if err != nil {
 			return err
@@ -240,4 +250,20 @@ func cmdPending(root string, args []string) error {
 		return tokenIssueAs(root, ch.Args, true)
 	}
 	return errors.New("usage: aertun pending [list] | approve ID | decline ID | withdraw ID | redeem ID")
+}
+
+// waitingEnrolments are the people a live link to add a passkey is waiting
+// for. A store whose links cannot be read answers nobody, which lets an
+// approval through rather than stopping every one: the link itself is
+// refused when it is opened if the store cannot read it either.
+func waitingEnrolments(root string, now time.Time) []string {
+	links, err := enrolStore(root).Waiting(now)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(links))
+	for _, l := range links {
+		out = append(out, l.Principal)
+	}
+	return out
 }

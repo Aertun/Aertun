@@ -146,6 +146,8 @@ var notADestination = map[string]string{
 	"/sidebar":   "a preference toggle",
 	"/signin":    "reached when not signed in",
 	"/signout":   "a form target",
+	"/healthz":   "an orchestrator's liveness probe",
+	"/readyz":    "an orchestrator's readiness probe",
 	"/style.css": "a stylesheet",
 	"/admin.js":  "the console's script, fetched by every page's head",
 	"/icon.svg":  "the mark, fetched as a favicon; an image, not a screen",

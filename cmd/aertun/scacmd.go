@@ -21,7 +21,7 @@ import (
 // released fix is an afternoon. The same advisory four levels down is a
 // conversation with whoever maintains the thing above it.
 //
-// `sca scan` reads a CycloneDX bill and a set of OSV advisories and sorts
+// `sca scan` reads a bill (CycloneDX or SPDX) and a set of OSV advisories and sorts
 // by what can be started today.
 
 func cmdSCA(args []string) error {
@@ -38,7 +38,7 @@ func cmdSCA(args []string) error {
 
 func scaScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
-	bomPath := fs.String("bom", "", "a CycloneDX bill of materials")
+	bomPath := fs.String("bom", "", "a bill of materials: CycloneDX, or SPDX 2.x JSON")
 	osvPath := fs.String("osv", "", "OSV advisories, one record or an array")
 	where := fs.String("where", "prod", "which deployment this bill is of")
 	if err := fs.Parse(args); err != nil {

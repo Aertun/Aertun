@@ -85,6 +85,45 @@ type GrantChange struct {
 	Bindings []auth.Binding `json:"bindings"`
 }
 
+// Administrators are the people a request makes administrators of: the
+// principals a Grant request binds to the administrator role. Nil for any
+// other kind of request, or one whose payload does not read.
+func Administrators(r Request) []string {
+	if r.Kind != Grant {
+		return nil
+	}
+	var ch GrantChange
+	if err := json.Unmarshal(r.Payload, &ch); err != nil {
+		return nil
+	}
+	var out []string
+	for _, b := range ch.Bindings {
+		if b.Role == auth.RoleAdmin && !b.Deny {
+			out = append(out, b.Principal)
+		}
+	}
+	return out
+}
+
+// UnclaimedEnrolment refuses to approve making somebody an administrator
+// while a link that adds a passkey for them is waiting unused: whoever
+// opens a link first adds theirs, so until the person has used it, the
+// grant would make an administrator of whoever has the link. waiting are
+// the live links' principals. Approve once they have added their passkey,
+// or end the link if they sign in another way.
+func UnclaimedEnrolment(r Request, waiting []string) error {
+	for _, who := range Administrators(r) {
+		for _, w := range waiting {
+			if strings.EqualFold(w, who) {
+				return fmt.Errorf("%s's link to add a passkey has not been used yet, and whoever opens "+
+					"it first becomes this administrator: approve once %s has added their passkey, or "+
+					"end the link (aertun auth enrol %s --revoke) if they sign in another way", who, who, who)
+			}
+		}
+	}
+	return nil
+}
+
 // TokenChange is a Token request: the command that issues it, run again
 // for whoever asked once it is approved.
 type TokenChange struct {

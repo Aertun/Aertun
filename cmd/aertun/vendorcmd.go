@@ -45,9 +45,11 @@ func cmdVendor(root string, args []string) error {
 		return vendorReconcile(root)
 	case "review":
 		return vendorReview(root, args[1:])
+	case "check-breach":
+		return vendorCheckBreach(root, args[1:])
 	default:
 		return fmt.Errorf("unknown vendor command %q; try list, show, "+
-			"reconcile or review", args[0])
+			"reconcile, review or check-breach", args[0])
 	}
 }
 

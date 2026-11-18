@@ -50,7 +50,9 @@ func TestEveryScreenSurvivesWithNothingWiredIn(t *testing.T) {
 // filtered by a pattern — a pattern would also excuse the next thing that
 // happens to match it.
 var notAScreen = map[string]string{
-	"/": "sends a person to Today",
+	"/":        "sends a person to Today",
+	"/healthz": "an orchestrator's liveness probe: a word, for a machine",
+	"/readyz":  "an orchestrator's readiness probe: a word, for a machine",
 	"/signin/oidc": "starts an authorisation redirect, and answers 404 when " +
 		"no identity provider is configured",
 	"/auth/callback":         "receives one, and is never opened directly",

@@ -42,7 +42,7 @@ ENTITY = "urn:oasis:names:tc:SAML:2.0:nameid-format:entity"
 
 
 def sp(idp):
-    return "https://quilzo.example/saml/" + idp, "https://quilzo.example/saml/" + idp + "/acs"
+    return "https://aertun.example/saml/" + idp, "https://aertun.example/saml/" + idp + "/acs"
 
 
 def okta(rid, aid):

@@ -29,6 +29,7 @@
 package inbound
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -83,10 +84,15 @@ type Feed struct {
 	Status string `json:"status,omitempty"`
 	// Stream holds the keys an audit stream's sender publishes, which its
 	// batches and tree heads are checked against (see AuditStream).
-	Stream  *StreamKeys `json:"stream,omitempty"`
-	Off     bool        `json:"off,omitempty"`
-	Created time.Time   `json:"created"`
-	By      string      `json:"by,omitempty"`
+	Stream *StreamKeys `json:"stream,omitempty"`
+	// Seal says each record a webhook delivers is sealed: its digest
+	// committed to the audit log with the feed's others within the worker's
+	// tick, one entry a batch, so a sealed-alert proof can later show it
+	// existed by then (internal/seal).
+	Seal    bool      `json:"seal,omitempty"`
+	Off     bool      `json:"off,omitempty"`
+	Created time.Time `json:"created"`
+	By      string    `json:"by,omitempty"`
 }
 
 // ValidName keeps feed names to what can sit in a URL path and a file name.
@@ -355,4 +361,36 @@ func Records(body []byte) ([]any, error) {
 		return []any{x}, nil
 	}
 	return nil, fmt.Errorf("the body is neither an object nor a list")
+}
+
+// MaxRecordLines bounds the records one newline-delimited body holds.
+const MaxRecordLines = 10000
+
+// RecordLines is Records, and also a body of one JSON object a line
+// (NDJSON), which is how log shippers batch: LiteLLM's generic logger,
+// Vector, Fluent Bit. A body that is one JSON value is read as Records
+// reads it; otherwise every non-blank line must be one object.
+func RecordLines(body []byte) ([]any, error) {
+	if docs, err := Records(body); err == nil {
+		return docs, nil
+	}
+	var out []any
+	for n, line := range bytes.Split(body, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var v map[string]any
+		if err := json.Unmarshal(line, &v); err != nil {
+			return nil, fmt.Errorf("line %d is not a JSON object", n+1)
+		}
+		if len(out) == MaxRecordLines {
+			return nil, fmt.Errorf("the body holds more than %d records", MaxRecordLines)
+		}
+		out = append(out, v)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("the body holds no records")
+	}
+	return out, nil
 }

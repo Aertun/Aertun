@@ -1,61 +1,39 @@
 // SPDX-FileCopyrightText: 2026 Rashik Adhikari
 // SPDX-License-Identifier: Apache-2.0
 
-// Package anchor commits a publication to a public blockchain.
-//
-// # What this is for, and the one thing it proves
-//
-// A timestamp from an authority proves when something existed, and its proof
-// rests on that authority's certificate. When the certificate expires the token
-// has to be re-stamped; if the authority folds, every token it issued lands in a
-// legal grey area. An anchor has the opposite shape: there is no authority to
-// expire, so the proof does not decay — but until recently it had no formal
-// standing anywhere.
-//
-// That second half changed. eIDAS 2 (Regulation (EU) 2024/1183) introduces
-// qualified electronic ledgers, which carry a presumption of uniqueness,
-// authenticity, accurate date and time, and sequential ordering; implementing
-// acts run through 2026. Italy's Law 12/2019, Vermont and Arizona already give
-// blockchain records legal effect. So the layered answer — a signed token for
-// the lawyer today, an anchor for the decade — is now better on both sides than
-// it was.
+// Package anchor commits the audit log's head to Bitcoin, through
+// OpenTimestamps calendars, so that when the log said what it says can be
+// shown against something nobody here controls.
 //
 // # What is anchored, and why nothing else can be
 //
-// One hash: the fingerprint of the whole published site. Not a page, not a
+// One hash: the Merkle root over the whole log at a size. Not an entry, not a
 // field, not anything about a person.
 //
 // This is not a design preference. The EDPB's guidelines on blockchain and
-// personal data (02/2025, version 2.0, adopted July 2026) recommend not
-// registering clear text, encrypted *or hashed* personal data on a blockchain,
-// because the ledger is immutable and Article 17 erasure has to remain possible.
-// The pattern they endorse instead is exactly this one: keep the data off-chain
-// and put only a commitment on it, so that deleting the data renders the
-// on-chain record unlinkable.
-//
-// A root hash over an entire site satisfies that. Delete the content and the
-// anchor still proves a site existed on a date, and proves nothing about who was
-// in it. Publishing content itself to a permanent store — Arweave's pay-once
-// model most obviously — is the case the guidelines rule out, and this package
-// does not offer it.
+// personal data (02/2025) recommend not registering clear text, encrypted or
+// hashed personal data on a blockchain, because the ledger is immutable and
+// Article 17 erasure has to remain possible. The pattern they endorse is
+// exactly this one: keep the data off-chain and put only a commitment on it,
+// so that deleting the data renders the on-chain record unlinkable. A root
+// over a whole log is that commitment: it proves the log existed by a block,
+// and nothing about who is in it.
 //
 // # Pending is not anchored, and says so
 //
 // A calendar server returns a proof immediately, and that proof commits to
 // nothing yet: it says "this server has your hash and will include it in the
-// next Bitcoin commitment", which takes hours. Reporting that as anchored would
-// be the same class of lie as a sitemap claiming content changed when it did
-// not. Every proof here carries its state, and the state is derived from the
-// attestations in the proof rather than from how long ago it was submitted.
+// next Bitcoin commitment", which takes hours. Every proof here carries its
+// state, and the state is derived from the attestations in the proof rather
+// than from how long ago it was submitted.
 //
-// # What is verified here, and what is not
+// # What is verified here
 //
 // The operation chain is walked and the commitment recomputed, so a proof that
-// does not actually commit to the digest it claims is rejected here. Whether a
-// Bitcoin attestation names a real block containing that merkle root requires
-// block headers, and this has none — that check is delegated to the
-// `ots` client, which has them. A verifier that is subtly wrong is worse than
-// none, because its output is believed.
+// does not commit to the digest it claims is rejected. A Bitcoin attestation
+// is a height and nothing more, so it is believed only with that block's
+// header beside it: the header's merkle root must be the commitment, its work
+// must be real, and two explorers must have returned it (header.go).
 package anchor
 
 import (
@@ -95,7 +73,7 @@ const (
 
 // Proof is one calendar's answer.
 type Proof struct {
-	// Digest is what was submitted: the site fingerprint.
+	// Digest is what was submitted: the log head's Merkle root.
 	Digest string `json:"digest"`
 	// Calendar is who produced it.
 	Calendar string `json:"calendar"`
@@ -111,9 +89,19 @@ type Proof struct {
 	PendingAt   string `json:"pending_at,omitempty"`
 	SubmittedAt string `json:"submitted_at"`
 	UpgradedAt  string `json:"upgraded_at,omitempty"`
+	// Header is the header of the block the Bitcoin attestation names, in
+	// hex, once it has been fetched and found to hold the commitment;
+	// HeaderHeight is that block's height, HeaderFrom the explorers that
+	// returned it, and HeaderChecked when. Confirm checks the header again
+	// every time; the rest says where it came from.
+	Header        string   `json:"header,omitempty"`
+	HeaderHeight  uint64   `json:"header_height,omitempty"`
+	HeaderFrom    []string `json:"header_from,omitempty"`
+	HeaderChecked string   `json:"header_checked,omitempty"`
 }
 
-// Anchored reports whether this proof is actually committed to a chain.
+// Anchored reports whether this proof carries a Bitcoin attestation. That is
+// not yet a block anybody checked: Confirm is.
 func (p Proof) Anchored() bool { return p.State == Anchored }
 
 // -- the OpenTimestamps proof format ----------------------------------------

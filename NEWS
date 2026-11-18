@@ -1,6 +1,370 @@
 Aertun NEWS
 ***********
 
+Version 0.2.0
+=============
+
+Aertun 0.2 holds more of security work to evidence: detection coverage
+technique by technique, each dependency against the release before it, AI-written
+vulnerability reports against the source they cite, managed detection tested
+blind, alerts sealed by a Bitcoin block, a protocol's on-chain posture, a VEX
+issuer's record and another site's audit log, each as a signed proof, and any
+proven one as an in-toto verification result a policy engine reads.  It meets
+the tools already in place: Wazuh in both directions, LiteLLM's gateway
+records and traces, a GitHub Action, Kubernetes manifests and a Helm chart.
+
+Upgrading from 0.1:
+
+* A feed for a signed audit stream is now the kind `stream`; one added under
+  the earlier name must be removed and added again (below).
+* azure/activity keeps `raw.operation`, `raw.status` and `raw.category`
+  where it kept one `raw.value`, and duo/auth `raw.user_name` and
+  `raw.application` where it kept one `raw.name`: each overwrote another.
+  A rule of your own reading the old names needs the new ones.
+* The detection proof's verifier is version 2: an entry labelled as an attack
+  is no longer counted as one a rule must stay quiet on.
+
+* Wazuh, both ways.  `aertun inbound add webhook wazuh --mapping
+  wazuh/alerts --seal` takes a manager's alerts, signed as Standard Webhooks
+  deliveries by `integrations/wazuh/custom-aertun.py`, which Wazuh's
+  integrator runs for each alert.  `--seal`, on any webhook feed, commits
+  each delivered record's digest to the audit log in the feed's name, in
+  one entry for each feed's batch within 30 seconds of arrival (at once for
+  a full batch), so
+  `aertun proof sealed --alert FILE` later finds the alert as its sender
+  wrote it.  A mapping installed here before 0.2 for wazuh/alerts stays in
+  place of the shipped one.  The new `wazuh/alerts` mapping reads alerts as a 4.14 manager
+  writes them.  `integrations/wazuh/ruleset/rules/aertun_rules.xml` (IDs
+  998000-998017) raises Wazuh alerts from Aertun's audit log.  The rule on a
+  seal is level 0, so an alert is never sent back to be sealed again.  All
+  of it was tested against a live 4.14.10 manager; the README says what was
+  and was not.
+
+* A mapping's `keep` may name the field a path is kept under ("rule.mitre.id
+  as mitre"), and keeps a list of plain values joined by spaces.  Two kept
+  paths ending alike are now refused when a mapping is added; one installed
+  before still loads.  That found two shipped mappings
+  overwriting a field: azure/activity now keeps `raw.operation`,
+  `raw.status` and `raw.category` where it kept one `raw.value`, and
+  duo/auth keeps `raw.user_name` and `raw.application` where it kept one
+  `raw.name`.
+
+* `aertun vuln referee REPORT --source DIR --key F` holds a vulnerability
+  report's static claims, usually a model's, to a checkout of the source it
+  is about, and signs what came of it.  The report is JSON in the new
+  format aertun/vuln-report/v1, read strictly.  It is refuted when a cited
+  file is not there, a cited function is not defined in it (Go, JavaScript
+  and TypeScript, Python, C and C++, Rust, Java and Kotlin, Ruby and PHP),
+  or a line is past its end; when the source declares another version, or
+  the version is outside the range the report gives, or the range is
+  inverted; when its CVSS 3 vector scores otherwise or the score is not of
+  the severity given; and when an earlier report of the same flaw was
+  committed or refereed here.  It is inconclusive when the checkout is not
+  at the report's commit, or a claim cannot be checked.  `--asset DIR`
+  asks whether an asset's own Go code references the vulnerable symbol.
+  Proofs of concept are never run.  `aertun vuln commit REPORT` writes the
+  report's digest and its flaw's fingerprint to the audit log, and nothing
+  else of it: a referee proof names that entry as the report's priority,
+  and the moment it was known.  Paths and names the report chose are
+  carried only as digests.  The predicate is
+  https://aertun.github.io/proof/referee/v1.
+
+* `aertun vuln continuity BILL --key F` holds each npm, PyPI and Go package
+  in a bill of materials (CycloneDX or SPDX) to the release before it, as
+  its registry describes both, and signs what came of it.  A package is
+  refuted when it lost what its predecessor had: provenance, trusted
+  publishing, the repository, workflow or tag it was built from, its
+  publishing account's email, or its having no install script (or the
+  script changed); and when its registry has withdrawn it, its publisher
+  yanked it, or the provenance served is about another artifact by digest.
+  The predecessor is the greatest earlier version still served and
+  published before it.  It is proven when every package was read and none
+  lost anything, and inconclusive when one could not be read.  The axios
+  releases of 31 March 2026 are refused as they were published (provenance
+  and trusted publishing lost, and an install script added by the new
+  dependency), and today because npm withdrew them.  Publishers'
+  names, emails, repositories and workflows are carried only as sha256
+  digests.  Registries are read through the new network purpose
+  `registry`; `--npm`, `--pypi` and `--goproxy` name mirrors.  The
+  predicate is https://aertun.github.io/proof/continuity/v1.
+
+* `aertun proof coverage --key F` signs, for each technique the rules
+  claim, whether the claim holds.  A corpus entry can now carry
+  `"techniques"`: the ATT&CK, ATLAS or OWASP ids of what produced it, such
+  as the Atomic Red Team test that was run, never a rule's own tag.  A
+  technique is refuted when an entry labelled with it is caught by no rule
+  claiming it, or when a rule claiming it that raises an alert fires on an
+  entry labelled benign.  It is proven when every instance is caught on at
+  least `--min-positives` instances and `--min-benign` benign entries, and
+  inconclusive when an instance is seen only by a rule that raises nothing
+  on its own, or the evidence is too thin.  A sub-technique is an instance
+  of its parent and not the reverse.  With `--telemetry 7d` each instance
+  caught is asked again with only the fields its source sent in that window,
+  read from the store (which takes tune): one no longer caught keeps its
+  technique from being proven, and a rule catching none of its own examples
+  that way is listed as dark, with the fields its sources stopped sending.
+  Techniques the corpus labels and no rule claims are listed.  There is no
+  percentage anywhere.  `--navigator FILE` draws the result as an ATT&CK
+  Navigator layer (format 4.5): each technique coloured by its verdict and
+  saying it in words, with no score.  The predicate is
+  https://aertun.github.io/proof/coverage/v1.
+
+* `detect replay` no longer counts a rule firing on an entry labelled with
+  a technique as a false positive, and a detection proof no longer counts
+  one as an entry the rule must stay quiet on.  The detection verifier's
+  version is now 2.
+
+* `aertun vendor check-breach FILE` holds a vendor's disclosure of its own
+  breach — its window, the indicators it published and what it told you —
+  against your own events, and signs a breach-scope proof.  An indicator
+  seen before or after the window refutes the window; one seen inside it
+  refutes "not affected"; each is named with how many events carried it.
+  Proven needs the store to hold the whole of the window and a margin
+  either side (30 days by default), so not finding an indicator means it
+  was not there.  The disclosure's title is never read.  The predicate is
+  https://aertun.github.io/proof/breach-scope/v1.
+
+* `aertun incident prove ID --trigger aware` signs when an incident's clock
+  started and whether what it started was done in time.  The decision's
+  time and every discharge's are taken from the verified audit log, and
+  the incident's own record is held against them: a clock moved in it
+  afterwards refutes, and so does an anchored log head the log no longer
+  matches, an entry dated more than two hours after the block that anchors
+  it, an obligation discharged late or one past due.  Proven needs a
+  verified person's decision under a log head anchored in a Bitcoin block
+  whose header was checked, and every obligation discharged or ruled out;
+  until then it is inconclusive and says why.  The predicate is
+  https://aertun.github.io/proof/clock/v1.
+
+* `aertun vuln vex-record --source NAME --since DATE --tolerance R` signs a
+  VEX issuer's track record from the not-affected proofs kept here about
+  it.  Each kept proof is verified again as it is read; one that no longer
+  verifies is counted and never used.  Only proofs signed by a key this
+  store trusts are used (`aertun proof trust`, which takes two
+  administrators), unless `--include-untrusted` asks for the rest and the
+  record says so: anybody who may hand a proof in can make a key that signs
+  one.  The others are counted, and none can supersede a trusted proof.
+  The same document about the same asset proved again counts once, from
+  its latest proof.  The rate is contradicted statements over those
+  supported or contradicted, with exact one-sided bounds; uncheckable ones
+  are counted and never in it.  It is refuted when the lower bound is over
+  the tolerance, naming the contradicting proofs by their ids in the store;
+  proven when the upper bound is at or under it on at least 30 checked
+  statements; inconclusive otherwise.  Reversals are not counted, because a
+  not-affected proof does not name the statements it supported.  The
+  predicate is https://aertun.github.io/proof/vex-record/v1.
+
+* `aertun chain posture FILE --rpc URL` signs whether a protocol's
+  on-chain posture is what it declares.  The posture file names the chain
+  and, for each Safe multisig, the least threshold and number of owners;
+  for each OpenZeppelin TimelockController, the least delay; for each
+  EIP-1967 proxy, its admin and optionally its implementation.  Every
+  setting is read at one block (the latest finalized unless `--block`
+  names one), each read naming the block by its hash.  A setting weaker
+  than declared refutes it, by contract, setting, declared and found; it
+  is proven only when every setting was read and holds, and otherwise
+  inconclusive, saying which could not be read and why.  The endpoint is
+  reached over HTTPS through the new network purpose `chain`, a node
+  inside the organisation only when `--reach` declares its range, and its
+  URL is never written down.  The predicate is
+  https://aertun.github.io/proof/chain-posture/v1.  A rule,
+  evm.timelock-delay-changed, raises a timelock's delay changing, beside
+  the rules for a multisig's signers and a proxy's upgrade.
+
+* `aertun alert seal FILE` commits alerts from any monitor — an MDR's,
+  a web3 monitor's, Aertun's own findings exported — to the audit log by
+  digest: one entry per batch carries the Merkle root over the SHA-256 of
+  each alert's RFC 8785 canonical JSON, the digests are kept beside the
+  store, and the alerts themselves are not kept.  A detection run seals
+  the findings it raises in its own entry.  `aertun proof sealed --alert
+  FILE` (or `--finding ID`) signs when one existed: proven when a Bitcoin
+  attestation whose block was checked covers a head of the verified log
+  that includes the entry that sealed it, so it existed no later than that
+  block; inconclusive while the head is pending, its timestamp names a
+  block nobody has checked, or nothing anchored covers it, saying the time
+  rests on the log alone; refuted when the digest is
+  in no sealed batch, its path to the batch's root or the entry's to the
+  head does not verify, or the log does not — including a head sent to be
+  anchored that the log no longer matches.  `aertun alert seal --list`
+  lists the batches.  The predicate is
+  https://aertun.github.io/proof/sealed/v1.
+
+* `aertun mdr plan NAME --provider P --emulations F --count N` tests a
+  managed detection provider, or an AI SOC, blind on your own estate.  The
+  plan draws emulations from your list at random times in a window (30
+  days by default) and commits its digest to the audit log before any is
+  shown; `aertun mdr next` says only what has fallen due, never when the
+  next one comes.  A verified person records each run (`mdr ran`), which
+  counts only within a day of falling due, and each notification
+  (`mdr notified --item N --at TIME --ref REF`, or `--source S` to join
+  the provider's alerts from the event store by host and time, never by
+  guessing).  `aertun mdr prove NAME --sla 30m --tolerance R` signs the
+  missed share — notified late or not at all — with exact one-sided
+  bounds: refuted when the lower bound is over the tolerance, naming each
+  missed item; proven when the upper bound is at or under it on at least
+  30 runs; inconclusive otherwise, and always until the test has closed,
+  so it cannot be stopped on a good day.  The emulations are named only
+  for the items missed, and hosts never.  The predicate is
+  https://aertun.github.io/proof/mdr/v1.
+
+* Running it where enterprises run things.  A GitHub Action
+  (`uses: Aertun/Aertun@v0.2.0`) fetches the release for the runner,
+  checks it against SHA256SUMS and its build attestation, and runs the
+  command given, one argument a line, never written into a script; a
+  proof command fails the job unless it is proven.  `deploy/kubernetes`
+  and the Helm chart `deploy/helm/aertun` run one replica with its
+  volume, as the image's nonroot user, with a read-only root filesystem,
+  no capabilities, the default seccomp profile, the restricted Pod
+  Security level and a NetworkPolicy; checked with helm lint --strict,
+  kubeconform and the image run that way.  The console answers /healthz
+  (serving) and /readyz (the audit log can take a record) with a word and
+  nothing more.
+
+* `aertun proof svr ID|FILE --key F` sums a proven proof up as an in-toto
+  Simple Verification Result (https://in-toto.io/attestation/svr/v0.2),
+  the predicate policy engines admit artifacts on: about the same
+  artifacts as the proof, with one property a policy asks for —
+  AERTUN_DETECTION_PROVEN, AERTUN_NOT_AFFECTED_PROVEN and so on — the
+  proof's predicate as the verifier and policy, and the proof's digest
+  and key on it so the evidence can be found.  Only a proven proof has
+  one: a result lists what passed.  Its Ed25519 signature is plain DSSE,
+  and its ML-DSA one is in a domain of its own, so a result is never read
+  as a proof nor a proof as a result.
+
+* `aertun agent reconcile NAME` holds an agent's own account against two
+  more witnesses when they are declared: a model gateway's record of the
+  agent's key (`--gateway litellm/requests:HASH`), whose every call must
+  be in the account, and with `--gateway-only` every model call in the
+  account must be at the gateway; and what the systems it acts on
+  recorded of its identity there (`--identity github/audit:LOGIN`,
+  repeatable), each action of which must be near something the agent did
+  — by its account, at the gateway or at the agent interface.  An action
+  with nothing of the agent near is its identity used outside it.  Tool
+  names are matched across a host's and a gateway's ways of prefixing
+  them (mcp__github__create_issue is github-create_issue).  What does not
+  match is named by kind, source and time, never by a model's, a tool's
+  or an action's name, which the caller chose.  A reconciliation without
+  either reads, and verifies, as it did.
+
+* The last administrator cannot take their own administration away, on a
+  store with an Owner or without one: revoking it, denying it, narrowing
+  it to one area, giving it an end date, from the command line, the
+  console or an identity provider's provisioning, is refused while nobody
+  else administers the whole store.  A store made before Owners could
+  lock itself out from the command line; it no longer can.
+
+* An administrator is not made while their link to add a passkey waits
+  unused: whoever opens a link first adds theirs, so until the person has
+  used it, approving the grant would make an administrator of whoever had
+  the link.  The approval waits, on the command line and the People
+  screen, and goes through once the link has been used or ended.  A
+  second administrator is still set up in either order — the grant or
+  the passkey first, or both at once with `aertun auth invite NAME
+  admin` — and the grant now takes effect only after the passkey.
+
+* A token is issued at most at its holder's role: `aertun token issue
+  NAME --principal WHO --role R` refuses a role above what WHO holds now,
+  naming the grant to make first.  A token's power was already the lesser
+  of its role and its holder's when used; one labelled higher waited, and
+  became that much stronger the day its holder was granted more, with
+  nobody looking at it.  So the grant comes first and the token after.
+
+* LiteLLM, and any model gateway, is read two ways.  Its logging
+  callback (`generic_api`) posts every call to a new bearer feed, `aertun
+  inbound add webhook litellm --mapping litellm/requests --bearer`: a
+  static secret in Authorization, for senders that can set a header and
+  cannot sign (also Alertmanager, falcosidekick, SIEM and SOAR webhook
+  actions), as a JSON array or one object a line, the same body twice
+  taken once.  The shipped litellm/requests mapping reads the call's key
+  by its hash as the actor, its alias, team and owner, the model, cost,
+  tokens, MCP tool and guardrail status, and never what was asked or
+  answered.  Its OpenTelemetry spans arrive at /v1/traces, which now reads
+  OTLP protobuf as well as JSON — most SDKs send nothing else — and a span
+  with no agent id is the key the gateway authenticated (raw.via names the
+  gateway) rather than the gateway itself.  The current GenAI content
+  attributes (gen_ai.input.messages, gen_ai.output.messages,
+  gen_ai.system_instructions) are measured and dropped like the older
+  ones.  Checked against a running LiteLLM proxy; its header must be
+  written with a space, not %20, which it does not decode.  A new time
+  layout, epoch-s-frac, reads seconds with a fraction exactly.
+
+* `aertun inbound add stream NAME --keys FILE --head-context C` receives
+  another program's signed audit stream when it signs its tree heads in a
+  context of its own and its keys file does not say which.  The head
+  key's published id is a fingerprint over its keys and its context, so a
+  feed added with the wrong context is now refused when it is added,
+  saying so, rather than refusing every batch afterwards; and a head that
+  does not verify names the context it was checked in.
+
+* `aertun inbound prove NAME --key F [--at TIME]` signs whether another
+  site's audit log, received on a stream feed, is complete and unforked up
+  to a time.  A stream feed now keeps every tree head the sender signs
+  with the batch it came in.  A head signed with the sender's own keys
+  that is not the log already held — records it sent before, now under
+  another root — is a fork: answered 409, kept as evidence with its
+  signatures, written once to this deployment's audit log (where the new
+  rule aertun.peer-log-forked reads it, from this log or a peer's), and
+  nothing is taken from it.  The proof rebuilds the log from what was
+  kept and holds every head to it: refuted when a head is not the records
+  held, or the sender forked — even when the evidence was deleted from
+  the feed afterwards, since the audit log still records it; proven when
+  the last batch arrived at or after the time asked about and was smaller
+  than a full batch, so it reached the end of the sender's log; and
+  inconclusive otherwise, because a site with nothing to send is silent
+  and so is one that stopped sending.  The Feeds screen and `inbound
+  status` show each peer's chain head and any fork.  The predicate is
+  https://aertun.github.io/proof/peer-log/v1.
+
+* A Bitcoin timestamp counts only with its block.  An OpenTimestamps
+  attestation is a block height and nothing more, and anybody who can
+  write the store could append one to back-date a head; so `aertun
+  auditlog anchor upgrade` now fetches the header of the block each
+  attestation names from public explorers (three by default, or the ones
+  `--explorer URL` names, such as a node of your own), takes it only when
+  two return the same header and none returns another, and keeps it only
+  when its merkle root is the value the timestamp reaches.  The clock and
+  sealed-alert proofs check that again offline, with the header's work —
+  it must meet its own target at a difficulty of at least 50 trillion —
+  and carry the header, the block's hash and the time it was mined, so
+  whoever reads one can look the block up in any node.  A timestamp with
+  no checked header is no anchor: `anchor status` shows it as unchecked,
+  and a proof resting on it is inconclusive.  Stores anchored before this
+  need `aertun auditlog anchor upgrade` run once.
+
+* `aertun proof revocation` signs whether a revocation held.  For an agent
+  disabled with the kill switch (`--agent NAME`) it reads this program's
+  own verified audit log, the agent's own telemetry and any identity the
+  agent is declared to act as elsewhere; for an identity revoked in another
+  system (`--identity ISSUER:VALUE --at TIME`) it reads every collected
+  source.  Any act after the grace refutes it, by source, identity and
+  time; attempts a source refused are counted beside.  It is proven only
+  when a source had seen the identity act before and every such source
+  delivered events in every stretch of the period, so silence means nothing
+  happened rather than nothing was listening; otherwise it is inconclusive
+  and says why.  The predicate is
+  https://aertun.github.io/proof/revocation/v1.
+
+* Bills of materials in SPDX 2.2 and 2.3 JSON are read as CycloneDX ones
+  are (`vuln import --bom`, `sca scan --bom`): the package the document
+  describes is the root, each package's purl is what advisories match, and
+  DEPENDS_ON and DEPENDENCY_OF are the graph.  This is the form GitHub's
+  dependency graph, Syft and Trivy export.  The 0.1.0 README said SPDX was
+  read before it was; now it is.  SPDX 3 and the tag-value form are
+  refused by name.
+
+* The feed that receives a signed audit stream is the kind `stream`
+  (`aertun inbound add stream NAME --keys FILE`): it takes what
+  `aertun siem stream` sends, from another Aertun deployment or any program
+  that sends the same format, and stores it as stream/audit with each actor
+  named by the feed.  The published keys may name the context the sender
+  signs its tree heads in (`head_context`), and `aertun siem stream key
+  --json` now states its own.  Six of the rules over Aertun's own audit
+  log — an administrator granted or given a token, the audit log moved,
+  emergency recovery, a privileged change made alone, sign-in failures —
+  read a stream too, so one deployment raises them about another.  A feed
+  added under the kind's earlier name must be removed and added again, and
+  the rules that read only that sender's records are gone.
+
 Version 0.1.0
 =============
 
@@ -54,8 +418,8 @@ The evidence
 * Collecting: ten connectors with sealed credentials, twenty log sources
   mapped to one event shape, scheduled collection, files, and feeds other
   systems push to (SSF and CAEP security events, Okta event hooks, signed
-  webhooks, GenAI agent telemetry over OTLP, Quilzo's audit log).  Every
-  event is kept append-only before anything reads it.
+  webhooks, GenAI agent telemetry over OTLP, another deployment's signed
+  audit stream).  Every event is kept append-only before anything reads it.
 
 * Detecting: rules with fixtures, imported Sigma, trial and live rings,
   suppressions that end, correlations, and indicators of compromise.  The

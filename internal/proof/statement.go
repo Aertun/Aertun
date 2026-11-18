@@ -143,6 +143,39 @@ type Predicate struct {
 	// Citations is set on an evidence proof: an investigation's citations
 	// run again against the store.
 	Citations *CitationsEvidence `json:"citations,omitempty"`
+	// Revocation is set on a revocation proof: what acted as something
+	// after it was revoked, and which sources were watching.
+	Revocation *RevocationEvidence `json:"revocation,omitempty"`
+	// Clock is set on a clock proof: when an incident's decision was made,
+	// held against the signed log, and what it started.
+	Clock *ClockEvidence `json:"clock,omitempty"`
+	// BreachScope is set on a breach-scope proof: a vendor's disclosure of
+	// its own breach, held against this organisation's events.
+	BreachScope *BreachScopeEvidence `json:"breach_scope,omitempty"`
+	// VEXRecord is set on a VEX record: one issuer's not_affected
+	// statements scored over the not-affected proofs kept about it.
+	VEXRecord *VEXRecordEvidence `json:"vex_record,omitempty"`
+	// ChainPosture is set on a chain-posture proof: the settings a posture
+	// file declares, each with what was read from the chain at one block.
+	ChainPosture *ChainPostureEvidence `json:"chain_posture,omitempty"`
+	// Sealed is set on a sealed-alert proof: an alert's digest found in a
+	// batch the audit log sealed, and the anchored head that covers it.
+	Sealed *SealedEvidence `json:"sealed,omitempty"`
+	// MDR is set on an MDR proof: a provider's notifications on emulations
+	// run blind, from a plan committed before any was run.
+	MDR *MDREvidence `json:"mdr,omitempty"`
+	// PeerLog is set on a peer-log proof: another deployment's audit log as
+	// it was received, held against every tree head that deployment signed.
+	PeerLog *PeerLogEvidence `json:"peer_log,omitempty"`
+	// Coverage is set on a coverage proof: each technique the rules claim,
+	// held to the corpus entries labelled with it and those labelled benign.
+	Coverage *CoverageEvidence `json:"coverage,omitempty"`
+	// Continuity is set on a continuity proof: each package of a bill held
+	// to the release before it.
+	Continuity *ContinuityEvidence `json:"continuity,omitempty"`
+	// Referee is set on a referee proof: a vulnerability report's static
+	// claims held to the source it is about.
+	Referee *RefereeEvidence `json:"referee,omitempty"`
 	// VerifiedAt is when the verifier ran, in UTC, RFC 3339.
 	VerifiedAt string `json:"verified_at"`
 }
@@ -265,7 +298,9 @@ func (s *Statement) validateEvidence() error {
 	kinds := 0
 	for _, set := range []bool{p.Detection != nil, p.Calibration != nil, p.Verdicts != nil,
 		p.Reconciliation != nil, p.Adjudication != nil, p.ClaimTest != nil,
-		p.NotAffected != nil, p.Triage != nil, p.Citations != nil} {
+		p.NotAffected != nil, p.Triage != nil, p.Citations != nil, p.Revocation != nil, p.Clock != nil,
+		p.BreachScope != nil, p.VEXRecord != nil, p.ChainPosture != nil, p.Sealed != nil, p.MDR != nil,
+		p.PeerLog != nil, p.Coverage != nil, p.Continuity != nil, p.Referee != nil} {
 		if set {
 			kinds++
 		}
@@ -316,6 +351,61 @@ func (s *Statement) validateEvidence() error {
 			return fmt.Errorf("an evidence proof carries its claims' outcomes and no other evidence")
 		}
 		return p.Citations.validate(s)
+	case PredicateRevocation:
+		if p.Revocation == nil || kinds != 1 {
+			return fmt.Errorf("a revocation proof carries revocation evidence and no other")
+		}
+		return p.Revocation.validate(s)
+	case PredicateClock:
+		if p.Clock == nil || kinds != 1 {
+			return fmt.Errorf("a clock proof carries clock evidence and no other")
+		}
+		return p.Clock.validate(s)
+	case PredicateBreachScope:
+		if p.BreachScope == nil || kinds != 1 {
+			return fmt.Errorf("a breach-scope proof carries its indicators' counts and no other evidence")
+		}
+		return p.BreachScope.validate(s)
+	case PredicateVEXRecord:
+		if p.VEXRecord == nil || kinds != 1 {
+			return fmt.Errorf("a VEX record carries the issuer's counts and no other evidence")
+		}
+		return p.VEXRecord.validate(s)
+	case PredicateChainPosture:
+		if p.ChainPosture == nil || kinds != 1 {
+			return fmt.Errorf("a chain-posture proof carries chain-posture evidence and no other")
+		}
+		return p.ChainPosture.validate(s)
+	case PredicateSealed:
+		if p.Sealed == nil || kinds != 1 {
+			return fmt.Errorf("a sealed-alert proof carries sealing evidence and no other")
+		}
+		return p.Sealed.validate(s)
+	case PredicateMDR:
+		if p.MDR == nil || kinds != 1 {
+			return fmt.Errorf("an MDR proof carries MDR evidence and no other")
+		}
+		return p.MDR.validate(s)
+	case PredicatePeerLog:
+		if p.PeerLog == nil || kinds != 1 {
+			return fmt.Errorf("a peer-log proof carries what is held of a peer's log and no other evidence")
+		}
+		return p.PeerLog.validate(s)
+	case PredicateCoverage:
+		if p.Coverage == nil || kinds != 1 {
+			return fmt.Errorf("a coverage proof carries each technique's counts and no other evidence")
+		}
+		return p.Coverage.validate(s)
+	case PredicateContinuity:
+		if p.Continuity == nil || kinds != 1 {
+			return fmt.Errorf("a continuity proof carries each package's releases and no other evidence")
+		}
+		return p.Continuity.validate(s)
+	case PredicateReferee:
+		if p.Referee == nil || kinds != 1 {
+			return fmt.Errorf("a referee proof carries what was found of the report's claims and no other evidence")
+		}
+		return p.Referee.validate(s)
 	default:
 		return fmt.Errorf("the predicate %q is not one this version can read", s.PredicateType)
 	}

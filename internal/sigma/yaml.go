@@ -522,7 +522,7 @@ func unescape(s string) string {
 		digits := map[byte]int{'x': 2, 'u': 4, 'U': 8}[s[i]]
 		if digits > 0 && i+digits < len(s) {
 			if n, err := strconv.ParseUint(s[i+1:i+1+digits], 16, 32); err == nil &&
-				utf8.ValidRune(rune(n)) {
+				n <= utf8.MaxRune && utf8.ValidRune(rune(n)) {
 				b.WriteRune(rune(n))
 				i += digits
 				continue

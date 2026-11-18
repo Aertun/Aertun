@@ -64,7 +64,9 @@ var signerName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 // digits, dots, dashes and underscores, starting with a letter or digit.
 func ValidSignerName(s string) bool { return signerName.MatchString(s) }
 
-func signersPath(root string) string { return filepath.Join(Dir(root), "signers.json") }
+// SignersPath is the file the trusted signers are kept in: what a proof that
+// counts trusted signers names, by digest, as read.
+func SignersPath(root string) string { return filepath.Join(Dir(root), "signers.json") }
 
 // Signers is every trusted signer, in the order they were added.
 func Signers(root string) ([]Signer, error) {
@@ -76,7 +78,7 @@ func Signers(root string) ([]Signer, error) {
 }
 
 func loadSigners(root string, f *signersFile) error {
-	body, err := proof.ReadBounded(signersPath(root), 1<<20)
+	body, err := proof.ReadBounded(SignersPath(root), 1<<20)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
@@ -84,7 +86,7 @@ func loadSigners(root string, f *signersFile) error {
 		return err
 	}
 	if err := strictJSON(body, f); err != nil {
-		return fmt.Errorf("%s does not read as a list of signers: %w", signersPath(root), err)
+		return fmt.Errorf("%s does not read as a list of signers: %w", SignersPath(root), err)
 	}
 	return nil
 }
@@ -122,7 +124,7 @@ func Trust(root, name string, pub []byte, by, why string, now time.Time) (Signer
 		return Signer{}, err
 	}
 	s := Signer{Name: name, KeyID: kid, Key: key, AddedBy: by, AddedAt: now.UTC(), Why: strings.TrimSpace(why)}
-	err = atomicfile.Update(signersPath(root), func(f *signersFile) error {
+	err = atomicfile.Update(SignersPath(root), func(f *signersFile) error {
 		for _, have := range f.Signers {
 			switch {
 			case have.Name == name:
@@ -143,7 +145,7 @@ func Trust(root, name string, pub []byte, by, why string, now time.Time) (Signer
 // Untrust removes a signer by name, and reports whether there was one.
 func Untrust(root, name string) (bool, error) {
 	found := false
-	err := atomicfile.Update(signersPath(root), func(f *signersFile) error {
+	err := atomicfile.Update(SignersPath(root), func(f *signersFile) error {
 		kept := f.Signers[:0]
 		for _, s := range f.Signers {
 			if s.Name == name {

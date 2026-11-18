@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Rashik Adhikari
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v2
+name: aertun
+description: The proving ground for AI security work, self-hosted
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
+home: https://aertun.github.io/
+icon: https://raw.githubusercontent.com/Aertun/Aertun/main/docs/brand/aertun-icon-512.png
+sources:
+  - https://github.com/Aertun/Aertun
+license: Apache-2.0
+keywords:
+  - security
+  - ai-security
+  - in-toto
+  - siem

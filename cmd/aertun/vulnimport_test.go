@@ -340,3 +340,30 @@ func TestTheSameCVEFromTwoDatabasesIsOneRow(t *testing.T) {
 		t.Errorf("after one database withdrew: %+v", all)
 	}
 }
+
+// An SPDX 2.3 bill, as GitHub's dependency graph exports one, is imported
+// and matched exactly as a CycloneDX one is.
+func TestAnSPDXBillIsImportedAndMatched(t *testing.T) {
+	root, dir := importSite(t)
+	bill := put(t, filepath.Join(dir, "sbom.spdx.json"), `{
+  "spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": "storefront",
+  "documentDescribes": ["SPDXRef-root"],
+  "packages": [
+    {"SPDXID": "SPDXRef-root", "name": "storefront", "versionInfo": "1.0.0"},
+    {"SPDXID": "SPDXRef-npm-express", "name": "express", "versionInfo": "4.18.0",
+     "externalRefs": [{"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/express@4.18.0"}]}
+  ],
+  "relationships": [
+    {"spdxElementId": "SPDXRef-root", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-npm-express"}
+  ]
+}`)
+	osv := filepath.Join(dir, "osv")
+	put(t, filepath.Join(osv, "GHSA-1.json"), osvRecord("GHSA-1", "npm",
+		"express", `{"introduced":"0"},{"fixed":"4.21.3"}`, `,"aliases":["CVE-2026-4410"]`))
+	if err := cmdVuln(root, []string{"import", "--bom", bill, "--where", "repo:storefront", "--osv", osv}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := advisoryByID(t, root, "CVE-2026-4410"); !ok {
+		t.Fatal("the advisory for a package the SPDX bill lists was not kept")
+	}
+}

@@ -42,15 +42,23 @@ import (
 // interface run: they read and add to the proofs kept in the store.
 func cmdProof(root string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("proof needs detection, analyst, evidence, verify, list, show, keep, signers, trust or untrust")
+		return fmt.Errorf("proof needs detection, coverage, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust")
 	}
 	switch args[0] {
 	case "detection":
 		return proofDetection(args[1:])
+	case "coverage":
+		return proofCoverage(root, args[1:])
 	case "analyst":
 		return proofAnalyst(root, args[1:])
 	case "evidence":
 		return proofEvidence(root, args[1:])
+	case "revocation":
+		return proofRevocation(root, args[1:])
+	case "sealed":
+		return proofSealed(root, args[1:])
+	case "svr":
+		return proofSVR(root, args[1:])
 	case "verify":
 		return proofVerify(args[1:])
 	case "list":
@@ -72,7 +80,7 @@ func cmdProof(root string, args []string) error {
 	case "untrust":
 		return proofUntrust(root, args[1:])
 	default:
-		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, verify, list, show, keep, signers, trust or untrust", args[0])
+		return fmt.Errorf("unknown proof command %q; try detection, coverage, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust", args[0])
 	}
 }
 
@@ -238,6 +246,28 @@ func summary(st *proof.Statement) map[string]any {
 		out["not_affected"] = st.Predicate.NotAffected
 	case st.Predicate.Citations != nil:
 		out["citations"] = st.Predicate.Citations
+	case st.Predicate.Revocation != nil:
+		out["revocation"] = st.Predicate.Revocation
+	case st.Predicate.Clock != nil:
+		out["clock"] = st.Predicate.Clock
+	case st.Predicate.BreachScope != nil:
+		out["breach_scope"] = st.Predicate.BreachScope
+	case st.Predicate.VEXRecord != nil:
+		out["vex_record"] = st.Predicate.VEXRecord
+	case st.Predicate.ChainPosture != nil:
+		out["chain_posture"] = st.Predicate.ChainPosture
+	case st.Predicate.Sealed != nil:
+		out["sealed"] = st.Predicate.Sealed
+	case st.Predicate.MDR != nil:
+		out["mdr"] = st.Predicate.MDR
+	case st.Predicate.PeerLog != nil:
+		out["peer_log"] = st.Predicate.PeerLog
+	case st.Predicate.Coverage != nil:
+		out["coverage"] = st.Predicate.Coverage
+	case st.Predicate.Continuity != nil:
+		out["continuity"] = st.Predicate.Continuity
+	case st.Predicate.Referee != nil:
+		out["referee"] = st.Predicate.Referee
 	}
 	return out
 }
@@ -300,6 +330,68 @@ func describe(st *proof.Statement) string {
 		fmt.Fprintf(&b, "  evidence: %d call(s) answered, %d in its account, %d unreported, %d claimed "+
 			"and never received; %d connection(s) checked, %d unexplained; it reported %d tool call(s)",
 			v.Calls, v.Matched, v.Unreported, v.Unreceived, v.Connects, v.Unexplained, v.Reported)
+		if v.Gateway != "" {
+			fmt.Fprintf(&b, "; the gateway saw %d call(s), %d not in its account; %d model call(s) "+
+				"reported, %d never at the gateway", v.GatewayCalls, v.GatewayUnreported, v.ModelSpans,
+				v.ModelUnseen)
+		}
+		if len(v.Identities) > 0 {
+			fmt.Fprintf(&b, "; %d action(s) recorded of %s, %d with nothing of it near", v.Changes,
+				strings.Join(v.Identities, " and "), v.UnexplainedChanges)
+		}
+	}
+	if v := p.Revocation; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d use(s) after the grace and %d refused attempt(s) across %d "+
+			"source(s); watched as %s", v.Uses, v.Refused, len(v.Sources), strings.Join(v.Identities, ", "))
+	}
+	if v := p.Clock; v != nil {
+		anchored := "no anchor yet"
+		if v.Anchor != nil {
+			anchored = fmt.Sprintf("anchored in block %d, %s, mined %s", v.Anchor.Block, v.Anchor.Hash,
+				v.Anchor.Mined)
+		}
+		fmt.Fprintf(&b, "  evidence: %s at audit entry %d (%s); %d obligation(s)", v.Trigger, v.Entry,
+			anchored, len(v.Duties))
+	}
+	if v := p.BreachScope; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d indicator(s) from %s %s; %d event(s) read; the store holds "+
+			"the margin before %v, the window %v, the margin after %v", len(v.Indicators), v.Vendor,
+			v.Reference, v.Events, v.HeldBefore, v.HeldDuring, v.HeldAfter)
+	}
+	if v := p.VEXRecord; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d of %d checked statement(s) contradicted, between %.4f and %.4f, "+
+			"against %g; %d uncheckable; %d proof(s) used about %d asset(s), %d by trusted signers; "+
+			"%d superseded, %d left out unverified, %d left out for an untrusted signer",
+			v.Share.K, v.Share.N, v.Share.Lower, v.Share.Upper, v.Tolerance, v.Uncheckable, v.Used,
+			v.Assets, v.Trusted, v.Superseded, v.LeftOut, v.UntrustedLeftOut)
+	}
+	if v := p.ChainPosture; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d setting(s) on chain %d at block %d: %d held, %d regressed, "+
+			"%d unread", len(v.Settings), v.ChainID, v.Block, v.Held, v.Regressed, v.Unread)
+	}
+	if v := p.Sealed; v != nil {
+		b.WriteString(describeSealed(v))
+	}
+	if v := p.MDR; v != nil {
+		fmt.Fprintf(&b, "  evidence: plan %s for %s, committed at audit entry %d: %d of %d planned run; "+
+			"%d notified within %ds, %d late, %d not at all; missed between %.4f and %.4f against %g; "+
+			"time to notify %ds median, %ds at the 90th percentile; test closed: %v",
+			v.Plan, v.Provider, v.Committed.Seq, v.Run, v.Planned, v.Within, v.SLA, v.Late, v.Never,
+			v.Missed.Lower, v.Missed.Upper, v.Tolerance, v.Median, v.P90, v.Closed)
+	}
+	if v := p.PeerLog; v != nil {
+		fmt.Fprintf(&b, "  evidence: %d record(s) of %s held; %d of %d tree head(s) it signed agree, "+
+			"%d fork(s); last batch of %d received %s", v.Held, v.Peer, v.Agreeing, v.Heads, v.ForkCount,
+			v.LastRecords, v.LastReceived)
+	}
+	if v := p.Coverage; v != nil {
+		b.WriteString(describeCoverage(v))
+	}
+	if v := p.Continuity; v != nil {
+		b.WriteString(describeContinuity(v))
+	}
+	if v := p.Referee; v != nil {
+		b.WriteString(describeReferee(v))
 	}
 	if v := p.Verdicts; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d of %d closure(s) false, between %.4f and %.4f, against %g; "+

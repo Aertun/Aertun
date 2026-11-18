@@ -228,8 +228,29 @@ var coverage = map[string]surfaces{
 			"thing under test choosing its test; the replay itself is served " +
 			"over MCP, by aertun mcp --twin",
 	},
+	// A protocol's posture on a chain, read at one block and signed: the
+	// proof is kept and read with every other on the Proofs screen and
+	// through the proof operations.
+	"chain": {GUI: "/proving/proofs",
+		NoMCP: "proving signs with a key file named on the command line, which an MCP " +
+			"server must never hold on a caller's behalf, and reads from an endpoint whose " +
+			"URL carries a credential; an agent choosing the endpoint would choose the " +
+			"witness its own claim is checked against"},
 	// Claim cards: pre-registered tests of vendors' claims.
 	"claim": {GUI: "/proving/claims", MCP: []string{"list_claims"}},
+
+	// Sealed alerts: a monitor's alerts committed to the audit log by
+	// digest, for proof sealed to show when each existed.
+	"alert": {
+		Why: "sealing reads a monitor's export at a terminal or in the pipeline that " +
+			"receives it, and a batch is one audit entry, which the Logs screen shows; " +
+			"what a seal is for is the sealed-alert proof, read on the Proofs screen " +
+			"like every other",
+		NoMCP: "a seal is a claim made in this organisation's name that these alerts " +
+			"existed now, and an agent sealing them would be the party whose alerts are " +
+			"in question choosing what the record says was seen first — the claim this " +
+			"exists to keep honest",
+	},
 
 	// Closures judged again blind, on a sample committed first.
 	"adjudicate": {GUI: "/proving/adjudication",
@@ -237,6 +258,17 @@ var coverage = map[string]surfaces{
 			"agent shown the queue would be an agent choosing evidence for the " +
 			"measurement of agents; drawing and proving sign with a key file " +
 			"named on the command line"},
+
+	// A detection provider tested blind, on a schedule committed first.
+	"mdr": {GUI: "/proving/proofs",
+		Why: "the signed result is kept with the other proofs; the plan itself has no screen " +
+			"because its schedule is the one thing the provider must not learn, and a provider " +
+			"under test is often given a seat on the console it would be shown on, so it is " +
+			"read at a terminal, by whoever may draw one, and only as each item falls due",
+		NoMCP: "the schedule must be kept from the provider, and an AI SOC under test may be the " +
+			"very agent at this interface; a run or a notification is recorded as a verified " +
+			"person's word, which a model cannot give, and proving signs with a key file named " +
+			"on the command line"},
 
 	// Another vendor's AI verdicts, scored against people's decisions.
 	"verdict": {

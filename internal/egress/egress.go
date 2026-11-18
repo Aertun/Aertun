@@ -112,7 +112,9 @@ var Purposes = []Purpose{
 	},
 	{
 		Name: "anchor",
-		What: "publishing an audit head where the operator cannot alter it",
+		What: "publishing an audit head where the operator cannot alter it, " +
+			"through OpenTimestamps calendars, and reading the header of the " +
+			"Bitcoin block that holds it from public block explorers",
 		Without: "heads are not anchored. Rewriting history stays detectable " +
 			"against a head somebody else holds and is no longer provable " +
 			"against one nobody controls",
@@ -170,6 +172,26 @@ var Purposes = []Purpose{
 		Without: "metadata is pasted or given as a file instead. Signing in " +
 			"never fetches anything: the trusted certificates are stored " +
 			"when a person confirms them",
+	},
+	{
+		Name: "registry",
+		What: "reading what a package registry says about a release in a " +
+			"bill of materials and the release before it — who published " +
+			"each and how, its provenance, its install scripts — from npm, " +
+			"PyPI and the Go module proxy, or the mirrors an operator names",
+		Without: "no continuity proof can be made. The bill is still read, " +
+			"and its advisories, reachability and VEX checks still run " +
+			"offline",
+	},
+	{
+		Name: "chain",
+		What: "reading an EVM chain's state from the JSON-RPC endpoint an " +
+			"operator names — a multisig's threshold and owners, a " +
+			"timelock's delay, a proxy's admin and implementation — to " +
+			"prove a protocol's posture at one block",
+		Without: "no chain posture can be proved from a hosted endpoint. A " +
+			"node run on this machine is still reached, since a " +
+			"connection that stays on the host is not egress",
 	},
 }
 

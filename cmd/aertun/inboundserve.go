@@ -7,9 +7,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aertun/aertun/internal/seal"
 	"io"
 	"net/http"
 	"os"
@@ -242,6 +245,17 @@ type inboundServer struct {
 	// fresh is that events were stored since the rules last ran, by the
 	// worker or by a delivery that found the store free.
 	fresh bool
+	// sealing are the digests of records delivered on sealing feeds and not
+	// yet committed, by feed: committed together, one audit entry for each
+	// feed every tick, rather than one for every delivery.
+	sealing map[string]*sealQueue
+}
+
+// sealQueue is one feed's records waiting to be sealed.
+type sealQueue struct {
+	feed    inbound.Feed
+	digests []string
+	seen    map[string]bool
 }
 
 type cachedReceiver struct {
@@ -293,6 +307,7 @@ func (s *inboundServer) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.process()
+			s.sealPending(false)
 			s.flush()
 			return
 		case <-s.work:
@@ -302,8 +317,11 @@ func (s *inboundServer) run(ctx context.Context) {
 			case <-time.After(300 * time.Millisecond):
 			}
 			s.process()
+			// A full batch is sealed at once; the rest wait for the tick.
+			s.sealPending(true)
 			s.flush()
 		case <-tick.C:
+			s.sealPending(false)
 			s.flush()
 		}
 	}
@@ -431,6 +449,11 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	} else {
 		stored = len(events)
 	}
+	// Sealed whether or not every record mapped: what is sealed is that the
+	// record arrived, which does not depend on reading it.
+	if p.feed.Seal && serr == nil {
+		serr = s.queueSeal(p.feed, p.docs)
+	}
 	s.mu.Lock()
 	st.Stored += stored
 	if serr != nil {
@@ -450,6 +473,98 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	s.dirty = true
 	s.mu.Unlock()
 	return stored, learned
+}
+
+// queueSeal takes a delivery's records' digests to be sealed with the feed's
+// others. A record that is not one JSON object is no alert and is not
+// sealed; one delivered twice is sealed once.
+func (s *inboundServer) queueSeal(f inbound.Feed, docs []any) error {
+	var digests []string
+	for _, d := range docs {
+		if _, ok := d.(map[string]any); !ok {
+			continue
+		}
+		b, err := json.Marshal(d)
+		if err != nil {
+			return err
+		}
+		digest, err := seal.Digest(b)
+		if err != nil {
+			return err
+		}
+		digests = append(digests, digest)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sealing == nil {
+		s.sealing = map[string]*sealQueue{}
+	}
+	q := s.sealing[f.Name]
+	if q == nil {
+		q = &sealQueue{feed: f, seen: map[string]bool{}}
+		s.sealing[f.Name] = q
+	}
+	for _, d := range digests {
+		if !q.seen[d] {
+			q.seen[d] = true
+			q.digests = append(q.digests, d)
+		}
+	}
+	return nil
+}
+
+// sealPending commits what waits to be sealed, one audit entry for each
+// feed and each full batch, in the feed's name: the sender proved itself to
+// the feed, and the entry says only that these records arrived by now. With
+// onlyFull, only a feed holding a full batch is sealed, so a burst does not
+// wait for the tick and a trickle is not an entry an alert.
+func (s *inboundServer) sealPending(onlyFull bool) {
+	s.mu.Lock()
+	var ready []*sealQueue
+	for name, q := range s.sealing {
+		if len(q.digests) == 0 || (onlyFull && len(q.digests) < seal.MaxBatch) {
+			continue
+		}
+		ready = append(ready, q)
+		delete(s.sealing, name)
+	}
+	s.mu.Unlock()
+	for _, q := range ready {
+		if err := s.seal(q.feed, q.digests); err != nil {
+			s.mu.Lock()
+			s.statusOf(q.feed.Name).Error = "sealing: " + err.Error()
+			s.dirty = true
+			s.mu.Unlock()
+		}
+	}
+}
+
+// seal commits digests in batches of at most seal.MaxBatch.
+func (s *inboundServer) seal(f inbound.Feed, digests []string) error {
+	for len(digests) > 0 {
+		n := min(len(digests), seal.MaxBatch)
+		b, err := seal.NewBatch(digests[:n])
+		if err != nil {
+			return err
+		}
+		digests = digests[n:]
+		dir := seal.Dir(s.root)
+		existed, err := seal.Save(dir, b)
+		if err != nil {
+			return err
+		}
+		detail := seal.Detail(b)
+		detail["feed"] = f.Name
+		if err := recordE(s.root, audit.Record{Action: seal.ActionSealed, Resource: "/feeds/" + f.Name,
+			Outcome: audit.Success, Principal: "feed:" + f.Name, Kind: audit.KindService, Verified: true,
+			Detail: detail}); err != nil {
+			if !existed {
+				_ = seal.Remove(dir, b.Root)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // mapping is the source mapping a feed's records go through.
@@ -639,6 +754,10 @@ func (s *inboundServer) webhook(w http.ResponseWriter, r *http.Request, f inboun
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+	if f.Kind == inbound.Webhook && f.TokenHash != "" && f.Secret == "" {
+		s.bearerWebhook(w, r, f, body)
+		return
+	}
 	secrets, err := loadSecrets(s.root)
 	secret := secrets[f.Secret]
 	if err != nil || secret == "" {
@@ -669,6 +788,39 @@ func (s *inboundServer) webhook(w http.ResponseWriter, r *http.Request, f inboun
 	}
 	if err := s.accept(pushed{feed: f, docs: docs, at: s.now().UTC()}); err != nil {
 		s.seen.Forget(f.Name + ":" + id)
+		http.Error(w, "busy", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// bearerWebhook takes a delivery from a sender that sets a static secret in
+// Authorization and signs nothing. The delivery is named by its body's
+// digest, so the same body sent again inside the replay window is answered
+// as taken and not stored twice; what a bearer secret cannot show — that the
+// body is the one its sender sent — is why such a feed is given out only
+// over https.
+func (s *inboundServer) bearerWebhook(w http.ResponseWriter, r *http.Request, f inbound.Feed, body []byte) {
+	if !inbound.StaticMatches(inbound.BearerOrRaw(r.Header.Get("Authorization")), f.TokenHash) {
+		s.refused(f.Name, "the Authorization header does not hold this feed's secret")
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	sum := sha256.Sum256(body)
+	id := f.Name + ":" + hex.EncodeToString(sum[:])
+	if !s.seen.First(id, s.now()) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	docs, err := inbound.RecordLines(body)
+	if err != nil {
+		s.seen.Forget(id)
+		s.refused(f.Name, err.Error())
+		http.Error(w, "the body is not JSON records", http.StatusBadRequest)
+		return
+	}
+	if err := s.accept(pushed{feed: f, docs: docs, at: s.now().UTC()}); err != nil {
+		s.seen.Forget(id)
 		http.Error(w, "busy", http.StatusServiceUnavailable)
 		return
 	}

@@ -62,16 +62,26 @@ func usage() {
 
 Proving AI security work: checked against evidence the AI did not write, then signed
   aertun proof detection --rule F [--corpus F] --key F | verify FILE --key F   a rule checked against evidence its author did not write, signed; verify is the CI gate
+  aertun proof coverage --key F [--rules DIR] [--corpus F] [--technique T]... [--min-positives N] [--min-benign N] [--telemetry 7d] [--navigator F] [--out F]   each technique the rules claim, held to entries labelled with it and benign ones, with decay against what sources send now; signed, and as an ATT&CK Navigator layer
   aertun proof analyst --key F [--k 3] [--tolerance 0.05] [--out F]   your AI analyst on the labelled corpus, asked k times with planted instructions, signed
   aertun proof evidence --report F --key F [--source S --since D --until D] [--out F]   an AI's investigation with every citation run again against the event store, signed
+  aertun proof revocation --agent NAME | --identity ISSUER:VALUE --at TIME --key F [--grace 5m] [--stretch 1h] [--out F]   after a kill switch or a revocation elsewhere, whether anything still acted as it, by sources shown to be listening, signed
+  aertun chain posture FILE --rpc URL --key F [--block N] [--reach CIDR] [--public-key F] [--out F]   a protocol's declared multisig thresholds, timelock delays and proxy admins, read from the chain at one block, signed
+  aertun proof sealed --alert F | --finding ID --key F [--public-key F] [--out F]   when an alert existed: its digest in a batch the verified audit log sealed, under a head anchored in Bitcoin, signed
+  aertun alert seal FILE|- | seal --list   alerts from any monitor, one JSON object per line, committed to the audit log by digest; the alerts are not kept
+  aertun proof svr ID|FILE [--proof-key F] --key F [--public-key F] [--out F]   a proven proof as an in-toto Simple Verification Result, for a policy engine that admits artifacts on attestations, signed
   aertun proof list [--kind K] | show ID | keep FILE --public-key F   the proofs kept here, as the console's Proofs screen and the agent interface show them
   aertun proof signers | trust NAME --key F --why "…" | untrust NAME   the keys whose proofs speak for this store; trusting one takes two administrators
   aertun analyst calibrate --key F [--out F] [--epsilon 0.05] [--delta 0.05] [--valid-for 720h]   the analyst's threshold fitted on verified people's verdicts, signed
   aertun verdict import FILE --source NAME | list | prove --source NAME --since DATE --tolerance R --key F   another vendor's AI verdicts scored against people's decisions, signed
   aertun adjudicate draw --source NAME --since DATE --per N | list | next SAMPLE | judge SAMPLE --item N --judgement W --because "…" | size | prove SAMPLE --tolerance R --key F   closures judged again blind, on a random sample committed first
   aertun claim register NAME --source S --metric M --direction at-least|at-most --threshold R [--window-days 30] | list | test NAME --key F   a vendor's claim, pre-registered and tested once its window closes
-  aertun agent reconcile NAME --since DATE --key F   an agent's own account held against what was seen, signed
+  aertun mdr plan NAME --provider P --emulations F --count N [--over 30d] | next NAME | ran NAME --item N --at TIME | notified NAME --item N --at TIME --ref REF | notified NAME --source S | prove NAME --sla 30m --tolerance R --key F [--out F]   a detection provider tested blind: emulations at random times committed first, notifications held to its SLA, signed
+  aertun agent reconcile NAME --since DATE --key F [--gateway SOURCE:KEY [--gateway-only]] [--identity SOURCE:ACTOR ...]   an agent's own account held against what was seen: the agent interface, its machines, a model gateway, the systems it acts on, signed
   aertun vuln prove-vex FILE --source NAME --where ASSET --key F   another party's "not affected" statements held to the evidence, signed
+  aertun vuln continuity BILL --key F [--out F] [--npm URL] [--pypi URL] [--goproxy URL]   each npm, PyPI and Go package held to the release before it: provenance, trusted publishing, source, publisher and install scripts kept; signed, the gate before an install
+  aertun vuln commit REPORT | referee REPORT --source DIR [--asset DIR] --key F [--out F]   a vulnerability report's digest committed to the audit log; its cited files and functions, version, range, CVSS and novelty held to the source, signed
+  aertun vuln vex-record --source NAME --since DATE [--until DATE] --tolerance R --key F [--out F]   that party's track record over the not-affected proofs kept here, each verified again as it is read, signed
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
   aertun windtunnel run --score reference | list-scenarios | preflight | scorecard | diff OLD NEW | verify   the shipped pack, self-graded; signed only in CI; diff is the CI gate
   aertun bench run [--stub] [--out F] [--k N] | report FILE   the labelled corpus, and how the analyst scored on it
@@ -90,8 +100,9 @@ Collecting what happens
   aertun collect status | auto 15m|off     what each source did last, and the schedule
   aertun source list | add MAPPING.json --sample RECORDS.json | check --source S RECORDS.json
   aertun telemetry check [FILE] | fields [FILE]   can a source's events be used, and what a rule may name
-  aertun inbound list | add okta|webhook|ssf|quilzo NAME | connect NAME | verify NAME | status NAME
+  aertun inbound list | add okta|webhook|ssf|stream NAME | connect NAME | verify NAME | status NAME
   aertun inbound rotate NAME | on NAME | off NAME | remove NAME | help
+  aertun inbound prove NAME --key F [--at TIME] [--public-key F] [--out F]   another site's audit log, received on a stream feed: complete and unforked up to a time, held against every tree head it signed, signed
   aertun spool add [FILE] | stats | verify | retain [--apply] | hold NAME --why W | lift NAME
   aertun identity list | link ISSUER:VALUE PERSON@… | unlink ISSUER:VALUE
 
@@ -117,6 +128,7 @@ Cases and response
   aertun incident declare --title T --grade sev2 [--finding ID]   open one, under the regimes set
   aertun incident list | show ID | decide ID aware --because "…" | discharge|waive ID "REGIME" --because "…"
   aertun incident note|assign|link|watch|reopen|close ID …   the rest of the record
+  aertun incident prove ID --trigger aware --key F [--out F]   when the clock started, held against the signed log and its Bitcoin anchors, and whether what it started was done in time, signed
   aertun incident playbooks [show ID | check FILE] | propose|approve|withdraw ID PLAYBOOK
   aertun incident step ID PLAYBOOK STEP done|skip|undo --because "…"
   aertun incident act ID ACTION ISSUER:VALUE --because "…" | act-approve ID N
@@ -142,6 +154,7 @@ The estate and its people
   aertun workforce coverage | propose | people | gaps [FILE] | link A B --because W
   aertun remind preview | enable | disable | send
   aertun vendor list | show ID | reconcile | review ID
+  aertun vendor check-breach FILE --key F [--margin 30d] [--out F]   a vendor's breach disclosure held against your own events: indicators seen outside its window, or inside it when it said you were not affected, signed
   aertun access open ID [FILE] --scope S | items ID | decide ID ACCOUNT VERDICT | close ID [FILE] | list
 
 People, sign-in and changes
@@ -168,7 +181,7 @@ Its own record and settings
   aertun privacy export SUBJECT [--out FILE] [--audit] [--pseudonym p_…] | statement
                                         a data subject's events as a handover document, and the honest privacy posture
   aertun auditlog dir | verify | show SEQ | export -o FILE | head --save | verify-head FILE | prove SEQ | consistency
-  aertun auditlog anchor [submit|upgrade|status]   the log head, committed to Bitcoin
+  aertun auditlog anchor [submit|upgrade [--explorer URL ...]|status]   the log head, committed to Bitcoin, each block's header checked
   aertun logd [status]                     the log writer, run as its own account
   aertun siem ocsf|cef|jsonl --envelope F | verify FILE --envelope F   its own audit log, still verifiable
   aertun siem stream [status] | key | send  its own audit log, pushed to a SIEM as it is written
@@ -213,20 +226,10 @@ func main() {
 	// A tiny hand-rolled global flag pass, so `--root` and `--token` work
 	// before the subcommand as well as after it.
 	//
-	// --token is here because it was read globally and removed nowhere. The
-	// authorisation check picked it out of the raw arguments, then handed the
-	// same arguments to the subcommand's own flag set — which rejected an
-	// undeclared flag. Seven of eighty-one flag sets declared it, so `publish
-	// --token X` worked and `add --token X` exited 1 with "flag provided but
-	// not defined: -token".
-	//
-	// The command that mattered most was the one printing the advice. Every
-	// refusal in this program ends "Present one with --token,
-	// ~/.aertun/token, or AERTUN_TOKEN", and for `aertun add` on a store with
-	// access control the first of those three could not be done at all.
-	//
-	// Stripping it here makes the sentence true everywhere, and the seven
-	// local declarations are gone rather than left to shadow it.
+	// --token is taken here, once, rather than declared by each command's
+	// own flag set: every refusal in this program ends "Present one with
+	// --token, ~/.aertun/token, or AERTUN_TOKEN", and that sentence is true
+	// only if no command can reject the flag as one it never declared.
 	var rest []string
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--root" && i+1 < len(args) {
@@ -259,11 +262,11 @@ func main() {
 	// The network boundary, applied once for every command before any of them
 	// runs.
 	//
-	// Here rather than in the two servers, because an isolated deployment is
-	// not only a running site: `import`, `fediverse`, `auditlog anchor` and
-	// the chat bots all reach the network from the command line, and a
-	// boundary that only the server honoured would be one somebody steps over
-	// by running a command.
+	// Here rather than in the server, because an isolated deployment is not
+	// only a running console: `collect run`, `connect run`, `auditlog
+	// anchor` and `chain posture` all reach the network from the command
+	// line, and a boundary that only the server honoured would be one
+	// somebody steps over by running a command.
 	//
 	// A mode that cannot be read leaves the default. Refusing to run because
 	// a config file is unreadable would make an unrelated fault look like a
@@ -363,6 +366,10 @@ func main() {
 		err = cmdWindtunnel(root, cmdArgs)
 	case "proof":
 		err = cmdProof(root, cmdArgs)
+	case "chain":
+		err = cmdChain(root, cmdArgs)
+	case "alert":
+		err = cmdAlert(root, cmdArgs)
 	case "twin":
 		err = cmdTwin(root, cmdArgs)
 	case "forge":
@@ -373,6 +380,8 @@ func main() {
 		err = cmdAdjudicate(root, cmdArgs)
 	case "claim":
 		err = cmdClaim(root, cmdArgs)
+	case "mdr":
+		err = cmdMDR(root, cmdArgs)
 	case "vendor":
 		err = cmdVendor(root, cmdArgs)
 	case "access":
@@ -452,44 +461,6 @@ func main() {
 		}
 		os.Exit(out.ExitFailure)
 	}
-}
-
-// splitFlags separates the flags, and the values they consume, from the
-// positional arguments.
-//
-// Pulled out of reorder because the privilege gate needs the positional
-// arguments too: it has to know which page a command is about before the
-// command has parsed anything, so that a grant or a deny scoped to part of the
-// site is enforced here as well as in the browser.
-//
-// One function rather than two readings of the same arguments. A second copy
-// of "which flags take a value" would drift, and a drifted copy reads as a
-// page name the word the command reads as a flag value — which authorises one
-// resource and acts on another, and a check on the wrong resource is not a
-// check.
-func splitFlags(args []string, valued map[string]bool) (flags, positional []string) {
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			positional = append(positional, args[i+1:]...)
-			break
-		}
-		if !strings.HasPrefix(a, "-") || a == "-" {
-			positional = append(positional, a)
-			continue
-		}
-		flags = append(flags, a)
-		name := strings.TrimLeft(a, "-")
-		if n, _, hasEq := strings.Cut(name, "="); hasEq {
-			_ = n
-			continue // --flag=value carries its own value
-		}
-		if valued[name] && i+1 < len(args) {
-			flags = append(flags, args[i+1])
-			i++
-		}
-	}
-	return flags, positional
 }
 
 // cmdInit makes the store: a directory private to this account, with the

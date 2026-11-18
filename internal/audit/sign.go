@@ -67,6 +67,11 @@ import (
 // thing it replaced.
 const signatureContext = "aertun/audit-head/v1"
 
+// HeadContext is the context this program signs its audit tree heads in:
+// what a receiver of its stream checks them against when nothing else is
+// named.
+const HeadContext = signatureContext
+
 // SignedHead is a head with proof of who published it.
 type SignedHead struct {
 	Head
@@ -124,6 +129,9 @@ type HeadVerifier struct {
 	// another's whose log it receives (NewHeadVerifierIn).
 	context string
 }
+
+// Context is the context this verifier checks heads in.
+func (v *HeadVerifier) Context() string { return v.domain() }
 
 // domain is the context this verifier checks heads in.
 func (v *HeadVerifier) domain() string {
@@ -219,8 +227,7 @@ func (v *HeadVerifier) PublicKeys() (ed, ml []byte) {
 }
 
 // NewHeadVerifierIn reads published public keys for heads another program
-// signed in its own context, such as "quilzo/audit-head/v1", for a receiver
-// of that program's audit stream.
+// signed in its own context, for a receiver of that program's audit stream.
 func NewHeadVerifierIn(context string, ed, ml []byte) (*HeadVerifier, error) {
 	if context == "" || len(context) > 255 {
 		return nil, fmt.Errorf("a head's context is named, in at most 255 bytes")

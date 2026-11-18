@@ -6,6 +6,7 @@ package source
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +43,7 @@ const trailRecord = `{
 
 func TestEveryBuiltInMappingValidates(t *testing.T) {
 	for _, s := range Known() {
-		if err := s.Validate(); err != nil {
+		if err := s.Strict(); err != nil {
 			t.Errorf("%s/%s: %v", s.Issuer, s.Stream, err)
 		}
 	}
@@ -390,7 +391,7 @@ func TestTheBreadthIsRealAndConsistent(t *testing.T) {
 	seen := map[string]bool{}
 	classes := map[telemetry.Class]int{}
 	for _, s := range all {
-		if err := s.Validate(); err != nil {
+		if err := s.Strict(); err != nil {
 			t.Errorf("%s/%s: %v", s.Issuer, s.Stream, err)
 			continue
 		}
@@ -783,5 +784,86 @@ func TestAKeptFieldCannotStandInForThePerson(t *testing.T) {
 		"meta":{"person":"ceo@acme.test"}}`))
 	if e.Raw[PersonField] != "lee@acme.test" {
 		t.Fatalf("person = %q", e.Raw[PersonField])
+	}
+}
+
+// A kept path can be named, so two that end alike are both kept, and a
+// list of plain values is kept joined.
+func TestAKeptPathCanBeNamedAndCanBeAList(t *testing.T) {
+	s := Source{Issuer: "x", Tool: "X", Stream: "alerts", Class: telemetry.ClassDetection, Activity: 1,
+		Time: "t", Layout: time.RFC3339, Require: []string{"t"},
+		Keep:     []string{"rule.id as rule", "rule.mitre.id as mitre", "rule.groups", "rule.mixed"},
+		Lateness: time.Minute}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var doc any
+	_ = json.Unmarshal([]byte(`{"t":"2026-11-18T09:42:37Z","rule":{"id":"40112","mitre":{"id":["T1078","T1110"]},`+
+		`"groups":["syslog","attacks"],"mixed":["a",{"b":1}]}}`), &doc)
+	e, miss := s.Map(doc)
+	if len(miss) != 0 {
+		t.Fatal(miss)
+	}
+	if e.Raw["rule"] != "40112" || e.Raw["mitre"] != "T1078 T1110" || e.Raw["groups"] != "syslog attacks" {
+		t.Fatalf("raw %v", e.Raw)
+	}
+	if _, ok := e.Raw["mixed"]; ok {
+		t.Error("a list holding an object was kept as text")
+	}
+	for name, keep := range map[string][]string{
+		"two paths ending alike": {"a.id", "b.id"},
+		"a name that is not one": {"a.id as Rule ID"},
+		"a name with no path":    {" as rule"},
+	} {
+		bad := s
+		bad.Keep = keep
+		if err := bad.Strict(); err == nil {
+			t.Errorf("%s: %v validates", name, keep)
+		}
+	}
+}
+
+// The Wazuh mapping reads the alerts a 4.14.10 manager raised.
+func TestWazuhAlertsAreReadAsTheManagerWritesThem(t *testing.T) {
+	s, ok := Find("wazuh", "alerts")
+	if !ok {
+		t.Fatal("no wazuh/alerts mapping")
+	}
+	b, err := os.ReadFile("testdata/wazuh-alerts.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		var doc any
+		if err := json.Unmarshal([]byte(line), &doc); err != nil {
+			t.Fatal(err)
+		}
+		e, miss := s.Map(doc)
+		if len(miss) != 0 {
+			t.Fatalf("missed %v in %s", miss, line[:120])
+		}
+		// Arrival is the collector's to stamp, as mapRecords does.
+		e.Received = e.Time.Add(time.Second)
+		if err := e.Validate(); err != nil {
+			t.Fatalf("%v: %s", err, line[:120])
+		}
+		read++
+		if e.Raw["rule"] == "40112" {
+			if e.Raw["level"] != "12" || e.Raw["mitre"] != "T1078 T1110" || e.Target.Value != "root" ||
+				e.Device.Value != "wazuh-mgr" || e.Raw[telemetry.AlertField] == "" ||
+				!strings.Contains(e.Raw["full_log"], "Accepted password") {
+				t.Fatalf("40112: %+v", e)
+			}
+			if len(e.Observables) != 1 || e.Observables[0].Value != "203.0.113.9" {
+				t.Fatalf("observables %+v", e.Observables)
+			}
+			if e.Time.Format(time.RFC3339Nano) != "2026-11-18T09:42:37.693Z" {
+				t.Fatalf("time %s", e.Time)
+			}
+		}
+	}
+	if read != 16 {
+		t.Fatalf("read %d alerts", read)
 	}
 }

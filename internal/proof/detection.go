@@ -36,7 +36,7 @@ import (
 // every proof it makes. The version moves when what a check does changes.
 const (
 	DetectionVerifier        = "aertun/detection"
-	DetectionVerifierVersion = "1"
+	DetectionVerifierVersion = "2"
 	// MaxRuleFile bounds a rule file; real ones are a few kilobytes.
 	MaxRuleFile = 1 << 20
 )
@@ -176,7 +176,9 @@ func corpusCheck(r detect.Rule, entries []detect.Labelled, ev *DetectionEvidence
 		if mine {
 			l.Expect = []string{r.ID}
 			ev.Positives++
-		} else if reads(r, l.Event.Source) {
+		} else if reads(r, l.Event.Source) && len(l.Techniques) == 0 {
+			// An entry labelled as an attack is not one the rule must stay
+			// quiet on, though no rule is named to catch it.
 			ev.Negatives++
 		}
 		view = append(view, l)

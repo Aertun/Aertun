@@ -121,6 +121,47 @@ type ReconciliationEvidence struct {
 	Unexplained   int      `json:"unexplained"`
 	SharedSkipped int      `json:"shared_skipped"`
 	MinObserved   int      `json:"min_observed"`
+
+	// Gateway is the model gateway's record held against the account, as
+	// SOURCE:ACTOR — the source its calls are stored under and the key it
+	// names the agent's calls by, as the operator declared; empty when none
+	// was. GatewayOnly is the declaration that the gateway is the agent's
+	// only way to a model.
+	Gateway     string `json:"gateway,omitempty"`
+	GatewayOnly bool   `json:"gateway_only,omitempty"`
+	// GatewayCalls is the gateway's calls on that key in the period,
+	// GatewayMatched those in the agent's own account and
+	// GatewayUnreported those not. ModelSpans is the agent's own model
+	// calls in the period, and ModelUnseen those the gateway never saw,
+	// counted only when it is declared the only way to a model.
+	GatewayCalls      int `json:"gateway_calls,omitempty"`
+	GatewayMatched    int `json:"gateway_matched,omitempty"`
+	GatewayUnreported int `json:"gateway_unreported,omitempty"`
+	ModelSpans        int `json:"model_spans,omitempty"`
+	ModelUnseen       int `json:"model_unseen,omitempty"`
+	// Identities are the agent's identities in the systems it acts on, as
+	// SOURCE:ACTOR, as the operator declared them; Changes what those
+	// systems' own audits recorded of them in the period, and
+	// UnexplainedChanges those nothing the agent did, by its account or
+	// seen elsewhere, was near.
+	Identities         []string `json:"identities,omitempty"`
+	Changes            int      `json:"changes,omitempty"`
+	UnexplainedChanges int      `json:"unexplained_changes,omitempty"`
+}
+
+// GatewayCallSeen is one call a model gateway saw on the agent's key, by
+// whether it was to a model or a tool and when: never by the model's or the
+// tool's name, which the caller chose.
+type GatewayCallSeen struct {
+	Tool bool
+	At   time.Time
+}
+
+// TargetChange is one change a target system's audit recorded of the
+// agent's identity, by the source it is stored under and when.
+type TargetChange struct {
+	Source string
+	At     time.Time
 }
 
 // ReconciliationInput is what a reconciliation proof is made from.
@@ -138,6 +179,16 @@ type ReconciliationInput struct {
 	Hosts                                  []string
 	SharedHosts, Connects, SharedSkipped   int
 	Unexplained                            []AgentConnect
+
+	// The gateway and the target systems, when they were declared.
+	Gateway                                  string
+	GatewayOnly                              bool
+	GatewayCalls, GatewayMatched, ModelSpans int
+	GatewayUnreported                        []GatewayCallSeen
+	ModelUnseen                              []time.Time
+	Identities                               []string
+	Changes                                  int
+	UnexplainedChanges                       []TargetChange
 
 	Materials []Material
 	Program   string
@@ -163,7 +214,64 @@ func connectFailure(c AgentConnect) string {
 const (
 	unreportedPhrase = "unreported call"
 	unreceivedPhrase = "claimed, never received"
+	// What the gateway and the target systems show that the account does
+	// not, and what the account says that the gateway never saw.
+	gatewayPhrase = "at the gateway, not in its account"
+	unseenPhrase  = "in its account, never at the gateway"
+	changePhrase  = "acted as it with nothing of it near"
 )
+
+// eventSourceShape is how an event source is named: ISSUER/STREAM.
+var eventSourceShape = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,39}/[a-z0-9][a-z0-9._-]{0,39}$`)
+
+// ValidDeclared reports whether a declared gateway or identity is
+// SOURCE:ACTOR in the shapes a proof may carry them in.
+func ValidDeclared(s string) bool {
+	src, actor, ok := strings.Cut(s, ":")
+	return ok && eventSourceShape.MatchString(src) && identShape.MatchString(actor)
+}
+
+func gatewayFailure(c GatewayCallSeen) string {
+	kind := "a model call"
+	if c.Tool {
+		kind = "a tool call"
+	}
+	return gatewayPhrase + ": " + kind + " at " + c.At.UTC().Format(time.RFC3339Nano)
+}
+
+func unseenFailure(at time.Time) string {
+	return unseenPhrase + ": a model call at " + at.UTC().Format(time.RFC3339Nano)
+}
+
+func changeFailure(c TargetChange) string {
+	return changePhrase + ": " + c.Source + " at " + c.At.UTC().Format(time.RFC3339Nano)
+}
+
+// validGatewayFailure and validChangeFailure accept only the shapes the
+// functions above write.
+func validGatewayFailure(s string) bool {
+	for _, phrase := range []string{gatewayPhrase + ": a model call", gatewayPhrase + ": a tool call",
+		unseenPhrase + ": a model call"} {
+		if when, ok := strings.CutPrefix(s, phrase+" at "); ok {
+			_, err := time.Parse(time.RFC3339Nano, when)
+			return err == nil
+		}
+	}
+	return false
+}
+
+func validChangeFailure(s string) bool {
+	rest, ok := strings.CutPrefix(s, changePhrase+": ")
+	if !ok {
+		return false
+	}
+	src, when, ok := strings.Cut(rest, " at ")
+	if !ok || !eventSourceShape.MatchString(src) {
+		return false
+	}
+	_, err := time.Parse(time.RFC3339Nano, when)
+	return err == nil
+}
 
 // validCallFailure and validConnectFailure accept only the shapes the two
 // functions above write: closed phrases, closed tool names, strict hosts and
@@ -221,7 +329,25 @@ func ProveReconciliation(in ReconciliationInput) (*Statement, error) {
 		Unreported: len(in.Unreported), Unreceived: len(in.Unreceived),
 		Hosts: append([]string{}, in.Hosts...), SharedHosts: in.SharedHosts,
 		Connects: in.Connects, Unexplained: len(in.Unexplained), SharedSkipped: in.SharedSkipped,
-		MinObserved: MinObserved}
+		MinObserved: MinObserved,
+		Gateway:     in.Gateway, GatewayOnly: in.GatewayOnly, GatewayCalls: in.GatewayCalls,
+		GatewayMatched: in.GatewayMatched, GatewayUnreported: len(in.GatewayUnreported),
+		ModelSpans: in.ModelSpans, ModelUnseen: len(in.ModelUnseen),
+		Identities: append([]string(nil), in.Identities...), Changes: in.Changes,
+		UnexplainedChanges: len(in.UnexplainedChanges)}
+	if err := ev.wellFormed(); err != nil {
+		return nil, err
+	}
+	var gateway, changes []string
+	for _, c := range in.GatewayUnreported {
+		gateway = append(gateway, gatewayFailure(c))
+	}
+	for _, at := range in.ModelUnseen {
+		gateway = append(gateway, unseenFailure(at))
+	}
+	for _, c := range in.UnexplainedChanges {
+		changes = append(changes, changeFailure(c))
+	}
 	var unreported, unreceived, unexplained []string
 	for _, c := range in.Unreported {
 		unreported = append(unreported, callFailure(unreportedPhrase, c))
@@ -242,7 +368,7 @@ func ProveReconciliation(in ReconciliationInput) (*Statement, error) {
 			Verifier: VerifierID{ID: ReconciliationVerifier, Version: ReconciliationVerifierVersion,
 				Program: in.Program},
 			Materials:      append([]Material{}, in.Materials...),
-			Checks:         ev.checks(unreported, unreceived, unexplained),
+			Checks:         ev.checks(unreported, unreceived, unexplained, gateway, changes),
 			Reconciliation: ev, VerifiedAt: in.Now.UTC().Format(time.RFC3339),
 		},
 	}
@@ -254,20 +380,62 @@ func ProveReconciliation(in ReconciliationInput) (*Statement, error) {
 	return st, nil
 }
 
-func (ev *ReconciliationEvidence) observed() int { return ev.Calls + ev.Connects }
+func (ev *ReconciliationEvidence) observed() int {
+	return ev.Calls + ev.Connects + ev.GatewayCalls + ev.Changes
+}
+
+// wellFormed refuses a gateway or an identity not in the shapes a proof
+// carries them in, and counts that do not add up.
+func (ev *ReconciliationEvidence) wellFormed() error {
+	if ev.Gateway != "" && !ValidDeclared(ev.Gateway) {
+		return fmt.Errorf("a gateway is declared as SOURCE:ACTOR, the source its calls are stored under and the key it names the agent's calls by")
+	}
+	if ev.Gateway == "" && (ev.GatewayOnly || ev.GatewayCalls+ev.GatewayMatched+ev.GatewayUnreported+
+		ev.ModelSpans+ev.ModelUnseen != 0) {
+		return fmt.Errorf("with no gateway declared, nothing is counted at one")
+	}
+	for _, id := range ev.Identities {
+		if !ValidDeclared(id) {
+			return fmt.Errorf("an identity is declared as SOURCE:ACTOR, the source a system's audit is stored under and the actor it names the agent by")
+		}
+	}
+	if len(ev.Identities) == 0 && ev.Changes+ev.UnexplainedChanges != 0 {
+		return fmt.Errorf("with no identity declared, no change is counted")
+	}
+	if ev.GatewayCalls < 0 || ev.GatewayMatched < 0 || ev.GatewayUnreported < 0 || ev.ModelSpans < 0 ||
+		ev.ModelUnseen < 0 || ev.Changes < 0 || ev.UnexplainedChanges < 0 ||
+		ev.GatewayMatched+ev.GatewayUnreported != ev.GatewayCalls || ev.ModelUnseen > ev.ModelSpans ||
+		(!ev.GatewayOnly && ev.ModelUnseen != 0) || ev.UnexplainedChanges > ev.Changes {
+		return fmt.Errorf("the gateway's and the target systems' counts do not add up")
+	}
+	return nil
+}
 
 func (ev *ReconciliationEvidence) claim() string {
-	return fmt.Sprintf("Between %s and %s, every call this program's agent interface answered "+
+	c := fmt.Sprintf("Between %s and %s, every call this program's agent interface answered "+
 		"for agent %s, and every connection from a machine declared to run it alone, is in the "+
 		"agent's own telemetry as %s, and nothing that telemetry says it asked of the agent "+
 		"interface went unreceived.", ev.Since, ev.Until, ev.Agent, ev.Telemetry)
+	if ev.Gateway != "" {
+		c += fmt.Sprintf(" Every call the gateway %s saw on its key is in that account", ev.Gateway)
+		if ev.GatewayOnly {
+			c += ", and every model call the account has, the gateway saw"
+		}
+		c += "."
+	}
+	if len(ev.Identities) > 0 {
+		c += fmt.Sprintf(" Everything %s recorded of it was near something the agent did.",
+			strings.Join(ev.Identities, " and "))
+	}
+	return c
 }
 
 func (ev *ReconciliationEvidence) verdict() Verdict {
 	switch {
-	case ev.Unreported+ev.Unreceived+ev.Unexplained > 0:
+	case ev.Unreported+ev.Unreceived+ev.Unexplained+ev.GatewayUnreported+ev.ModelUnseen+
+		ev.UnexplainedChanges > 0:
 		return Refuted
-	case ev.Reported > 0 && ev.observed() >= MinObserved:
+	case ev.Reported+ev.ModelSpans > 0 && ev.observed() >= MinObserved:
 		return Proven
 	}
 	return Inconclusive
@@ -275,14 +443,17 @@ func (ev *ReconciliationEvidence) verdict() Verdict {
 
 // checks are the proof's checks, from the evidence and the names of what was
 // not accounted for: each lists at most MaxFailures and counts the rest.
-func (ev *ReconciliationEvidence) checks(unreported, unreceived, unexplained []string) []Check {
+func (ev *ReconciliationEvidence) checks(unreported, unreceived, unexplained, gateway, changes []string) []Check {
 	// What the account held, said as it is: the checks below are where it
 	// passes or fails.
 	reported := Check{Name: "reported", Passed: true,
 		Detail: fmt.Sprintf("the agent's own telemetry reported %d tool call(s) in the period, "+
 			"%d of them to the agent interface; %d observation(s) were made without it",
 			ev.Reported, ev.ForInterface, ev.observed())}
-	if ev.Reported == 0 && ev.observed() > 0 {
+	if ev.Gateway != "" {
+		reported.Detail += fmt.Sprintf("; it reported %d model call(s)", ev.ModelSpans)
+	}
+	if ev.Reported+ev.ModelSpans == 0 && ev.observed() > 0 {
 		reported.Detail += "; it reported nothing while it was seen acting, which nothing here " +
 			"tells apart from never having been instrumented"
 	} else if ev.observed() < MinObserved && ev.verdict() != Refuted {
@@ -308,7 +479,37 @@ func (ev *ReconciliationEvidence) checks(unreported, unreceived, unexplained []s
 	if more > 0 {
 		conns.Detail += fmt.Sprintf("; %d more not listed", more)
 	}
-	return []Check{reported, calls, conns}
+	out := []Check{reported, calls, conns}
+	if ev.Gateway != "" {
+		gw := Check{Name: "gateway-accounted-for", Passed: ev.GatewayUnreported+ev.ModelUnseen == 0,
+			Detail: fmt.Sprintf("%d of the %d call(s) the gateway %s saw on its key are in its own "+
+				"account, within %d second(s); %d are not", ev.GatewayMatched, ev.GatewayCalls,
+				ev.Gateway, ev.Window, ev.GatewayUnreported)}
+		if ev.GatewayOnly {
+			gw.Detail += fmt.Sprintf("; it is declared the agent's only way to a model, and %d of "+
+				"the %d model call(s) the account has, it never saw", ev.ModelUnseen, ev.ModelSpans)
+		} else {
+			gw.Detail += fmt.Sprintf("; the account has %d model call(s), which may have gone another "+
+				"way than the gateway, as it is not declared the only one", ev.ModelSpans)
+		}
+		gw.Failures, more = capped(gateway)
+		if more > 0 {
+			gw.Detail += fmt.Sprintf("; %d more not listed", more)
+		}
+		out = append(out, gw)
+	}
+	if len(ev.Identities) > 0 {
+		ch := Check{Name: "identities-accounted-for", Passed: ev.UnexplainedChanges == 0,
+			Detail: fmt.Sprintf("%d action(s) recorded of %s; %d with nothing the agent did, by its "+
+				"account, at the gateway or at the agent interface, within %d second(s)", ev.Changes,
+				strings.Join(ev.Identities, " and "), ev.UnexplainedChanges, ev.Window)}
+		ch.Failures, more = capped(changes)
+		if more > 0 {
+			ch.Detail += fmt.Sprintf("; %d more not listed", more)
+		}
+		out = append(out, ch)
+	}
+	return out
 }
 
 // validate refuses evidence whose numbers do not add up, do not support the
@@ -333,13 +534,24 @@ func (ev *ReconciliationEvidence) validate(s *Statement) error {
 	if ev.MinObserved != MinObserved {
 		return fmt.Errorf("the evidence's minimum is not this version's")
 	}
+	if err := ev.wellFormed(); err != nil {
+		return err
+	}
 	if want := ev.verdict(); s.Predicate.Verdict != want {
 		return fmt.Errorf("the counts make this %s, not %s", want, s.Predicate.Verdict)
 	}
-	if len(s.Predicate.Checks) != 3 {
-		return fmt.Errorf("a reconciliation has three checks")
+	want := 3
+	gatewayAt, changesAt := -1, -1
+	if ev.Gateway != "" {
+		gatewayAt, want = want, want+1
 	}
-	var unreported, unreceived, unexplained []string
+	if len(ev.Identities) > 0 {
+		changesAt, want = want, want+1
+	}
+	if len(s.Predicate.Checks) != want {
+		return fmt.Errorf("a reconciliation has three checks, one more for a gateway and one more for identities")
+	}
+	var unreported, unreceived, unexplained, gateway, changes []string
 	for i, c := range s.Predicate.Checks {
 		for _, f := range c.Failures {
 			switch {
@@ -349,11 +561,19 @@ func (ev *ReconciliationEvidence) validate(s *Statement) error {
 				unreceived = append(unreceived, f)
 			case i == 2 && validConnectFailure(f):
 				unexplained = append(unexplained, f)
+			case i == gatewayAt && validGatewayFailure(f):
+				gateway = append(gateway, f)
+			case i == changesAt && validChangeFailure(f):
+				changes = append(changes, f)
 			default:
 				return fmt.Errorf("a failure in a reconciliation names a call or a connection " +
 					"in its own shape, on its own check, and nothing else")
 			}
 		}
+	}
+	if len(gateway) != min(ev.GatewayUnreported+ev.ModelUnseen, MaxFailures) ||
+		len(changes) != min(ev.UnexplainedChanges, MaxFailures) {
+		return fmt.Errorf("the failures listed are not the ones counted")
 	}
 	if len(unreported)+len(unreceived) != min(ev.Unreported+ev.Unreceived, MaxFailures) ||
 		len(unexplained) != min(ev.Unexplained, MaxFailures) ||
@@ -366,5 +586,6 @@ func (ev *ReconciliationEvidence) validate(s *Statement) error {
 	pad := func(list []string, n int) []string { return append(list, make([]string, n-len(list))...) }
 	callNames := pad(append(unreported, unreceived...), ev.Unreported+ev.Unreceived)
 	return sameWords(s, "agent/"+ev.Agent, ev.claim(),
-		ev.checks(callNames, nil, pad(unexplained, ev.Unexplained)))
+		ev.checks(callNames, nil, pad(unexplained, ev.Unexplained),
+			pad(gateway, ev.GatewayUnreported+ev.ModelUnseen), pad(changes, ev.UnexplainedChanges)))
 }

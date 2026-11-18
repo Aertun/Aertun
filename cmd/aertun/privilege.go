@@ -106,6 +106,11 @@ var commandNeeds = map[string]need{
 	"inbound list":   {action: auth.ActView},
 	"inbound status": {action: auth.ActView},
 	"inbound help":   {action: auth.ActView},
+	// A proof that a peer's log is whole and unforked reads what the feed
+	// kept and this deployment's audit log, and signs in the organisation's
+	// name: it asks for tune itself before it reads anything, as the other
+	// proofs signed from the store do, so this row only lets it start.
+	"inbound prove": {action: auth.ActView},
 	// Where sign-ins come from decides which of them are stepped up, so
 	// naming a network is a decision for all of Aertun; reading is a view.
 	"geo":        {action: auth.ActGrant},
@@ -177,6 +182,11 @@ var commandNeeds = map[string]need{
 	"vendor list":      {action: auth.ActView},
 	"vendor show":      {action: auth.ActView},
 	"vendor reconcile": {action: auth.ActView},
+	// Holding a vendor's breach disclosure against the event store signs
+	// what came of it in the organisation's name: the command asks for tune
+	// itself before it reads anything, as the other proofs signed from the
+	// store do.
+	"vendor check-breach": {action: auth.ActView},
 
 	// Deciding a vulnerability does not apply is a statement the
 	// organisation stands behind and is appended to the audit chain rather
@@ -208,6 +218,14 @@ var commandNeeds = map[string]need{
 	"verdict":         {action: auth.ActTriage},
 	"verdict list":    {action: auth.ActView},
 	"verdict prove":   {action: auth.ActTriage},
+	// A provider's blind test: drawing the plan, reading what has fallen
+	// due and proving ask for tune themselves, because the schedule is the
+	// secret the test rests on and the proof a measurement in the
+	// organisation's name; recording a run or a notification is an
+	// analyst's report of what happened, taken at this row and asked again
+	// of a verified person by the command. No subcommand steps down: there
+	// is nothing here a viewer should read.
+	"mdr": {action: auth.ActTriage},
 	// The benchmark measures the analyst and, against a real model, spends
 	// the model budget to do it: the same weight as the analyst's own eval.
 	// Rendering a document somebody already has is only reading.
@@ -233,6 +251,42 @@ var commandNeeds = map[string]need{
 	// tune itself before it reads anything, as the other proofs signed from
 	// the store do, because a row here may only narrow its parent.
 	"proof evidence": {action: auth.ActView},
+	// A revocation proof reads the audit log and the event store and signs
+	// what they showed after a revocation in the organisation's name: it
+	// asks for tune itself before it reads anything, as the other proofs
+	// signed from the store do.
+	"proof revocation": {action: auth.ActView},
+	// A chain-posture proof reads a chain's state from an endpoint the
+	// operator names and signs what it found in the organisation's name:
+	// tune, as the other proofs signed in that name ask for, and asked for
+	// again by the command before it reads anything. A strict parent, so a
+	// subcommand added beside it arrives guarded.
+	"chain": {action: auth.ActTune},
+	// A sealed-alert proof reads the audit log whole, the batches kept
+	// beside it and the anchors sent from it, and signs when an alert
+	// existed in the organisation's name: it asks for tune itself before it
+	// reads anything, as the other proofs signed from the store do.
+	"proof sealed": {action: auth.ActView},
+	// A verification result says, in the organisation's name, that an
+	// artifact passed, and a policy engine admits it on that: it asks for
+	// tune itself before it reads the proof, as signing a proof does.
+	"proof svr": {action: auth.ActView},
+	// A coverage proof checks rule files and a corpus the caller named, the
+	// weight of a detection proof; with --telemetry it also reads the event
+	// store and signs what it showed in the organisation's name, and asks
+	// for tune itself before it reads anything, as the other proofs signed
+	// from the store do.
+	"proof coverage": {action: auth.ActView},
+	// Sealing alerts is evidence brought into the security area — the
+	// weight of importing another vendor's verdicts or intelligence, so an
+	// analyst's: it decides nothing about anybody and changes no control,
+	// and what it writes is one audit entry and a file of digests, whatever
+	// the batch held. Not tune, which signing a proof takes: a seal claims
+	// only that these digests were handed in now, and the proof made later
+	// is what speaks for the organisation. Listing what was sealed rides at
+	// the same rung, because `--list` is a flag and this table reads one
+	// word deep — over-guarded rather than under-.
+	"alert": {action: auth.ActTriage},
 	// A recorded case is the security queue and its evidence copied out of
 	// the store into a file, which is what listing the queue on the command
 	// line takes (`finding`); each part of it is gated again, operation by
@@ -269,7 +323,20 @@ var commandNeeds = map[string]need{
 	// Holding a VEX document to the evidence signs a measurement in the
 	// organisation's name: the command asks for tune itself.
 	"vuln prove-vex": {action: auth.ActAssess},
-	"vuln assets":    {action: auth.ActView},
+	// An issuer's track record reads the proofs kept here and signs what they
+	// came to in the organisation's name: the command asks for tune itself,
+	// as prove-vex does, because a row here may only narrow its parent.
+	"vuln vex-record": {action: auth.ActAssess},
+	// Holding a bill's packages to the releases before them reads public
+	// registries and signs what they said in the organisation's name: the
+	// command asks for tune itself, as prove-vex does.
+	"vuln continuity": {action: auth.ActAssess},
+	// Committing a report writes its digest to the audit log, the weight of
+	// taking a report in; refereeing it signs what its claims came to in the
+	// organisation's name, and asks for tune itself.
+	"vuln commit":  {action: auth.ActAssess},
+	"vuln referee": {action: auth.ActAssess},
+	"vuln assets":  {action: auth.ActView},
 
 	// Storing a credential for another company's system is the heaviest
 	// thing here, and running a connector is an ordinary write. Reading a
@@ -697,8 +764,11 @@ var commandAreas = map[string]string{
 	"siem": auth.AreaLog, "automate": auth.AreaSecurity, "inbound": auth.AreaSecurity,
 	"auditlog": auth.AreaLog, "compliance": auth.AreaLog, "bench": auth.AreaSecurity,
 	"windtunnel": auth.AreaSecurity, "proof": auth.AreaSecurity, "verdict": auth.AreaSecurity,
+	"chain": auth.AreaSecurity,
+	"mdr":   auth.AreaSecurity,
 	"twin":  auth.AreaSecurity,
 	"forge": auth.AreaSecurity, "forge verify": auth.AreaLog,
+	"alert": auth.AreaSecurity,
 }
 
 // commandArea is the area a command works in, if it works in one.

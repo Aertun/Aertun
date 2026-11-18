@@ -155,7 +155,7 @@ func TestAChangedValueIsRefused(t *testing.T) {
 	for _, edit := range [][2]string{
 		{"sam.rivera@northwind.example</NameID>", "hana.sato@northwind.example</NameID>"},
 		{`NotOnOrAfter="2026-10-03T12:05:00.123Z" Recipient`, `NotOnOrAfter="2027-10-03T12:05:00.123Z" Recipient`},
-		{"<Audience>https://quilzo.example/saml/entra</Audience>", "<Audience>https://evil.example</Audience>"},
+		{"<Audience>https://aertun.example/saml/entra</Audience>", "<Audience>https://evil.example</Audience>"},
 	} {
 		changed := strings.Replace(src, edit[0], edit[1], 1)
 		if changed == src {

@@ -30,7 +30,7 @@ import (
 // Filling the queue from what the world publishes.
 //
 // `vuln load` takes this program's own two formats, which nobody publishes.
-// `vuln import` takes the four files people actually have: a CycloneDX bill
+// `vuln import` takes the four files people actually have: a bill (CycloneDX or SPDX)
 // of materials for what is installed, OSV records for what is wrong with
 // it, CISA's catalogue for what is being exploited, and FIRST's EPSS scores
 // for what is likely to be.
@@ -93,7 +93,7 @@ func vulnImport(root string, args []string) error {
 	var osv multiFlag
 	fs.Var(&osv, "osv", "OSV records: a file, a directory, or a .zip "+
 		"as osv.dev publishes them; may be given more than once")
-	bom := fs.String("bom", "", "a CycloneDX bill of materials")
+	bom := fs.String("bom", "", "a bill of materials: CycloneDX, or SPDX 2.x JSON")
 	where := fs.String("where", "", "the asset the bill describes, "+
 		"as issuer:value, for example repo:storefront")
 	kev := fs.String("kev", "", "CISA's known exploited vulnerabilities, as JSON")
@@ -448,7 +448,7 @@ func parseAsset(s string) (telemetry.ID, error) {
 		Value: strings.TrimSpace(value)}, nil
 }
 
-// readBill turns a CycloneDX bill into components on one asset.
+// readBill turns a bill, CycloneDX or SPDX, into components on one asset.
 func readBill(path string, asset telemetry.ID) ([]vuln.Component, int, error) {
 	raw, err := readBounded(path, MaxVulnFile)
 	if err != nil {

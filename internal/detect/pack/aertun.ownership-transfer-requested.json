@@ -4,7 +4,8 @@
   "why": "ownership is the one access nobody else can take away, and a transfer waits a day so the Owner can see the request and decline it; a stolen Owner session that wants the store for good starts here",
   "blind": "an Owner who confirms a transfer they did not mean to ask for, and changes made on the machine itself, outside aertun",
   "sources": [
-    "aertun/audit"
+    "aertun/audit",
+    "stream/audit"
   ],
   "severity": 4,
   "when": {
@@ -20,7 +21,7 @@
       },
       {
         "match": {
-          "field": "raw.kind",
+          "field": "raw.request_kind",
           "op": "equals",
           "values": [
             "owner"
@@ -51,9 +52,10 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "owner",
           "to": "lee",
-          "not_before": "2026-11-07T09:00:00Z"
+          "not_before": "2026-11-07T09:00:00Z",
+          "request_kind": "owner",
+          "kind": "human"
         }
       }
     },
@@ -75,7 +77,8 @@
           "action": "dual.proposed",
           "outcome": "success",
           "resource": "/",
-          "kind": "grant"
+          "request_kind": "grant",
+          "kind": "human"
         }
       }
     },
@@ -97,7 +100,8 @@
           "action": "dual.approved",
           "outcome": "success",
           "resource": "/",
-          "kind": "owner"
+          "request_kind": "owner",
+          "kind": "human"
         }
       }
     }

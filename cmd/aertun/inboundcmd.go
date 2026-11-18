@@ -22,10 +22,11 @@ import (
 
 func inboundUsage() error {
 	return fmt.Errorf("usage: aertun inbound list | status NAME | add okta NAME | " +
-		"add webhook NAME --mapping ISSUER/STREAM [--github] | " +
+		"add webhook NAME --mapping ISSUER/STREAM [--github | --bearer] [--seal] | " +
 		"add ssf NAME --issuer URL --url https://YOUR-ADMIN [--alias okta] | " +
 		streamFeedUsage +
 		"connect NAME --client-id ID [--token-url URL] | verify NAME | " +
+		"prove NAME --key F [--at TIME] [--out F] | " +
 		"rotate NAME | on NAME | off NAME | remove NAME | help")
 }
 
@@ -95,6 +96,8 @@ func cmdInbound(root string, args []string) error {
 			return inboundUsage()
 		}
 		return inboundStatusOf(root, args[1])
+	case "prove":
+		return inboundProve(root, args[1:])
 	case "add":
 		if len(args) < 3 {
 			return inboundUsage()
@@ -162,6 +165,12 @@ func inboundHelp() error {
     aertun inbound add webhook billing --mapping billing/admin
     aertun inbound add webhook github --mapping github/audit --github
 
+  Wazuh alerts, each sealed in the audit log within 30 seconds
+    aertun inbound add webhook wazuh --mapping wazuh/alerts --seal
+    Then on the manager, custom-aertun.py from integrations/wazuh in the
+    repository, and an <integration> block naming this feed's URL and its
+    signing secret (integrations/wazuh/README.md).
+
   OpenID Shared Signals (Okta, Google, Jamf, any SSF 1.0 transmitter)
     aertun inbound add ssf okta-signals --issuer https://acme.okta.com \
         --url https://admin.acme.example --alias okta
@@ -187,7 +196,11 @@ func inboundAdd(root string, caller *Caller, kind, name string, rest []string,
 		switch rest[i] {
 		case "--github":
 			opts["github"] = "yes"
-		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys":
+		case "--bearer":
+			opts["bearer"] = "yes"
+		case "--seal":
+			opts["seal"] = "yes"
+		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys", "--head-context":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("%s needs a value", rest[i])
 			}
@@ -262,6 +275,29 @@ func makeFeed(root, kind, name string, opts map[string]string, by string) (inbou
 			return f, nil, err
 		}
 		f.Mapping = opts["mapping"]
+		// Sealed as it arrives: each record's digest committed to the
+		// audit log, in the feed's name, with the batch kept beside it.
+		f.Seal = opts["seal"] != ""
+		// A sender that can set a header and cannot sign: a static secret
+		// in Authorization, as Okta sends it, checked in constant time
+		// against a digest and kept nowhere here in the clear. It proves
+		// who sent a delivery and not that its body is the one sent, so
+		// the feed is for a sender on a path this deployment trusts (TLS
+		// end to end), and an exact replay is refused by the body's digest.
+		if opts["bearer"] != "" {
+			if f.Kind == inbound.GitHub {
+				return f, nil, fmt.Errorf("a GitHub webhook signs its deliveries; --bearer is for a sender that cannot")
+			}
+			secret, digest, err := inbound.NewSecret()
+			if err != nil {
+				return f, nil, err
+			}
+			f.TokenHash = digest
+			shown = append(shown, "Authorization header value: Bearer "+secret,
+				"the secret proves who sent a delivery, not that the body is the one sent: "+
+					"give this address only over https")
+			break
+		}
 		var secret string
 		var err error
 		if f.Kind == inbound.GitHub {
@@ -546,11 +582,16 @@ func removeFeed(root, name string) (string, error) {
 	}
 	delete(m, name)
 	if f.Kind == inbound.AuditStream {
-		// The chain held for it goes with it: a feed added again under the
-		// name starts from nothing, and its sender is told so by the first
-		// answer and sends everything again.
-		if err := os.Remove(streamLeavesPath(root, name)); err != nil && !os.IsNotExist(err) {
-			return warn, err
+		// The chain held for it goes with it, and the heads signed over
+		// that chain: a feed added again under the name starts from
+		// nothing, and its sender is told so by the first answer and sends
+		// everything again. A fork it was caught in stays in the audit log,
+		// where the entry that recorded it cannot be removed with the feed.
+		for _, path := range []string{streamLeavesPath(root, name), streamHeadsPath(root, name),
+			streamForksPath(root, name)} {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return warn, err
+			}
 		}
 	}
 	return warn, saveFeeds(root, m)
@@ -573,7 +614,14 @@ func inboundStatusOf(root, name string) error {
 	if st == nil {
 		st = &inboundStatus{}
 	}
-	if w.JSON(map[string]any{"feed": f, "status": st}) {
+	var head *peerHead
+	forks := 0
+	if f.Kind == inbound.AuditStream {
+		if head, forks, err = peerChainHead(root, name); err != nil {
+			return err
+		}
+	}
+	if w.JSON(map[string]any{"feed": f, "status": st, "chain_head": head, "forks": forks}) {
 		return nil
 	}
 	w.Human("%s%s%s  %s  /feeds/%s\n", bold, f.Name, reset, f.Kind, f.Name)
@@ -586,6 +634,16 @@ func inboundStatusOf(root, name string) error {
 	}
 	w.Human("  %d deliveries, %d records: %d stored, %d already held, %d did not map; %d signals\n",
 		st.Deliveries, st.Records, st.Stored, st.Known, st.Missed, st.Signals)
+	if f.Kind == inbound.AuditStream {
+		if head != nil {
+			w.Human("  chain head: %d records, root %s, signed by the sender and taken %s\n",
+				head.Head.Size, head.Head.Root, head.Received.UTC().Format("2 Jan 2006 15:04"))
+		}
+		if forks > 0 {
+			w.Human("  %s%d tree head(s) the sender signed are not the log held: it has signed two "+
+				"histories (aertun inbound prove %s)%s\n", red, forks, name, reset)
+		}
+	}
 	if st.Field != "" {
 		w.Human("  %smost often missing: %s%s\n", yellow, st.Field, reset)
 	}

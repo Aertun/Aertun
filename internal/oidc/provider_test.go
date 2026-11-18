@@ -237,7 +237,7 @@ func TestTheCommonRefusalsExplainTheFix(t *testing.T) {
 // parameter, for amr and auth_time by name.
 func TestTheAuthorizationRequestAsksHowAndWhen(t *testing.T) {
 	p := &Provider{Discovery: Discovery{AuthorizationEndpoint: "https://idp.example/authorize"}}
-	r, err := NewRequest("https://cms.example/auth/callback")
+	r, err := NewRequest("https://aertun.example/auth/callback")
 	if err != nil {
 		t.Fatal(err)
 	}

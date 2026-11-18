@@ -1257,29 +1257,6 @@ func audienceError(aud string) error {
 // assertion may last: a job's identity is for the job.
 const MaxFederatedTTL = time.Hour
 
-// IssueFederated mints a token for a program another issuer vouched for,
-// such as a CI job: short, named for the trust that admitted it, and bound
-// to a key when the request proved one.
-func (ts *TokenStore) IssueFederated(name, principal string, role Role, resource string, scope Scope,
-	ttl time.Duration, thumbprint string, now time.Time) (string, Token, error) {
-	if ttl <= 0 || ttl > MaxFederatedTTL {
-		return "", Token{}, fmt.Errorf("a federated token lasts more than nothing and at most %s", MaxFederatedTTL)
-	}
-	secret, t, err := ts.issue(name, principal, role, resource, ttl, RoleAdmin, scope, false)
-	if err != nil {
-		return "", Token{}, err
-	}
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	for i := range ts.Tokens {
-		if ts.Tokens[i].ID == t.ID {
-			ts.Tokens[i].ExpiresAt, ts.Tokens[i].Key = now.Add(ttl).Unix(), thumbprint
-			t = ts.Tokens[i]
-		}
-	}
-	return secret, t, nil
-}
-
 // IssueForGrant mints an access token for an app a person consented to,
 // bound to one resource. Not a session: signing out of the browser does not
 // disconnect the app; revoking the grant does.

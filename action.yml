@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: 2026 Rashik Adhikari
+# SPDX-License-Identifier: Apache-2.0
+#
+# Run Aertun in a workflow: a proof as a CI gate, a rule checked before it
+# merges, a proof's verification result for the policy that deploys.
+#
+#   - uses: Aertun/Aertun@v0.2.0
+#     with:
+#       args: |
+#         proof
+#         detection
+#         --rule
+#         detections/okta.mfa-reset.json
+#         --corpus
+#         corpus/okta.jsonl
+#         --key
+#         ${{ runner.temp }}/signing.key
+#
+# The step fails unless the command does: a proof command exits non-zero
+# unless what it proves is proven.
+name: Aertun
+description: Run Aertun in CI, from a release whose checksum and build attestation are checked first
+author: Rashik Adhikari
+branding:
+  icon: shield
+  color: blue
+inputs:
+  args:
+    description: The aertun command line, one argument a line
+    required: true
+  version:
+    description: The Aertun release to run
+    default: "0.2.0"
+  verify-attestation:
+    description: Check the binary's build attestation with gh before running it ("true" or "false")
+    default: "true"
+  token:
+    description: The token gh checks the attestation with
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Fetch and check Aertun
+      shell: bash
+      env:
+        AERTUN_VERSION: ${{ inputs.version }}
+        AERTUN_ATTEST: ${{ inputs.verify-attestation }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        case "$AERTUN_VERSION" in
+          *[!0-9.]*|"") echo "version is a release number such as 0.2.0" >&2; exit 2 ;;
+        esac
+        case "$RUNNER_OS" in
+          Linux) os=linux ;; macOS) os=darwin ;; Windows) os=windows ;;
+          *) echo "no Aertun build for $RUNNER_OS" >&2; exit 2 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;; ARM64) arch=arm64 ;;
+          *) echo "no Aertun build for $RUNNER_ARCH" >&2; exit 2 ;;
+        esac
+        asset="aertun-$os-$arch"
+        [ "$os" = windows ] && asset="$asset.exe"
+        # A fixed directory: what is added to PATH depends on nothing an
+        # input can say.
+        dir="$RUNNER_TEMP/aertun-bin"
+        mkdir -p "$dir"
+        base="https://github.com/Aertun/Aertun/releases/download/v$AERTUN_VERSION"
+        curl -fsSL --proto '=https' -o "$dir/$asset" "$base/$asset"
+        curl -fsSL --proto '=https' -o "$dir/SHA256SUMS" "$base/SHA256SUMS"
+        want=$(awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}' "$dir/SHA256SUMS")
+        if [ -z "$want" ]; then echo "SHA256SUMS lists no $asset" >&2; exit 1; fi
+        if command -v sha256sum >/dev/null; then got=$(sha256sum "$dir/$asset" | awk '{print $1}')
+        else got=$(shasum -a 256 "$dir/$asset" | awk '{print $1}'); fi
+        if [ "$got" != "$want" ]; then echo "$asset does not match SHA256SUMS" >&2; exit 1; fi
+        if [ "$AERTUN_ATTEST" = "true" ]; then
+          gh attestation verify "$dir/$asset" --repo Aertun/Aertun
+        fi
+        if [ "$os" = windows ]; then cp "$dir/$asset" "$dir/aertun.exe"
+        else cp "$dir/$asset" "$dir/aertun" && chmod 0755 "$dir/aertun"; fi
+        echo "$dir" >> "$GITHUB_PATH"
+    - name: Run Aertun
+      shell: bash
+      env:
+        AERTUN_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        args=()
+        while IFS= read -r line; do
+          [ -n "$line" ] && args+=("$line")
+        done <<< "$AERTUN_ARGS"
+        if [ "${#args[@]}" -eq 0 ]; then echo "args names an aertun command" >&2; exit 2; fi
+        aertun "${args[@]}"

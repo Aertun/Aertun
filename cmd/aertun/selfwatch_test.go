@@ -171,3 +171,36 @@ func storedBySource(t *testing.T, root, source string) []telemetry.Event {
 	}
 	return out
 }
+
+// Every shipped rule over this program's own log fires on the records the
+// program really writes, not only on the fixtures written beside it. Two
+// did not: a privileged change made alone, and a request to pass ownership
+// on, both read details the self-watch never copied into the event store,
+// so in use neither could ever fire.
+func TestTheRulesOverTheAuditLogFireOnWhatItWrites(t *testing.T) {
+	root, rules := packSite(t)
+	dana := &Caller{Name: "dana", Kind: audit.KindHuman, Verified: true}
+	for _, r := range []audit.Record{
+		// As proposeSecond writes them: an only administrator's request,
+		// and an Owner's request to transfer ownership.
+		dana.auditRecord("dual.proposed", "/", audit.Success, map[string]string{"request": "r1",
+			"kind": "grant", "what": "role admin for sam", "why": "on call", "alone": "true",
+			"not_before": "2026-11-07T09:00:00Z"}),
+		dana.auditRecord("dual.proposed", "/", audit.Success, map[string]string{"request": "r2",
+			"kind": "owner", "what": "ownership to lee", "alone": "true",
+			"not_before": "2026-11-08T09:00:00Z"}),
+	} {
+		if err := recordE(root, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := detectRun(root, []string{"--rules", rules}); err != nil {
+		t.Fatal(err)
+	}
+	got := bySource(queue(t, root))
+	for _, want := range []string{"aertun.privileged-change-alone", "aertun.ownership-transfer-requested"} {
+		if len(got[want]) == 0 {
+			t.Errorf("%s did not fire on the record the program writes", want)
+		}
+	}
+}

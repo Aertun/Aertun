@@ -33,19 +33,6 @@ func (b *Board) Blocking(who string) []*Item {
 	return out
 }
 
-// Mine is everything somebody owns that is still open.
-func (b *Board) Mine(who string) []*Item {
-	who = strings.ToLower(strings.TrimSpace(who))
-	var out []*Item
-	for _, it := range b.Items {
-		if it.State.Open() && strings.ToLower(it.Owner) == who {
-			out = append(out, it)
-		}
-	}
-	byAge(out)
-	return out
-}
-
 // In is everything in a state.
 func (b *Board) In(s State) []*Item {
 	var out []*Item

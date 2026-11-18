@@ -303,21 +303,6 @@ func (s *Server) handleStepUpReport(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/signin?e=reported", http.StatusSeeOther)
 }
 
-func (s *Server) passStepUp(w http.ResponseWriter, r *http.Request, p principal, how string) {
-	if err := s.Tokens.ClearStepUp(p.TokenID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if s.SaveTokens != nil {
-		if err := s.SaveTokens(s.Tokens); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	s.audit("session.stepup-passed", "/", map[string]string{"by": p.Name, "session": p.TokenID, "how": how})
-	http.Redirect(w, r, startPath(r), http.StatusSeeOther)
-}
-
 // -- sign-ins -------------------------------------------------------------------
 
 type signInRow struct {

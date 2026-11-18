@@ -242,3 +242,43 @@ func TestInvitingOnTheScreenGrantsAndShowsTheLink(t *testing.T) {
 		t.Fatalf("a deny was taken for an invitation: %d %s", w.Code, loc)
 	}
 }
+
+// The screen does not make somebody an administrator while their link to
+// add a passkey waits unused, and says why; once it has been used, it does.
+func TestTheScreenWaitsForANewAdministratorsLinkToBeUsed(t *testing.T) {
+	srv, editor := setup(t)
+	if err := srv.Policy.Grant(auth.Binding{Principal: "lee", Role: auth.RoleAdmin, Resource: "/"}); err != nil {
+		t.Fatal(err)
+	}
+	lee, _, err := srv.Tokens.IssueSession("lee", "lee", auth.RoleAdmin, "/", time.Hour, auth.RoleAdmin, auth.MethodPasskey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Enrol = &enrol.Store{Path: filepath.Join(t.TempDir(), "enrol.json")}
+	postForm(t, srv, "/people/grant", editor, url.Values{"principal": {"pat"}, "role": {"admin"}, "resource": {"/"}}.Encode())
+	pend, _ := srv.Dual.Store.Pending(time.Now())
+	if len(pend) != 1 {
+		t.Fatalf("pending: %+v", pend)
+	}
+	secret, _, err := srv.Enrol.Issue("pat", "editor", time.Hour, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := postForm(t, srv, "/people/pending", lee, url.Values{"id": {pend[0].ID}, "do": {"approve"}}.Encode())
+	if loc, _ := url.QueryUnescape(w.Header().Get("Location")); !strings.Contains(loc, "has not been used yet") {
+		t.Fatalf("approving while pat's link waits: %d %s", w.Code, loc)
+	}
+	if srv.Policy.Evaluate("pat", auth.ActGrant, "/").Allowed {
+		t.Fatal("pat became an administrator while their link waited unused")
+	}
+	if got, _ := srv.Dual.Store.Get(pend[0].ID); got.State != dual.Waiting {
+		t.Fatalf("the refused approval moved the request: %+v", got)
+	}
+	if _, err := srv.Enrol.Take(secret, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	postForm(t, srv, "/people/pending", lee, url.Values{"id": {pend[0].ID}, "do": {"approve"}}.Encode())
+	if !srv.Policy.Evaluate("pat", auth.ActGrant, "/").Allowed {
+		t.Fatal("approved once the link was used, and pat is not an administrator")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aertun/aertun/internal/atomicfile"
@@ -55,6 +56,15 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 		"of it may be, for clocks and queues: between 1s and 1h")
 	telemetryID := fs.String("telemetry", "", "the identity the agent's GenAI spans name it by "+
 		"(gen_ai.agent.id), as you declare it (default: its registered name)")
+	gatewayAt := fs.String("gateway", "", "a model gateway's record to hold the account against, as "+
+		"SOURCE:KEY: the source its calls are stored under and the key it names the agent's calls by, "+
+		"such as litellm/requests:HASH")
+	gatewayOnly := fs.Bool("gateway-only", false, "with --gateway: the gateway is the agent's only way "+
+		"to a model, so a model call it never saw is one the agent says it made and did not")
+	var identities multiFlag
+	fs.Var(&identities, "identity", "the agent's identity in a system it acts on, as SOURCE:ACTOR, "+
+		"such as github/audit:triage-bot; everything that system records of it must be near something "+
+		"the agent did (repeatable)")
 	keyAt := fs.String("key", "", "the dual signing key file (aertun content keygen makes one)")
 	pubAt := fs.String("public-key", "", "with --key, where to write the public key a verifier needs")
 	outAt := fs.String("out", "", "where to write the proof (default: standard output)")
@@ -75,6 +85,26 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 	tele := *telemetryID
 	if tele == "" {
 		tele = name
+	}
+	if *gatewayAt != "" && !proof.ValidDeclared(*gatewayAt) {
+		return fmt.Errorf("--gateway is SOURCE:KEY, such as litellm/requests:88dc28d0…")
+	}
+	if *gatewayOnly && *gatewayAt == "" {
+		return fmt.Errorf("--gateway-only says the gateway is the only way to a model, and names none: add --gateway")
+	}
+	for _, id := range identities {
+		if !proof.ValidDeclared(id) {
+			return fmt.Errorf("--identity %q is SOURCE:ACTOR, such as github/audit:triage-bot", id)
+		}
+	}
+	gatewaySource, gatewayKey, _ := strings.Cut(*gatewayAt, ":")
+	actorsAt := map[string]map[string]bool{}
+	for _, id := range identities {
+		src, actor, _ := strings.Cut(id, ":")
+		if actorsAt[src] == nil {
+			actorsAt[src] = map[string]bool{}
+		}
+		actorsAt[src][actor] = true
 	}
 	now := time.Now().UTC()
 	since, err := parseDay(*sinceAt)
@@ -143,7 +173,8 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 		lines.Write(b)
 		lines.WriteByte('\n')
 	}
-	in := reconcile.Input{Since: since, Until: until, Window: *window, Hosts: own, Shared: shared}
+	in := reconcile.Input{Since: since, Until: until, Window: *window, Hosts: own, Shared: shared,
+		GatewayOnly: *gatewayOnly}
 	for _, e := range events {
 		// By the registered name the gate checked, not by the client: that
 		// is the principal a credential was issued to, which need not be the
@@ -177,6 +208,19 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 			case e.Source == otelSource && e.Actor.Value == tele && e.Raw["operation"] == "execute_tool":
 				in.Spans = append(in.Spans, reconcile.Span{At: e.Time, Tool: e.Raw["tool"]})
 				line(map[string]any{"span": e.Raw["tool"], "at": e.Time})
+			case e.Source == otelSource && e.Actor.Value == tele && modelOperation(e.Raw["operation"]):
+				in.ModelSpans = append(in.ModelSpans, reconcile.Span{At: e.Time})
+				line(map[string]any{"model_span": e.Raw["operation"], "at": e.Time})
+			case gatewaySource != "" && e.Source == gatewaySource && e.Actor.Value == gatewayKey:
+				tool := e.Raw["namespaced_tool_name"]
+				if tool == "" {
+					tool = e.Raw["tool"]
+				}
+				in.Gateway = append(in.Gateway, reconcile.GatewayCall{At: e.Time, Tool: tool})
+				line(map[string]any{"gateway": gatewaySource, "tool": tool != "", "at": e.Time})
+			case actorsAt[e.Source][e.Actor.Value]:
+				in.Changes = append(in.Changes, reconcile.Change{At: e.Time, Source: e.Source})
+				line(map[string]any{"identity": e.Source, "at": e.Time})
 			case e.Source == auditdSource && e.Raw["syscall"] == "connect" && machines[e.Device.Value]:
 				in.Connects = append(in.Connects, reconcile.Connect{At: e.Time, Host: e.Device.Value,
 					Addr: e.Raw["addr"], Port: e.Raw["port"]})
@@ -200,7 +244,19 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 	pin := proof.ReconciliationInput{Agent: name, Telemetry: tele, Since: since, Until: until,
 		Window: *window, Lines: lines.Bytes(), Reported: r.Reported, ForInterface: r.ForInterface,
 		Calls: r.Calls, Matched: r.Matched, Hosts: own, SharedHosts: len(shared),
-		Connects: r.Connects, SharedSkipped: r.SharedSkipped, Program: version, Now: now}
+		Connects: r.Connects, SharedSkipped: r.SharedSkipped, Program: version, Now: now,
+		Gateway: *gatewayAt, GatewayOnly: *gatewayOnly, GatewayCalls: r.GatewayCalls,
+		GatewayMatched: r.GatewayMatched, ModelSpans: r.ModelSpans, Identities: identities,
+		Changes: r.Changes}
+	for _, g := range r.GatewayUnreported {
+		pin.GatewayUnreported = append(pin.GatewayUnreported, proof.GatewayCallSeen{Tool: g.Tool != "", At: g.At})
+	}
+	for _, m := range r.ModelUnseen {
+		pin.ModelUnseen = append(pin.ModelUnseen, m.At)
+	}
+	for _, c := range r.UnexplainedChanges {
+		pin.UnexplainedChanges = append(pin.UnexplainedChanges, proof.TargetChange{Source: c.Source, At: c.At})
+	}
 	for _, c := range r.Unreported {
 		pin.Unreported = append(pin.Unreported, proof.AgentCall{Tool: c.Tool, At: c.At})
 	}
@@ -264,4 +320,15 @@ func agentReconcile(root string, caller *Caller, args []string) error {
 		}
 	}
 	return notProven(st)
+}
+
+// modelOperation reports whether a GenAI span's operation is a call to a
+// model: anything but a tool's execution or an agent's own lifecycle, which
+// the conventions name, and which a gateway never sees as a model call.
+func modelOperation(op string) bool {
+	switch op {
+	case "", "execute_tool", "invoke_agent", "create_agent":
+		return false
+	}
+	return true
 }

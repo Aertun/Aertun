@@ -29,6 +29,19 @@ type FeedView struct {
 	Last, LastRefused, Why, Error    string
 	Field                            string
 	Recent                           []FeedSignal
+	// Peer is a stream feed's sender's chain: the last tree head it signed
+	// and this deployment took. Nil for other feeds, or before any arrived.
+	Peer *PeerChain
+}
+
+// PeerChain is a stream feed's sender's chain head, as the screen shows it.
+type PeerChain struct {
+	// Records is how many records the head covers, Root its root, shortened
+	// for reading, and Received when the batch it came with was taken.
+	Records        int
+	Root, Received string
+	// Forks is how many heads the sender signed that are not the log held.
+	Forks int
 }
 
 // FeedSignal is one signal a feed carried.

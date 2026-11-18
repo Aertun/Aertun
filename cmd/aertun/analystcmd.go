@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,8 +56,6 @@ const unusableAction = "analyst.model-unusable"
 // modelUnusable is abstainWord's word for the endpoint, rather than the
 // finding, being why there is no suggestion.
 const modelUnusable = "the model could not be used"
-
-func agentsDir(root string) string { return filepath.Join(root, "agents") }
 
 // analystModel is the model a triage asks, behind the privacy guard:
 // personal data reaches it only when it is on this organisation's network,
@@ -867,19 +864,4 @@ func analystEval(root string, args []string) error {
 	w.Human("\n  %seven hijacked, the analyst can only suggest: a person "+
 		"records every verdict%s\n", dim, reset)
 	return nil
-}
-
-// ---- agents as a log source -------------------------------------------------
-
-// agentsSeen is what has been observed of the agents so far.
-type agentsSeen struct {
-	// Seq is the last audit entry read.
-	Seq int64 `json:"seq"`
-	// Did is each agent's actions, and First when it was first seen.
-	Did   map[string][]string  `json:"did"`
-	First map[string]time.Time `json:"first"`
-}
-
-func agentsSeenPath(root string) string {
-	return filepath.Join(agentsDir(root), "observed.json")
 }

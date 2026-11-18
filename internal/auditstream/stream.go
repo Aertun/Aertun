@@ -292,6 +292,32 @@ func (rc *Receiver) Holds() int64 {
 	return int64(rc.log.Size())
 }
 
+// ErrFork is a batch the sender signed — the request with its stream key,
+// the tree head with its head keys — whose head is not the log this
+// receiver holds: the same sender has signed two histories. Head is the
+// head it signed, and Held the root this receiver computes over the same
+// number of records. Nothing is taken from the batch; the head is evidence.
+type ErrFork struct {
+	Head audit.SignedHead
+	Held string
+	// Resent is whether the batch covered records already held, so that
+	// both roots are of exactly the records the head names; otherwise the
+	// records it brought, added to those held, do not rebuild its head.
+	Resent bool
+}
+
+func (e *ErrFork) Error() string {
+	if e.Resent {
+		return fmt.Sprintf("the sender signed a tree head of its first %d records with root %s, and "+
+			"the first %d records held here hash to %s: it has signed two histories", e.Head.Size,
+			e.Head.Root, e.Head.Size, e.Held)
+	}
+	return fmt.Sprintf("the sender signed a tree head of %d records with root %s, and the records "+
+		"held here followed by the ones it sent hash to %s: the leaves do not rebuild the signed "+
+		"tree head, so a record was dropped or changed, or what it sent before is no longer its log",
+		e.Head.Size, e.Head.Root, e.Held)
+}
+
 // Accept checks a request carrying a batch and takes it.
 func (rc *Receiver) Accept(r *http.Request, body []byte, now time.Time) (*Batch, error) {
 	if rc.log == nil {
@@ -321,6 +347,14 @@ func (rc *Receiver) Accept(r *http.Request, body []byte, now time.Time) (*Batch,
 		return nil, fmt.Errorf("the batch is not readable: %w", err)
 	}
 	if b.From != rc.Holds()+1 {
+		// Records already held, sent again: the head signed over them is
+		// the one this receiver computes, or the sender has signed another
+		// history for them.
+		if b.To >= 1 && b.To <= rc.Holds() && b.Head.Size == int(b.To) && rc.Heads.Verify(b.Head) == nil {
+			if held, err := rc.log.HeadAt(int(b.To)); err == nil && held.Root != b.Head.Root {
+				return nil, &ErrFork{Head: b.Head, Held: held.Root, Resent: true}
+			}
+		}
 		return nil, &ErrGap{Holds: rc.Holds()}
 	}
 	n := b.To - b.From + 1
@@ -329,7 +363,9 @@ func (rc *Receiver) Accept(r *http.Request, body []byte, now time.Time) (*Batch,
 		return nil, errors.New("the batch's range, leaves and envelope do not agree")
 	}
 	if err := rc.Heads.Verify(b.Head); err != nil {
-		return nil, fmt.Errorf("the tree head does not verify: %w", err)
+		return nil, fmt.Errorf("the tree head does not verify in the context %s: %w. A sender "+
+			"that signs its heads in a context of its own is added with that context named "+
+			"(aertun inbound add stream NAME --keys FILE --head-context C)", rc.Heads.Context(), err)
 	}
 	if b.Head.Size != int(b.To) {
 		return nil, fmt.Errorf("the tree head covers %d records, and the batch ends at %d", b.Head.Size, b.To)
@@ -339,7 +375,10 @@ func (rc *Receiver) Accept(r *http.Request, body []byte, now time.Time) (*Batch,
 		return nil, err
 	}
 	if got := staged.Head(); got.Root != b.Head.Root {
-		return nil, errors.New("the leaves do not rebuild the signed tree head: a record was dropped or changed")
+		// The head is the sender's own, signed, and it is not the records
+		// held followed by the records sent: one was dropped or changed on
+		// the sender's side, or what it sent before is no longer its log.
+		return nil, &ErrFork{Head: b.Head, Held: got.Root}
 	}
 	rc.log = staged
 	return &b, nil

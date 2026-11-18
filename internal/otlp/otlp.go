@@ -3,26 +3,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package otlp reads the traces an AI agent's telemetry pipeline pushes, in
-// OpenTelemetry's HTTP/JSON protocol, and keeps from them exactly what a
-// security platform has any business keeping.
+// OpenTelemetry's HTTP protocol, and keeps from them exactly what a security
+// platform has any business keeping.
 //
-// # Why OTLP, and why only its JSON mapping
+// # Why OTLP, in both its encodings
 //
 // The agents this platform is built to watch already speak OpenTelemetry:
 // every harness and gateway either exports OTLP natively or stands in front
 // of something that does, and the GenAI semantic conventions
 // (gen_ai.operation.name, gen_ai.agent.id, gen_ai.usage.*) name the fields
 // the whole industry converged on. Accepting the protocol at /v1/traces
-// means a deployment points its collector at this program and is done — no
+// means a deployment points its exporter at this program and is done — no
 // agent-side code, which matters because the one thing an agent must not be
 // trusted to report is its own behaviour.
 //
-// The OTLP protocol defines a protobuf mapping and a JSON mapping of the
-// same messages; this program carries no dependencies and no protobuf
-// runtime, so it implements the JSON one — the mapping the specification
-// says receivers SHOULD support, and what every collector sends when
-// configured with application/json. A protobuf body is refused with 415 and
-// a sentence saying why, rather than half-parsed.
+// OTLP/HTTP has a JSON encoding and a protobuf one, and the SDKs most agents
+// run on send protobuf by default; some send nothing else (LiteLLM maps its
+// "http/json" setting onto the protobuf exporter). This program carries no
+// dependencies, so it reads both itself: JSON through encoding/json, and
+// protobuf through a reader for the one fixed set of messages a traces
+// export is (protobuf.go), into the same structure, after which there is
+// one path. A body in any other encoding is refused with 415 and a sentence
+// saying what is read, rather than half-parsed. Answers come back in the
+// encoding the request came in.
 //
 // # The rule that shapes everything here
 //

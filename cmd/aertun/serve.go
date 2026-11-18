@@ -108,6 +108,7 @@ func cmdServe(root string, args []string) error {
 	// Persistence and auditing for the changes the console makes. Without
 	// these an access change lives until the process restarts, and the
 	// administrator has already been told it worked.
+	srv.Ready = func() error { return auditReady(root) }
 	srv.UpdatePolicy = func(change func(*auth.Policy) error) (*auth.Policy, error) {
 		return updatePolicy(root, change)
 	}

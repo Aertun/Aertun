@@ -46,13 +46,21 @@ icons, public data sets) are credited in [NOTICE](NOTICE).
 
 ## Quickstart
 
-```bash
-git clone https://github.com/aertun/aertun aertun && cd aertun
-go build -o aertun ./cmd/aertun      # Go 1.27 or later, nothing to fetch
+Download the binary for your platform from the
+[latest release](https://github.com/aertun/aertun/releases/latest), check it,
+and run it — there is nothing else to install:
 
-./aertun init --owner you@example.com   # a store, its Owner, and the link that adds your passkey
-./aertun serve                          # the console, on http://localhost:8080
+```bash
+curl -LO https://github.com/aertun/aertun/releases/download/v0.2.0/aertun-linux-amd64
+curl -LO https://github.com/aertun/aertun/releases/download/v0.2.0/SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS && chmod +x aertun-linux-amd64
+
+./aertun-linux-amd64 init --owner you@example.com   # a store, its Owner, and the link that adds your passkey
+./aertun-linux-amd64 serve                          # the console, on http://localhost:8080
 ```
+
+Other platforms, the container image and building from source are under
+[Install](#install).
 
 Open the link `init` printed and add a passkey, and you are signed in as the
 store's Owner. There is no default password and no default account, and
@@ -97,9 +105,41 @@ Ed25519 and ML-DSA-65.
 | **Vendor verdicts** | another product's AI closed few alerts that people found real | the decisions verified people made here, on verdicts given before them | `aertun verdict prove` |
 | **Blind adjudication** | the same, without the bias of only re-examining what looked wrong | a random sample committed to the audit log before anybody saw it, judged without knowing who closed what | `aertun adjudicate prove` |
 | **Claim card** | a vendor's claim, tested as it was made | the metric, threshold and period registered before the data arrived | `aertun claim test` |
-| **Reconciliation** | an agent did what it says it did | the calls its interface answered, read from the signed log, and the connections its machine made | `aertun agent reconcile` |
+| **Reconciliation** | an agent did what it says it did | the calls its interface answered, read from the signed log, the connections its machine made, and, when declared, a model gateway's record of its key (LiteLLM) and what the systems it acts on recorded of its identity (GitHub, Okta, CloudTrail) | `aertun agent reconcile` |
 | **Not affected** | a VEX document's `not_affected` statements hold | the asset's bill of materials, advisories and reachability analysis | `aertun vuln prove-vex` |
 | **Cited evidence** | every claim in an AI's investigation report is true | the event store, with each citation run again | `aertun proof evidence` |
+| **Revocation** | after an agent was killed, or an identity revoked in another system, nothing acted as it | this program's signed log, the agent's own telemetry, and every collected source that had seen it act — each shown to have kept delivering events | `aertun proof revocation` |
+| **Clock** | an incident's awareness, major or material decision was made when its record says, and every reporting deadline it started was met | the signed audit log, the log's Bitcoin anchors — each held to its block's header — and the deadlines of the regimes the incident is under | `aertun incident prove` |
+| **Breach scope** | a supplier's disclosure of its own breach holds: no indicator outside the window it gave, and none inside it when it said you were not affected | your own event store, searched in the window and a margin either side, with whether the store holds each period whole | `aertun vendor check-breach` |
+| **VEX record** | over a period, an issuer's `not_affected` statements were contradicted at most this often | the not-affected proofs kept here about that issuer and signed by a key this store trusts, each verified again as it is read; uncheckable statements counted and never in the rate | `aertun vuln vex-record` |
+| **Chain posture** | a protocol's multisig thresholds, timelock delays and proxy admins are what it declares | the chain itself, read over JSON-RPC at one block named by its hash | `aertun chain posture` |
+| **Sealed alert** | this alert existed by then — a monitor saw it first | the audit log, verified, holding the alert's digest in a batch it sealed (`aertun alert seal`), under a log head anchored in Bitcoin through OpenTimestamps, in a block whose header was checked | `aertun proof sealed` |
+| **MDR** | a managed detection provider, or an AI SOC, notifies within its SLA on all but this share of attacks | emulations run on your estate at random times from a plan whose digest the audit log committed before any ran, each run and notification recorded by a verified person or joined from the provider's alerts | `aertun mdr prove` |
+| **Referee** | a vulnerability report, usually a model's, cites code that exists, the right version and range, a CVSS score its vector gives, and is the first of its flaw | a checkout of the source at the commit the report names, and the audit log's record of reports committed and refereed before it (`aertun vuln commit`) | `aertun vuln referee` |
+| **Continuity** | no package in a bill lost, from the release before it, its provenance, trusted publishing, source, publisher or install-script-free state, and none was withdrawn or yanked | npm, PyPI and the Go module proxy, read for the release the bill names and the one before it; each attestation held to the artifact by digest | `aertun vuln continuity` |
+| **Coverage** | each ATT&CK technique the rules claim is caught wherever it appears, without firing on benign events, and still with the fields the sources send today | corpus entries labelled with the technique by what produced them (an Atomic Red Team run, a red team's plan), entries labelled benign, and the field names each source sent lately; exported as an ATT&CK Navigator layer, with no score | `aertun proof coverage` |
+| **Peer log** | another site's audit log is complete up to a time, and the site has not signed a second history | the site's records as its signed stream delivered them, every tree head it signed with its own keys, and this deployment's log of any head that contradicted them | `aertun inbound prove` |
+
+In CI, the action runs any of these and fails the job unless the proof is
+proven:
+
+```yaml
+- uses: Aertun/Aertun@v0.2.0
+  with:
+    args: |
+      proof
+      verify
+      draft.proof.json
+      --key
+      release.pub.json
+```
+
+On Kubernetes, `deploy/kubernetes/aertun.yaml` or the Helm chart in
+`deploy/helm/aertun` (see `deploy/README.md`).
+
+A proven proof is also a verification result a policy engine reads:
+`aertun proof svr ID --key F` writes the in-toto Simple Verification Result
+for it, with one property to gate on, such as `AERTUN_DETECTION_PROVEN`.
 
 A detection rule as a model drafted it, held to five labelled events it did
 not write:
@@ -194,11 +234,11 @@ evidence itself.
 
 | | |
 |---|---|
-| **Collect** | Ten connectors that read other tools with sealed credentials, twenty log sources mapped to one event shape, scheduled collection, files, and feeds other systems push to: an identity provider's security events (SSF, CAEP, RISC), Okta event hooks, signed webhooks, GenAI agent telemetry over OTLP, and Quilzo's audit log. Every event is kept, append-only, before anything reads it. |
+| **Collect** | Ten connectors that read other tools with sealed credentials, twenty log sources mapped to one event shape, scheduled collection, files, and feeds other systems push to: an identity provider's security events (SSF, CAEP, RISC), Okta event hooks, signed webhooks, GenAI agent telemetry over OTLP, and another deployment's signed audit stream. Every event is kept, append-only, before anything reads it. |
 | **Detect** | Rules written here or imported as Sigma, each with fixtures that must match and must not, and MITRE ATT&CK technique IDs. A new rule runs in a trial ring that records what it would raise until its record earns it the queue. Correlations across rules and platforms, suppressions that end, and indicators imported from STIX 2.1 bundles or plain lists. |
 | **Decide** | One queue of findings, ranked by risk, with every decision kept and replayable. An AI analyst writes a first pass as a suggestion a person agrees with or not; it has no way to record a decision itself. Hunting stacks any field of the stored events by rarity. |
 | **Respond** | Cases and incidents with the notification clocks each law starts (GDPR, NIS2, DORA, the Cyber Resilience Act, SEC, CIRCIA, HIPAA), playbooks, and actions on other platforms asked for by one person and approved by another. Automations that watch, ask, or act, within limits. |
-| **Expose** | Vulnerabilities ranked with CISA KEV and EPSS, decided with SSVC and published as OpenVEX; dependency scanning from CycloneDX and SPDX bills of materials against OSV; code-scanning results from SARIF; workforce, device and vendor risk; access reviews. |
+| **Expose** | Vulnerabilities ranked with CISA KEV and EPSS, decided with SSVC and published as OpenVEX; dependency scanning from CycloneDX and SPDX 2.x (JSON) bills of materials against OSV; code-scanning results from SARIF; workforce, device and vendor risk; access reviews. |
 
 <p align="center">
   <img src="docs/screens/findings.webp" alt="The findings queue, ranked by risk, each with why it ranks where it does" width="900">
@@ -350,7 +390,7 @@ Chrome with a WebAuthn virtual authenticator:
 | **HTTP and MCP** | 30 checks: sign-in and two factors, cross-site requests, rate limiting, security headers, cookies, OAuth metadata with PKCE, the agent interface's authorisation, refusals and proof verification. |
 | **OpenID Connect** | 13 checks against Keycloak 26 over HTTPS: sign-in with PKCE; one factor is asked for a passkey; an address outside the domain, a forged callback, a provider at a private address without `--reach`, and a certificate from an unknown authority are each refused. |
 | **SAML 2.0** | 7 checks against Keycloak 26: a signed assertion signs in, one factor is asked for a passkey, an address outside the domain is refused. |
-| **Test suite** | Ninety-five packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
+| **Test suite** | Ninety-seven packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
 
 **Speed** — four CPUs of an Intel Core i5-1235U laptop under WSL2, Go
 1.27.4: the median of three runs of `go test -bench . -count 3` over
@@ -381,10 +421,16 @@ Plus, Vanta, and the OpenAI and Anthropic organisation audit logs.
 
 **Log sources** mapped to one event shape: AWS CloudTrail, Microsoft Entra ID,
 Microsoft Azure, Google Workspace, Google Cloud, Okta, Duo, CrowdStrike Falcon,
-Jamf Pro, GitHub, Kubernetes, Cloudflare, Salesforce, Slack, Snowflake, Linux
+Jamf Pro, GitHub, Kubernetes, Cloudflare, Salesforce, Slack, Snowflake, Wazuh, Linux
 auditd, EVM chains, the OpenAI and Anthropic audit logs, and GenAI agent
 telemetry over OTLP (agent, tool and model calls, with prompts read for size
 and never stored).
+
+**Wazuh**, both ways (`integrations/wazuh`): its alerts arrive on a signed
+webhook feed, mapped as `wazuh/alerts` and sealed in the audit log as they
+arrive; Aertun's audit log goes to Wazuh, with 18 rules for the kill switch,
+refuted proofs, forked peer logs, refusals, privilege and legal holds. Tested
+against a live Wazuh 4.14.10 manager.
 
 **Another vendor's AI verdicts** arrive as a file: JSON lines or CSV with the
 columns `alert`, `verdict`, `at` and optionally `confidence`, `disposition`,
@@ -398,21 +444,53 @@ SAML 2.0, SCIM 2.0 and WebAuthn passkeys.
 
 ## Install
 
-From source, as above, or with `make install`, which installs `aertun` and
-`aertun-collector`. Each release publishes static binaries for Linux, macOS
-and Windows on amd64 and arm64 with checksums and build provenance, and a
-container image, `ghcr.io/aertun/aertun`: the binary alone on
-`gcr.io/distroless/static-debian12:nonroot`, with no shell. See
-[INSTALL](INSTALL).
+**Download a release.** Each release has one static binary for each of Linux,
+macOS and Windows on amd64 and arm64, a `SHA256SUMS` file, and a build
+provenance attestation for every binary. Pick the file for your platform —
+`aertun-linux-amd64`, `aertun-linux-arm64`, `aertun-darwin-arm64`,
+`aertun-darwin-amd64`, `aertun-windows-amd64.exe` or
+`aertun-windows-arm64.exe` — then check it before you run it:
 
 ```bash
-docker build -t aertun .
-docker run --rm -v aertun:/srv aertun --root /srv/store init --owner you@example.com
-docker run -p 8080:8080 -v aertun:/srv aertun
+VERSION=0.2.0 FILE=aertun-linux-amd64
+curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/$FILE"
+curl -LO "https://github.com/aertun/aertun/releases/download/v$VERSION/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS            # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
+gh attestation verify "$FILE" --repo aertun/aertun   # built by this repository's release workflow, from the tag
+sudo install -m 0755 "$FILE" /usr/local/bin/aertun
+```
+
+On Windows, compare `Get-FileHash aertun-windows-amd64.exe` in PowerShell with
+the line for it in `SHA256SUMS`. The checksum proves the file is the one
+listed; the attestation proves which workflow, commit and tag built it.
+
+**Run the container.** `ghcr.io/aertun/aertun` is the binary alone on
+`gcr.io/distroless/static-debian12:nonroot`, with no shell, tagged with the
+version without its `v` (`0.2.0`, `0.2`, `latest`) for amd64 and arm64:
+
+```bash
+docker run --rm -v aertun:/srv ghcr.io/aertun/aertun:0.2.0 --root /srv/store init --owner you@example.com
+docker run -p 8080:8080 -v aertun:/srv ghcr.io/aertun/aertun:0.2.0
+```
+
+The image is attested like the binaries, by the release workflow from the
+tag:
+
+```bash
+gh attestation verify oci://ghcr.io/aertun/aertun:0.2.0 --repo aertun/aertun
+```
+
+**Build from source.** Go 1.27 or later and nothing else — `go.mod` has no
+dependencies to fetch:
+
+```bash
+git clone https://github.com/aertun/aertun && cd aertun
+go build -o aertun ./cmd/aertun        # or: make && sudo make install
 ```
 
 Behind a reverse proxy, set `admin.behind_tls_proxy` and `admin.base_url`;
-[deploy/](deploy/) has a systemd unit and a Caddy configuration.
+[deploy/](deploy/) has a systemd unit and a Caddy configuration, and
+[INSTALL](INSTALL) has the rest.
 
 ## Licence
 

@@ -73,10 +73,18 @@ func cmdVuln(root string, args []string) error {
 		return vulnVEX(root, args[1:])
 	case "prove-vex":
 		return vulnProveVEX(root, args[1:])
+	case "vex-record":
+		return vulnVEXRecord(root, args[1:])
+	case "continuity":
+		return vulnContinuity(root, args[1:])
+	case "commit":
+		return vulnCommit(root, args[1:])
+	case "referee":
+		return vulnReferee(root, args[1:])
 	default:
 		return fmt.Errorf("unknown vuln command %q; try load, import, reach, "+
-			"queue, plan, why, assess, accept, vex, ssvc-tree, asset, "+
-			"assets or reasons", args[0])
+			"queue, plan, why, assess, accept, vex, prove-vex, vex-record, continuity, commit, referee, "+
+			"ssvc-tree, asset, assets or reasons", args[0])
 	}
 }
 
