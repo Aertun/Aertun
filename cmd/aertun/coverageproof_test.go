@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aertun/aertun/internal/detect"
+	"github.com/aertun/aertun/internal/proofstore"
 	"github.com/aertun/aertun/internal/telemetry"
 )
 
@@ -121,6 +122,13 @@ func TestProofCoverageJudgesDecayAgainstTheStore(t *testing.T) {
 	}
 	if len(st.Predicate.Materials) != 2 {
 		t.Fatalf("materials %+v", st.Predicate.Materials)
+	}
+	// Signed from the store, it is kept there and written to its log.
+	if !auditHas(t, root, "coverage.proved", map[string]string{"verdict": "inconclusive", "dark": "2"}) {
+		t.Error("the audit log does not record the proof")
+	}
+	if kept, err := proofstore.List(root); err != nil || len(kept) != 1 {
+		t.Errorf("kept %d proof(s): %v", len(kept), err)
 	}
 }
 

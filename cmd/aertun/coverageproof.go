@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/aertun/aertun/internal/atomicfile"
+	"github.com/aertun/aertun/internal/audit"
 	"github.com/aertun/aertun/internal/auth"
 	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/pack"
@@ -65,6 +66,7 @@ func proofCoverage(root string, args []string) error {
 		return fmt.Errorf("proof coverage needs --key FILE: an unsigned verdict is a claim about a claim")
 	}
 	var window time.Duration
+	caller := resolveCaller(root, flagToken)
 	if *recent != "" {
 		d, err := parseCoverageWindow(*recent)
 		if err != nil {
@@ -74,7 +76,7 @@ func proofCoverage(root string, args []string) error {
 		// Reading the store and signing what it showed in the
 		// organisation's name: tune, as the other proofs signed from the
 		// store ask for, before anything is read.
-		if err := authorise(root, resolveCaller(root, flagToken), auth.ActTune, auth.AreaSecurity); err != nil {
+		if err := authorise(root, caller, auth.ActTune, auth.AreaSecurity); err != nil {
 			return err
 		}
 	}
@@ -121,6 +123,19 @@ func proofCoverage(root string, args []string) error {
 	doc = append(doc, '\n')
 	if *pubAt != "" {
 		if err := pack.WritePublicKey(*pubAt, k.PublicKey()); err != nil {
+			return err
+		}
+	}
+	if window > 0 {
+		// Signed from the store, so kept in it and written to its log, as
+		// the other proofs signed from the store are.
+		if pubDoc, err := json.Marshal(k.PublicKey()); err == nil {
+			keepMade(root, env, pubDoc, caller.Name)
+		}
+		if err := recordE(root, caller.auditRecord("coverage.proved", "/proofs", audit.Success,
+			map[string]string{"verdict": string(st.Predicate.Verdict),
+				"techniques": fmt.Sprint(len(st.Predicate.Coverage.Techniques)),
+				"dark":       fmt.Sprint(st.Predicate.Coverage.DarkCount)})); err != nil {
 			return err
 		}
 	}
