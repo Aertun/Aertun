@@ -336,10 +336,10 @@ func (ev *ClockEvidence) verdict() Verdict {
 }
 
 func (ev *ClockEvidence) claim() string {
-	return fmt.Sprintf("Incident %s's %s decision was recorded by a verified person in an entry "+
-		"of this program's audit log, the incident's own record agrees with it, the entry is "+
-		"under a log head anchored in Bitcoin, and every obligation the decision started was "+
-		"discharged by its deadline.", ev.Incident, ev.Trigger)
+	return fmt.Sprintf("The %s decision on incident %s was recorded by a verified person in an "+
+		"entry of the audit log of this program, the record the incident keeps agrees with it, "+
+		"the entry is under a log head anchored in Bitcoin, and every obligation the decision "+
+		"started was discharged by its deadline.", ev.Trigger, ev.Incident)
 }
 
 func (ev *ClockEvidence) checks() []Check {

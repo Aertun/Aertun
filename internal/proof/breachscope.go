@@ -223,8 +223,8 @@ func (ev *BreachScopeEvidence) verdict() Verdict {
 }
 
 func (ev *BreachScopeEvidence) claim() string {
-	s := fmt.Sprintf("No indicator in %s's disclosure %s was seen in this organisation's "+
-		"events outside the window it gave, %s to %s", ev.Vendor, ev.Reference, ev.Since, ev.Until)
+	s := fmt.Sprintf("No indicator in the disclosure %s by %s was seen in the events of this "+
+		"organisation outside the window it gave, %s to %s", ev.Reference, ev.Vendor, ev.Since, ev.Until)
 	if ev.Told == ToldNotAffected {
 		s += ", nor inside it, as the vendor said this organisation was not affected"
 	}
