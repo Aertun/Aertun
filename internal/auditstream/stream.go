@@ -363,7 +363,9 @@ func (rc *Receiver) Accept(r *http.Request, body []byte, now time.Time) (*Batch,
 		return nil, errors.New("the batch's range, leaves and envelope do not agree")
 	}
 	if err := rc.Heads.Verify(b.Head); err != nil {
-		return nil, fmt.Errorf("the tree head does not verify: %w", err)
+		return nil, fmt.Errorf("the tree head does not verify in the context %s: %w. A sender "+
+			"that signs its heads in a context of its own is added with that context named "+
+			"(aertun inbound add stream NAME --keys FILE --head-context C)", rc.Heads.Context(), err)
 	}
 	if b.Head.Size != int(b.To) {
 		return nil, fmt.Errorf("the tree head covers %d records, and the batch ends at %d", b.Head.Size, b.To)

@@ -310,7 +310,23 @@ func TestAnotherDeploymentsAuditStreamIsTakenInOrder(t *testing.T) {
 // another, so a signature made for one program is never taken as another's.
 func TestTheHeadsAreCheckedInTheContextTheKeysName(t *testing.T) {
 	root := streamStore(t)
+	// Keys that say another context, published by a sender that signs in
+	// this program's: the head key's id does not fit that context, so the
+	// feed is refused when it is added.
 	site := newSendingSite(t, 5, "other/audit-head/v1")
+	if _, _, err := makeFeed(root, "stream", "site-b", map[string]string{"keys": site.keys}, "boss"); err == nil ||
+		!strings.Contains(err.Error(), "another context") {
+		t.Fatalf("keys whose head id does not fit the context they name: %v", err)
+	}
+	// And without the id to check, the heads are refused as they arrive.
+	var k map[string]any
+	b, _ := os.ReadFile(site.keys)
+	_ = json.Unmarshal(b, &k)
+	delete(k, "head_key_id")
+	b, _ = json.Marshal(k)
+	if err := os.WriteFile(site.keys, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := makeFeed(root, "stream", "site-b", map[string]string{"keys": site.keys}, "boss"); err != nil {
 		t.Fatal(err)
 	}
@@ -376,5 +392,71 @@ func TestAStreamFeedNeedsItsPublishedKeys(t *testing.T) {
 	_ = os.WriteFile(bad, []byte(`{"key_id":"x","alg":"ed25519","public_key":"AAAA"}`), 0o600)
 	if _, _, err := makeFeed(root, "stream", "site-b", map[string]string{"keys": bad}, "boss"); err == nil {
 		t.Fatal("a key that is not an Ed25519 key was pinned")
+	}
+}
+
+// The context a sender signs its heads in is named when the feed is added,
+// if the sender's keys file does not say: a head is checked in that context
+// and no other, and a head that does not verify there is refused with a
+// reason that says how to name it.
+func TestTheContextAFeedChecksHeadsInIsTheOneNamed(t *testing.T) {
+	root := streamStore(t)
+	site := newSendingSite(t, 5, "")
+	inb := newInboundServer(root)
+
+	// Named as the context this sender really signs in: taken.
+	f, _, err := makeFeed(root, "stream", "named", map[string]string{"keys": site.keys,
+		"head-context": audit.HeadContext}, "boss")
+	if err != nil || f.Stream.HeadContext != audit.HeadContext {
+		t.Fatalf("named: %v %+v", err, f.Stream)
+	}
+	if code, holds := site.deliver(t, inb, "named", 0, 5, nil); code != http.StatusOK || holds != 5 {
+		t.Fatalf("heads checked in the context they were signed in answered %d, holding %d", code, holds)
+	}
+
+	// Named as another program's: the head key's published id is a
+	// fingerprint over the keys and the context, so the feed is refused when
+	// it is added, saying so.
+	other := "otherprogram/audit-head/v1"
+	if _, _, err := makeFeed(root, "stream", "other", map[string]string{"keys": site.keys,
+		"head-context": other}, "boss"); err == nil || !strings.Contains(err.Error(), "another context") ||
+		!strings.Contains(err.Error(), "--head-context") {
+		t.Fatalf("a context the head key's id does not fit: %v", err)
+	}
+
+	// Keys that publish no head key id cannot be checked when the feed is
+	// added: the heads are refused as they arrive, and the refusal names the
+	// context and how to change it.
+	var k map[string]any
+	b, _ := os.ReadFile(site.keys)
+	_ = json.Unmarshal(b, &k)
+	delete(k, "head_key_id")
+	b, _ = json.Marshal(k)
+	unnamed := filepath.Join(t.TempDir(), "keys.json")
+	if err := os.WriteFile(unnamed, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := makeFeed(root, "stream", "other", map[string]string{"keys": unnamed,
+		"head-context": other}, "boss"); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := site.deliver(t, inb, "other", 0, 5, nil); code != http.StatusUnauthorized {
+		t.Fatalf("heads checked in another context answered %d", code)
+	}
+	if why := inb.snapshot()["other"].Why; !strings.Contains(why, "context "+other) ||
+		!strings.Contains(why, "--head-context") {
+		t.Errorf("the refusal does not say which context, or how to name another: %s", why)
+	}
+
+	// A context the keys name is not overridden by another, and a context
+	// is a name.
+	keyed := newSendingSite(t, 2, other)
+	if _, _, err := makeFeed(root, "stream", "clash", map[string]string{"keys": keyed.keys,
+		"head-context": "third/audit-head/v1"}, "boss"); err == nil || !strings.Contains(err.Error(), "--head-context names") {
+		t.Errorf("a context different from the one the keys name: %v", err)
+	}
+	if _, _, err := makeFeed(root, "stream", "spaced", map[string]string{"keys": site.keys,
+		"head-context": "a context with spaces"}, "boss"); err == nil {
+		t.Error("a context that is not a usable name was taken")
 	}
 }

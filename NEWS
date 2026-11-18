@@ -97,6 +97,14 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* `aertun inbound add stream NAME --keys FILE --head-context C` receives
+  another program's signed audit stream when it signs its tree heads in a
+  context of its own and its keys file does not say which.  The head
+  key's published id is a fingerprint over its keys and its context, so a
+  feed added with the wrong context is now refused when it is added,
+  saying so, rather than refusing every batch afterwards; and a head that
+  does not verify names the context it was checked in.
+
 * `aertun inbound prove NAME --key F [--at TIME]` signs whether another
   site's audit log, received on a stream feed, is complete and unforked up
   to a time.  A stream feed now keeps every tree head the sender signs

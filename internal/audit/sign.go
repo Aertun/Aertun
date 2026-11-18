@@ -130,6 +130,9 @@ type HeadVerifier struct {
 	context string
 }
 
+// Context is the context this verifier checks heads in.
+func (v *HeadVerifier) Context() string { return v.domain() }
+
 // domain is the context this verifier checks heads in.
 func (v *HeadVerifier) domain() string {
 	if v.context == "" {

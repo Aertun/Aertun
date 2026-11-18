@@ -190,7 +190,7 @@ func inboundAdd(root string, caller *Caller, kind, name string, rest []string,
 		switch rest[i] {
 		case "--github":
 			opts["github"] = "yes"
-		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys":
+		case "--mapping", "--issuer", "--url", "--alias", "--audience", "--keys", "--head-context":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("%s needs a value", rest[i])
 			}

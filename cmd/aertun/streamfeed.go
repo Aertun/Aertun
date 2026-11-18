@@ -52,6 +52,10 @@ const streamFeedHelp = `
     Each batch is taken only when it is signed by the stream key, follows
     the last record held exactly, and rebuilds the signed tree head. The
     records are stored as stream/audit, the actors named by the feed.
+    Another program sending the same format signs its tree heads in a
+    context of its own; when its keys file does not say which, name it:
+    aertun inbound add stream app --keys app-keys.json --head-context app/audit-head/v1
+    aertun inbound prove site-b --key release.key    whole and unforked, signed
 `
 
 // streamFeedLabel is what the Feeds screen calls the kind.
@@ -62,7 +66,7 @@ const streamRotateHelp = "an audit stream's keys are the sender's: rotate them t
 	"`aertun inbound remove NAME` and add the feed again with the sender's new `aertun siem stream key --json`"
 
 // streamFeedUsage is its line in the usage.
-const streamFeedUsage = "add stream NAME --keys FILE | "
+const streamFeedUsage = "add stream NAME --keys FILE [--head-context C] | "
 
 // streamBodyLimit is the largest batch taken: five hundred records of OCSF
 // with their envelope and leaves come to about a megabyte and a half.
@@ -476,9 +480,49 @@ func streamFeed(root string, f *inbound.Feed, opts map[string]string) ([]string,
 	if err != nil {
 		return nil, err
 	}
+	// The context the sender signs its tree heads in, when its keys file
+	// does not say: another program's own, which a head signed in it
+	// verifies in and no other. Named by whoever adds the feed, never
+	// guessed from what arrives — a receiver that tried contexts until one
+	// worked would be one that accepted a signature made for another use.
+	if c := opts["head-context"]; c != "" {
+		if k.HeadContext != "" && k.HeadContext != c {
+			return nil, fmt.Errorf("the keys say the sender signs its tree heads in %q, and "+
+				"--head-context names %q", k.HeadContext, c)
+		}
+		k.HeadContext = c
+		if _, _, _, err := k.Decode(); err != nil {
+			return nil, err
+		}
+	}
+	// A head key's id is a fingerprint over its public keys and the context
+	// it signs in, so the id the sender published says whether the context
+	// here is the sender's: checked now, rather than found in every batch
+	// refused from now on.
+	if k.HeadKeyID != "" {
+		_, headEd, headML, err := k.Decode()
+		if err != nil {
+			return nil, err
+		}
+		context := k.HeadContext
+		if context == "" {
+			context = audit.HeadContext
+		}
+		v, err := audit.NewHeadVerifierIn(context, headEd, headML)
+		if err != nil {
+			return nil, err
+		}
+		if v.KeyID() != k.HeadKeyID {
+			return nil, fmt.Errorf("the sender names its head key %s, and in the context %s these "+
+				"public keys are %s: it signs its tree heads in another context. Name it with "+
+				"--head-context (the sender's documentation says which; a program's own is often "+
+				"NAME/audit-head/v1)", k.HeadKeyID, context, v.KeyID())
+		}
+	}
 	f.Kind, f.Stream = inbound.AuditStream, k
 	return []string{
 		"batches are checked against " + k.KeyID + ", tree heads against " + k.HeadKeyID,
-		"on the sender: aertun config set siem.stream.url " + feedURL(root, f.Name),
+		"on the sender, set siem.stream.url to " + feedURL(root, f.Name) +
+			" (on another Aertun: aertun config set siem.stream.url " + feedURL(root, f.Name) + ")",
 	}, nil
 }
