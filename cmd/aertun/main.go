@@ -68,6 +68,7 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun chain posture FILE --rpc URL --key F [--block N] [--reach CIDR] [--public-key F] [--out F]   a protocol's declared multisig thresholds, timelock delays and proxy admins, read from the chain at one block, signed
   aertun proof sealed --alert F | --finding ID --key F [--public-key F] [--out F]   when an alert existed: its digest in a batch the verified audit log sealed, under a head anchored in Bitcoin, signed
   aertun alert seal FILE|- | seal --list   alerts from any monitor, one JSON object per line, committed to the audit log by digest; the alerts are not kept
+  aertun proof svr ID|FILE [--proof-key F] --key F [--public-key F] [--out F]   a proven proof as an in-toto Simple Verification Result, for a policy engine that admits artifacts on attestations, signed
   aertun proof list [--kind K] | show ID | keep FILE --public-key F   the proofs kept here, as the console's Proofs screen and the agent interface show them
   aertun proof signers | trust NAME --key F --why "…" | untrust NAME   the keys whose proofs speak for this store; trusting one takes two administrators
   aertun analyst calibrate --key F [--out F] [--epsilon 0.05] [--delta 0.05] [--valid-for 720h]   the analyst's threshold fitted on verified people's verdicts, signed

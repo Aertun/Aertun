@@ -267,6 +267,10 @@ var commandNeeds = map[string]need{
 	// existed in the organisation's name: it asks for tune itself before it
 	// reads anything, as the other proofs signed from the store do.
 	"proof sealed": {action: auth.ActView},
+	// A verification result says, in the organisation's name, that an
+	// artifact passed, and a policy engine admits it on that: it asks for
+	// tune itself before it reads the proof, as signing a proof does.
+	"proof svr": {action: auth.ActView},
 	// Sealing alerts is evidence brought into the security area — the
 	// weight of importing another vendor's verdicts or intelligence, so an
 	// analyst's: it decides nothing about anybody and changes no control,

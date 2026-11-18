@@ -97,6 +97,17 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* `aertun proof svr ID|FILE --key F` sums a proven proof up as an in-toto
+  Simple Verification Result (https://in-toto.io/attestation/svr/v0.2),
+  the predicate policy engines admit artifacts on: about the same
+  artifacts as the proof, with one property a policy asks for —
+  AERTUN_DETECTION_PROVEN, AERTUN_NOT_AFFECTED_PROVEN and so on — the
+  proof's predicate as the verifier and policy, and the proof's digest
+  and key on it so the evidence can be found.  Only a proven proof has
+  one: a result lists what passed.  Its Ed25519 signature is plain DSSE,
+  and its ML-DSA one is in a domain of its own, so a result is never read
+  as a proof nor a proof as a result.
+
 * `aertun agent reconcile NAME` holds an agent's own account against two
   more witnesses when they are declared: a model gateway's record of the
   agent's key (`--gateway litellm/requests:HASH`), whose every call must

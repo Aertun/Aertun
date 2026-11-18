@@ -42,7 +42,7 @@ import (
 // interface run: they read and add to the proofs kept in the store.
 func cmdProof(root string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust")
+		return fmt.Errorf("proof needs detection, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust")
 	}
 	switch args[0] {
 	case "detection":
@@ -55,6 +55,8 @@ func cmdProof(root string, args []string) error {
 		return proofRevocation(root, args[1:])
 	case "sealed":
 		return proofSealed(root, args[1:])
+	case "svr":
+		return proofSVR(root, args[1:])
 	case "verify":
 		return proofVerify(args[1:])
 	case "list":
@@ -76,7 +78,7 @@ func cmdProof(root string, args []string) error {
 	case "untrust":
 		return proofUntrust(root, args[1:])
 	default:
-		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, sealed, verify, list, show, keep, signers, trust or untrust", args[0])
+		return fmt.Errorf("unknown proof command %q; try detection, analyst, evidence, revocation, sealed, svr, verify, list, show, keep, signers, trust or untrust", args[0])
 	}
 }
 
