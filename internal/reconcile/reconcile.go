@@ -71,6 +71,22 @@ type Connect struct {
 	Port string
 }
 
+// GatewayCall is one call a model gateway saw on the agent's key: to a
+// model, or, through the gateway's MCP proxy, to a tool.
+type GatewayCall struct {
+	At time.Time
+	// Tool is the tool's name when the call was to one, empty when it was
+	// to a model.
+	Tool string
+}
+
+// Change is one thing the target system's own audit says the agent's
+// identity did there.
+type Change struct {
+	At     time.Time
+	Source string
+}
+
 // Input is everything one reconciliation reads.
 type Input struct {
 	Since, Until time.Time
@@ -81,6 +97,18 @@ type Input struct {
 	// Hosts are the machines declared to run this agent and no other;
 	// Shared those declared to run it beside others.
 	Hosts, Shared []string
+	// ModelSpans are the agent's own spans for calls to a model, from the
+	// same telemetry as Spans.
+	ModelSpans []Span
+	// Gateway are the calls a model gateway saw on the key declared to be
+	// the agent's; GatewayOnly that the gateway is the agent's only way to
+	// a model, so a model call it never saw is one the agent says it made
+	// and did not.
+	Gateway     []GatewayCall
+	GatewayOnly bool
+	// Changes are what the target systems' audits record of the identities
+	// declared to be the agent's.
+	Changes []Change
 }
 
 // Result is what came of it.
@@ -101,6 +129,20 @@ type Result struct {
 	// attribute.
 	Connects, SharedSkipped int
 	Unexplained             []Connect
+	// GatewayCalls is the gateway's calls on the agent's key in the period,
+	// GatewayMatched those the agent's own account has, and
+	// GatewayUnreported those it does not. ModelSpans is the agent's model
+	// calls in the period, and ModelUnseen those the gateway never saw,
+	// counted only when the gateway is declared its only way to a model.
+	GatewayCalls, GatewayMatched, ModelSpans int
+	GatewayUnreported                        []GatewayCall
+	ModelUnseen                              []Span
+	// Changes is what the target systems recorded of the agent's
+	// identities in the period, and Unexplained Changes those with nothing
+	// the agent did near them: no span, no call through the gateway, no
+	// call to the agent interface.
+	Changes            int
+	UnexplainedChanges []Change
 }
 
 // interfaceTool is the agent-interface tool a span's tool names, or "".
@@ -259,5 +301,124 @@ func Reconcile(in Input) Result {
 			r.Unexplained = append(r.Unexplained, c)
 		}
 	}
+
+	// The gateway's calls, each matched to the nearest unused span of the
+	// agent's own of the same kind within the window: a model call to a
+	// model span, a tool call to a tool span naming the same tool.
+	var models []Span
+	for _, s := range in.ModelSpans {
+		if !s.At.Before(in.Since.Add(-in.Window)) && s.At.Before(in.Until.Add(in.Window)) {
+			models = append(models, s)
+		}
+	}
+	sort.SliceStable(models, func(i, j int) bool { return models[i].At.Before(models[j].At) })
+	modelUsed := make([]bool, len(models))
+	toolUsed := make([]bool, len(spans))
+	var gw []GatewayCall
+	for _, g := range in.Gateway {
+		if inPeriod(g.At) {
+			gw = append(gw, g)
+		}
+	}
+	sort.SliceStable(gw, func(i, j int) bool { return gw[i].At.Before(gw[j].At) })
+	r.GatewayCalls = len(gw)
+	for _, g := range gw {
+		list, used := models, modelUsed
+		if g.Tool != "" {
+			list, used = spans, toolUsed
+		}
+		best := -1
+		for i, s := range list {
+			if used[i] || !within(s.At, g.At, in.Window) || (g.Tool != "" && !sameTool(s.Tool, g.Tool)) {
+				continue
+			}
+			if best < 0 || abs(s.At.Sub(g.At)) < abs(list[best].At.Sub(g.At)) {
+				best = i
+			}
+		}
+		if best >= 0 {
+			used[best] = true
+			r.GatewayMatched++
+		} else {
+			r.GatewayUnreported = append(r.GatewayUnreported, GatewayCall{At: g.At, Tool: g.Tool})
+		}
+	}
+	for i, s := range models {
+		if !inPeriod(s.At) {
+			continue
+		}
+		r.ModelSpans++
+		if in.GatewayOnly && !modelUsed[i] {
+			r.ModelUnseen = append(r.ModelUnseen, s)
+		}
+	}
+
+	// What the target systems recorded of the agent's identities, each
+	// explained by anything the agent did near it, by its own account or
+	// seen elsewhere: a change nobody's call accounts for is the identity
+	// used outside the agent.
+	var acts []time.Time
+	for _, s := range spans {
+		acts = append(acts, s.At)
+	}
+	for _, s := range models {
+		acts = append(acts, s.At)
+	}
+	for _, g := range gw {
+		acts = append(acts, g.At)
+	}
+	for _, c := range calls {
+		acts = append(acts, c.At)
+	}
+	var changes []Change
+	for _, c := range in.Changes {
+		if inPeriod(c.At) {
+			changes = append(changes, c)
+		}
+	}
+	sort.SliceStable(changes, func(i, j int) bool { return changes[i].At.Before(changes[j].At) })
+	r.Changes = len(changes)
+	for _, c := range changes {
+		near := false
+		for _, a := range acts {
+			if within(a, c.At, in.Window) {
+				near = true
+				break
+			}
+		}
+		if !near {
+			r.UnexplainedChanges = append(r.UnexplainedChanges, c)
+		}
+	}
 	return r
+}
+
+// sameTool reports whether a span's tool and a gateway's name for it are
+// the same tool. Hosts and gateways prefix a server's tools each in their
+// own way — mcp__github__create_issue, github-create_issue,
+// github.create_issue — so each name is split on the separators they use,
+// and two names are one tool when their last parts are the same and, when
+// both name a server before it, so are the servers.
+func sameTool(a, b string) bool {
+	pa, pb := toolParts(a), toolParts(b)
+	if len(pa) == 0 || len(pb) == 0 || pa[len(pa)-1] != pb[len(pb)-1] {
+		return false
+	}
+	if len(pa) > 1 && len(pb) > 1 && pa[len(pa)-2] != pb[len(pb)-2] {
+		return false
+	}
+	return true
+}
+
+// toolParts splits a tool's name on the separators hosts and gateways put
+// between a server's name and its tool's, leaving out the "mcp" some put in
+// front of both.
+func toolParts(s string) []string {
+	f := strings.FieldsFunc(strings.NewReplacer("__", "\x00").Replace(s), func(r rune) bool {
+		return r == 0 || r == '.' || r == '/' || r == ':' || r == '-'
+	})
+	if len(f) > 1 && f[0] == "mcp" {
+		f = f[1:]
+	}
+	return f
 }

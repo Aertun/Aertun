@@ -62,7 +62,7 @@ func agentUsage() error {
 		"token NAME --tools TOOL[,TOOL] --for-run ID " +
 		"[--hours N] [--purpose observe|triage] [--calls N] [--level N] | disable NAME --why \"…\" | " +
 		"enable NAME --why \"…\" | consents [revoke ID] | " +
-		"reconcile NAME --since DATE --key F [--telemetry ID] [--window 2m] | help")
+		"reconcile NAME --since DATE --key F [--telemetry ID] [--window 2m] [--gateway SOURCE:KEY [--gateway-only]] [--identity SOURCE:ACTOR ...] | help")
 }
 
 // cmdAgent manages the agent register.

@@ -105,7 +105,7 @@ Ed25519 and ML-DSA-65.
 | **Vendor verdicts** | another product's AI closed few alerts that people found real | the decisions verified people made here, on verdicts given before them | `aertun verdict prove` |
 | **Blind adjudication** | the same, without the bias of only re-examining what looked wrong | a random sample committed to the audit log before anybody saw it, judged without knowing who closed what | `aertun adjudicate prove` |
 | **Claim card** | a vendor's claim, tested as it was made | the metric, threshold and period registered before the data arrived | `aertun claim test` |
-| **Reconciliation** | an agent did what it says it did | the calls its interface answered, read from the signed log, and the connections its machine made | `aertun agent reconcile` |
+| **Reconciliation** | an agent did what it says it did | the calls its interface answered, read from the signed log, the connections its machine made, and, when declared, a model gateway's record of its key (LiteLLM) and what the systems it acts on recorded of its identity (GitHub, Okta, CloudTrail) | `aertun agent reconcile` |
 | **Not affected** | a VEX document's `not_affected` statements hold | the asset's bill of materials, advisories and reachability analysis | `aertun vuln prove-vex` |
 | **Cited evidence** | every claim in an AI's investigation report is true | the event store, with each citation run again | `aertun proof evidence` |
 | **Revocation** | after an agent was killed, or an identity revoked in another system, nothing acted as it | this program's signed log, the agent's own telemetry, and every collected source that had seen it act — each shown to have kept delivering events | `aertun proof revocation` |

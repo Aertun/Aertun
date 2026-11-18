@@ -327,7 +327,14 @@ func readProof(src Source) func(ops.Call) (*ops.Answer, error) {
 				With("matched", ops.Ours(v.Matched)).With("unreported", ops.Ours(v.Unreported)).
 				With("unreceived", ops.Ours(v.Unreceived)).With("connections", ops.Ours(v.Connects)).
 				With("unexplained", ops.Ours(v.Unexplained)).
-				With("shared_skipped", ops.Ours(v.SharedSkipped)))
+				With("shared_skipped", ops.Ours(v.SharedSkipped)).
+				With("gateway", ops.Ours(v.Gateway)).With("gateway_only", ops.Ours(v.GatewayOnly)).
+				With("gateway_calls", ops.Ours(v.GatewayCalls)).
+				With("gateway_unreported", ops.Ours(v.GatewayUnreported)).
+				With("model_spans", ops.Ours(v.ModelSpans)).With("model_unseen", ops.Ours(v.ModelUnseen)).
+				With("identities", ops.ListOf(v.Identities, func(s string) *ops.Answer { return ops.Ours(s) })).
+				With("actions", ops.Ours(v.Changes)).
+				With("unexplained_actions", ops.Ours(v.UnexplainedChanges)))
 		case p.Revocation != nil:
 			v := p.Revocation
 			sources := ops.ListOf(v.Sources, func(s proof.RevocationSource) *ops.Answer {

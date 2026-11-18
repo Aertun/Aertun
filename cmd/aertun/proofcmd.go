@@ -320,6 +320,15 @@ func describe(st *proof.Statement) string {
 		fmt.Fprintf(&b, "  evidence: %d call(s) answered, %d in its account, %d unreported, %d claimed "+
 			"and never received; %d connection(s) checked, %d unexplained; it reported %d tool call(s)",
 			v.Calls, v.Matched, v.Unreported, v.Unreceived, v.Connects, v.Unexplained, v.Reported)
+		if v.Gateway != "" {
+			fmt.Fprintf(&b, "; the gateway saw %d call(s), %d not in its account; %d model call(s) "+
+				"reported, %d never at the gateway", v.GatewayCalls, v.GatewayUnreported, v.ModelSpans,
+				v.ModelUnseen)
+		}
+		if len(v.Identities) > 0 {
+			fmt.Fprintf(&b, "; %d action(s) recorded of %s, %d with nothing of it near", v.Changes,
+				strings.Join(v.Identities, " and "), v.UnexplainedChanges)
+		}
 	}
 	if v := p.Revocation; v != nil {
 		fmt.Fprintf(&b, "  evidence: %d use(s) after the grace and %d refused attempt(s) across %d "+

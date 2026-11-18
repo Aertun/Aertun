@@ -97,6 +97,21 @@ Unreleased
   for the items missed, and hosts never.  The predicate is
   https://aertun.github.io/proof/mdr/v1.
 
+* `aertun agent reconcile NAME` holds an agent's own account against two
+  more witnesses when they are declared: a model gateway's record of the
+  agent's key (`--gateway litellm/requests:HASH`), whose every call must
+  be in the account, and with `--gateway-only` every model call in the
+  account must be at the gateway; and what the systems it acts on
+  recorded of its identity there (`--identity github/audit:LOGIN`,
+  repeatable), each action of which must be near something the agent did
+  — by its account, at the gateway or at the agent interface.  An action
+  with nothing of the agent near is its identity used outside it.  Tool
+  names are matched across a host's and a gateway's ways of prefixing
+  them (mcp__github__create_issue is github-create_issue).  What does not
+  match is named by kind, source and time, never by a model's, a tool's
+  or an action's name, which the caller chose.  A reconciliation without
+  either reads, and verifies, as it did.
+
 * The last administrator cannot take their own administration away, on a
   store with an Owner or without one: revoking it, denying it, narrowing
   it to one area, giving it an end date, from the command line, the
