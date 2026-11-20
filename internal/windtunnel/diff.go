@@ -129,6 +129,19 @@ type DiffReport struct {
 	Fixes       int            `json:"fixes"`
 	Drifts      int            `json:"drifts"`
 	Ambient     *AmbientDrift  `json:"ambient,omitempty"`
+	// Benign is the benign axis, when both runs replayed a bundle
+	// (benigndiff.go); its regressions gate beside the scenarios'.
+	Benign *BenignDiffReport `json:"benign,omitempty"`
+}
+
+// Gating is every regression a gate fails on: the scenarios', the twins',
+// and the benign axis's unaccepted ones.
+func (d *DiffReport) Gating() int {
+	n := d.Regressions
+	if d.Benign != nil {
+		n += d.Benign.Regressions
+	}
+	return n
 }
 
 // modeOf is a scoring mode's name — the word before the directory or
@@ -263,6 +276,9 @@ func Diff(fromLabel string, from *Scorecard, toLabel string,
 			ToFires:           to.AmbientFires,
 			BaseDigestChanged: from.BaseDigest != to.BaseDigest}
 	}
+	if from.Benign != nil && to.Benign != nil {
+		rep.Benign = diffBenign(from.Benign, to.Benign)
+	}
 	return rep, nil
 }
 
@@ -363,9 +379,12 @@ func (d *DiffReport) Summarize() string {
 			shortDigest(d.From.PackDigest), d.To.Pack,
 			shortDigest(d.To.PackDigest))
 	}
-	if d.Regressions > 0 {
+	if d.Benign != nil {
+		b.WriteString(summarizeBenignDiff(d.Benign))
+	}
+	if d.Gating() > 0 {
 		fmt.Fprintf(&b, "  verdict: %d regression(s) — exit 1\n",
-			d.Regressions)
+			d.Gating())
 	} else {
 		fmt.Fprintf(&b, "  verdict: clean, no regression — exit 0\n")
 	}

@@ -269,6 +269,11 @@ type Scorecard struct {
 	// 2 only.
 	Mutation *MutationReport `json:"mutation,omitempty"`
 
+	// Benign is the run over the estate's own weird-but-benign sessions,
+	// when a bundle was named (benign.go): false positives this estate
+	// would have seen, per session, with Wilson bounds.
+	Benign *BenignReport `json:"benign,omitempty"`
+
 	// Scratch names where the scratch spools were written, so an operator
 	// can inspect the exact streams that were scored.
 	Scratch     string    `json:"scratch"`
@@ -546,6 +551,10 @@ func (c *Scorecard) Summarize() string {
 	}
 	if c.ModeBlind != "" {
 		b.WriteString(hang("  scoring blind: ", c.ModeBlind))
+	}
+	if c.Benign != nil {
+		b.WriteString(summarizeBenign(c.Benign))
+		b.WriteString(hang("  ", c.Benign.Caveat))
 	}
 	b.WriteString(hang("  ", c.Caveat))
 	sig := "unsigned: no key was supplied, and this document makes no claim " +

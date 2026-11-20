@@ -124,6 +124,25 @@ func TestABenignSessionGoesFromTheStoreToASignedBundle(t *testing.T) {
 		t.Fatalf("%v %+v", err, b)
 	}
 
+	// The wind tunnel replays it against the shipped pack: quiet on the
+	// AWS rules that can be measured on it, and the one that compares the
+	// pseudonymised actor with a literal named as not measurable rather
+	// than counted as quiet. The scorecard reads back with its benign axis.
+	cardAt := filepath.Join(t.TempDir(), "card.json")
+	if err := cmdWindtunnel(root, []string{"run", "--scenario", "agent.trifecta-mailroom-exfil",
+		"--baseline", out, "--baseline-key", pub, "--out", cardAt}); err != nil {
+		t.Fatal(err)
+	}
+	card, err := windtunnelReadScorecard(cardAt)
+	if err != nil || card.Benign == nil || card.Benign.Bundle != b.Digest || card.Benign.Fires.N != 1 ||
+		card.Benign.Fires.K != 0 || len(card.Benign.Gaps) == 0 || card.Benign.Gaps[0].Rule != "aws.root-account-used" {
+		t.Fatalf("%v %+v", err, card.Benign)
+	}
+	if err := cmdWindtunnel(root, []string{"run", "--scenario", "agent.trifecta-mailroom-exfil",
+		"--baseline", out}); err == nil {
+		t.Error("a bundle was replayed without the key to check it")
+	}
+
 	// Revoked, it is never bundled again.
 	if err := cmdBenign(root, []string{"revoke", "nightly-backup", "--why", "it was the attacker's staging run"}); err != nil {
 		t.Fatal(err)

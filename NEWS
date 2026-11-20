@@ -1,6 +1,31 @@
 Aertun NEWS
 ***********
 
+Unreleased
+==========
+
+* Your estate's own weird-but-benign workflows, measured.  `aertun benign
+  capture` selects a real session from the event store, refuses it when the
+  intelligence store, an open finding or an unacknowledged alert says it is
+  not benign, keeps only the fields the rules read, pseudonymises
+  identifiers with a keyed HMAC that keeps each shape (an address stays in
+  its special-purpose range and keeps its shared prefixes), masks secrets and
+  personal data in free text, and refuses when sanitising changed what a rule
+  does.  A second administrator approves it; it expires; it can be revoked.
+  `aertun benign bundle` seals approved sessions into a dual-signed,
+  content-addressed file, and `aertun benign verify` checks one offline.
+
+* `aertun windtunnel run --baseline BUNDLE --baseline-key F` replays each
+  benign session and reports the false positives the rules raise on it, per
+  session, per rule and per class, with Wilson bounds, and respells the
+  sessions under `--mutate`.  A rule that reads a dropped field, or compares
+  a pseudonymised one with a literal and was not in the session's fidelity
+  check, is named as not measurable, never counted as quiet.  Expired
+  sessions are left out and named.  `windtunnel diff` fails on every rule
+  newly firing on a benign session unless the pair is accepted with a reason
+  and an expiry (`--accept FILE`, at most 180 days).
+
+
 Version 0.2.0
 =============
 

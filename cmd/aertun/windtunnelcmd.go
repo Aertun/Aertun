@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aertun/aertun/internal/benign"
 	"github.com/aertun/aertun/internal/pack"
+	"github.com/aertun/aertun/internal/proof"
 	"github.com/aertun/aertun/internal/telemetry"
 	"github.com/aertun/aertun/internal/windtunnel"
 )
@@ -221,6 +223,12 @@ func windtunnelRun(args []string) error {
 	publicKey := fs.String("public-key", "", "with --key, where to write "+
 		"the public half for the verifiers you hand the scorecard to")
 	out := fs.String("out", "", "write the scorecard document to FILE")
+	baseline := fs.String("baseline", "", "a benign bundle (aertun benign bundle) of this "+
+		"estate's own vouched-for sessions: each is replayed into the base stream and every "+
+		"alert a measurable rule raises on it is a false positive, reported per session with "+
+		"Wilson bounds; respelled too under --mutate")
+	baselineKey := fs.String("baseline-key", "", "with --baseline, the public key file its "+
+		"signer published; a bundle is opened only under both its signatures")
 	drafts := fs.String("draft-misses", "", "after the run, draft a "+
 		"detection for every miss whose events the telemetry carried: a "+
 		"proposal rule per draft in DIR, in the pack's own format, with "+
@@ -255,6 +263,21 @@ func windtunnelRun(args []string) error {
 	opts := windtunnel.RunOptions{Scenarios: ids, Base: *over, Into: *into,
 		Seed: *seed, ScoreMode: *score, Mutate: *mutate,
 		Now: time.Now().UTC()}
+	if (*baseline == "") != (*baselineKey == "") {
+		return fmt.Errorf("--baseline and --baseline-key go together: a bundle is " +
+			"replayed only once both its signatures hold under the key its signer published")
+	}
+	if *baseline != "" {
+		pub, err := pack.LoadPublicKey(*baselineKey)
+		if err != nil {
+			return err
+		}
+		b, err := benign.Read(*baseline, pub)
+		if err != nil {
+			return fmt.Errorf("the baseline: %w", err)
+		}
+		opts.Baseline = b
+	}
 	if *key != "" {
 		// Before the key file is opened: refused signing never reads it.
 		if err := windtunnelMaySign(os.Getenv); err != nil {
@@ -464,31 +487,51 @@ func windtunnelReadScorecard(path string) (*windtunnel.Scorecard, error) {
 // diff runs means something too.
 func windtunnelDiff(args []string) error {
 	fs := flag.NewFlagSet("windtunnel diff", flag.ContinueOnError)
-	if err := fs.Parse(args); err != nil {
+	acceptAt := fs.String("accept", "", "a JSON file of accepted benign regressions — "+
+		"[{session, rule, reason, by, expires}] — reviewed with the rule change; an expired "+
+		"one is ignored and named")
+	pos, flags := leadingArgs(args, 2)
+	if err := fs.Parse(flags); err != nil {
 		return errUsage{err}
 	}
-	if fs.NArg() != 2 {
+	files := append(pos, fs.Args()...)
+	if len(files) != 2 {
 		return errUsage{fmt.Errorf("diff takes two scorecard FILEs, the run " +
 			"before and the run after; the exit code is the gate (0 clean, " +
 			"1 regression, 2 the command could not run)")}
 	}
-	before, err := windtunnelReadScorecard(fs.Arg(0))
+	before, err := windtunnelReadScorecard(files[0])
 	if err != nil {
 		return errUsage{err}
 	}
-	after, err := windtunnelReadScorecard(fs.Arg(1))
+	after, err := windtunnelReadScorecard(files[1])
 	if err != nil {
 		return errUsage{err}
 	}
-	report, err := windtunnel.Diff(fs.Arg(0), before, fs.Arg(1), after)
+	report, err := windtunnel.Diff(files[0], before, files[1], after)
 	if err != nil {
 		return errUsage{err}
+	}
+	if *acceptAt != "" {
+		body, rerr := proof.ReadBounded(*acceptAt, 4<<20)
+		if rerr != nil {
+			return errUsage{rerr}
+		}
+		now := time.Now().UTC()
+		acc, aerr := windtunnel.ReadAcceptances(body, now)
+		if aerr != nil {
+			return errUsage{aerr}
+		}
+		report.Accept(acc, now)
 	}
 	if !w.JSON(report) {
 		w.Human("%s", report.Summarize())
 	}
-	if report.Regressions > 0 {
-		outcomeReg, twinReg := 0, 0
+	if report.Gating() > 0 {
+		outcomeReg, twinReg, benignReg := 0, 0, 0
+		if report.Benign != nil {
+			benignReg = report.Benign.Regressions
+		}
 		for _, s := range report.Scenarios {
 			if s.Kind == windtunnel.DiffRegression {
 				outcomeReg++
@@ -498,9 +541,10 @@ func windtunnelDiff(args []string) error {
 			}
 		}
 		return errRegressed{fmt.Errorf("%d regression(s) between %s and %s: "+
-			"%d scenario(s) newly missed, %d twin(s) newly false-firing; "+
-			"the transitions are named above", report.Regressions, fs.Arg(0),
-			fs.Arg(1), outcomeReg, twinReg)}
+			"%d scenario(s) newly missed, %d twin(s) newly false-firing, %d "+
+			"benign session-and-rule pair(s) newly firing; the transitions are "+
+			"named above", report.Gating(), files[0], files[1], outcomeReg,
+			twinReg, benignReg)}
 	}
 	return nil
 }

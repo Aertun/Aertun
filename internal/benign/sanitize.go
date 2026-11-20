@@ -31,6 +31,12 @@ const PolicyVersion = "aertun/benign-sanitise/v1"
 // activity, severity and disposition. They carry no identity.
 var Structural = []string{"source", "class", "activity", "severity", "disposition"}
 
+// Interpretive are raw fields kept whatever the rules read because they say
+// how another field is to be read: the shell a command line runs in decides
+// what its quoting means, so a respelling of it (the wind tunnel's
+// mutation) is only sound with it. They name nobody.
+var Interpretive = []string{"raw.shell"}
+
 // PublicDomains are registrable domains of public services, kept as they are
 // because they name a provider, not a person or an organisation: a rule
 // about "anything from amazonaws.com" needs them, and the labels to their

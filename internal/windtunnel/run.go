@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aertun/aertun/internal/benign"
 	"github.com/aertun/aertun/internal/correlate"
 	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/pack"
@@ -210,6 +211,10 @@ type RunOptions struct {
 	// session to replay besides the session itself (mutate.go), at most
 	// MaxMutate. Zero runs no variants and writes no mutation section.
 	Mutate int
+	// Baseline is an opened, verified bundle of the estate's own benign
+	// sessions (internal/benign); nil runs no benign axis. Its sessions are
+	// respelled too when Mutate is set.
+	Baseline *benign.Bundle
 }
 
 // Run splices, replays, joins and scores, and returns the sealed scorecard.
@@ -390,6 +395,12 @@ func Run(opts RunOptions) (*Scorecard, error) {
 			ID: l.Scenario.ID, Digest: l.Digest, Twin: l.Scenario.Twin.ID})
 		card.Blinds = append(card.Blinds, Blind{Scenario: l.Scenario.ID,
 			Blind: l.Scenario.Blind})
+	}
+	if opts.Baseline != nil {
+		card.Benign, err = runBenign(opts.Baseline, ref, base, into, ambient, opts.Mutate, opts.Now.UTC())
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := card.aggregate(); err != nil {
 		return nil, err

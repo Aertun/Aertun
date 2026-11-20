@@ -22,7 +22,7 @@ import (
 // rest.
 func (rs RuleSet) Keep() map[string]bool {
 	keep := map[string]bool{}
-	for _, f := range Structural {
+	for _, f := range append(append([]string{}, Structural...), Interpretive...) {
 		keep[f] = true
 	}
 	for _, r := range rs.Rules {

@@ -220,6 +220,35 @@ equivalences their consumer applies (RFC 9110 URL normalisation, POSIX
 pathname resolution, POSIX shell quoting) — never letter case alone, and
 never a field the attacker does not spell.
 
+### Your estate's own weird-but-benign workflows
+
+Synthetic twins cannot know that your migration touches every table or that
+your agents make forty tool calls a second. `aertun benign capture` selects
+one real workflow from the event store — sources, a window of at most a day,
+an actor — and vouches for it with a reason and a ticket. It refuses a
+selection that holds an indicator the intelligence store knows, that touches
+an entity a finding is still open about, or that raises an alert nobody
+acknowledged by name. It keeps only the fields your rules read, turns names,
+addresses, domains and paths into keyed pseudonyms that keep their shape
+(an address stays private or public, an email stays an email), masks
+credentials and personal data inside free text, and then runs your rules on
+the raw and the sanitised events and refuses if any outcome differs. A second
+administrator approves it; it expires (90 days by default); it can be
+revoked at once.
+
+`aertun benign bundle` seals the approved sessions into one file signed with
+Ed25519 and ML-DSA-65; the pseudonym key never leaves the store, so the
+bundle can go to a CI runner. `windtunnel run --baseline BUNDLE` replays
+each session and reports the false positives your rules raise on your own
+workflows, per session, per rule and per class, as k of n with Wilson
+bounds — and respells them under `--mutate`, because an allowlist written for
+one exact spelling is not one. A rule that compares a pseudonymised field
+with a literal, or reads a field the bundle dropped, is named as not
+measurable rather than counted as quiet. `windtunnel diff` then fails on any
+rule newly firing on a benign session, unless that exact pair is accepted in
+a file with a reason and an expiry (`--accept`), reviewed with the rule
+change.
+
 Run without `--sigma`, it scores Aertun's own rule pack instead. The six
 scenarios that ship were written beside those rules, so that result is
 self-graded — a regression test of the pack, not an independent

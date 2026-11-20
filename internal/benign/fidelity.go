@@ -251,6 +251,19 @@ func aliased(set []string) map[string]bool {
 	return m
 }
 
+// Reads reports whether a rule reads any of a session's sources: a rule that
+// does not cannot fire on it, raw or sanitised.
+func Reads(r detect.Rule, s Session) bool {
+	for _, src := range r.Sources {
+		for _, have := range s.Sources {
+			if strings.EqualFold(strings.TrimSpace(src), have) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Unmeasurable says why a rule cannot be measured on a session, or nothing
 // when it can.
 //
@@ -260,15 +273,7 @@ func aliased(set []string) map[string]bool {
 // transformed with a literal — unless this exact rule, by digest, was in the
 // session's fidelity check, which showed its outcome unchanged.
 func Unmeasurable(r detect.Rule, digest string, s Session, checked map[string]bool) string {
-	reads := false
-	for _, src := range r.Sources {
-		for _, have := range s.Sources {
-			if strings.EqualFold(strings.TrimSpace(src), have) {
-				reads = true
-			}
-		}
-	}
-	if !reads {
+	if !Reads(r, s) {
 		return ""
 	}
 	dropped := aliased(s.Dropped)
