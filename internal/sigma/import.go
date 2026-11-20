@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aertun/aertun/internal/detect"
 )
@@ -25,8 +26,14 @@ type Skip struct {
 
 // Report is what happened to a library of rules.
 type Report struct {
-	Rules   []detect.Rule `json:"-"`
-	Skipped []Skip        `json:"skipped,omitempty"`
+	Rules []detect.Rule `json:"-"`
+	// Bare are the same rules before any global filter was added: what the
+	// library would detect with its exceptions taken away, so a caller can
+	// show what each exception costs.
+	Bare []detect.Rule `json:"-"`
+	// Filters are the library's global filters and what became of each.
+	Filters []FilterReport `json:"filters,omitempty"`
+	Skipped []Skip         `json:"skipped,omitempty"`
 	// Loud names rules that claim high or critical and say their false
 	// positives are unknown.
 	Loud []string `json:"loud,omitempty"`
@@ -113,14 +120,20 @@ func Import(files map[string][]byte, pipe Pipeline) Report {
 	}
 	sort.Strings(names)
 
+	var logsources, titles, filterFiles []string
+	var filters []Filter
 	for _, name := range names {
-		rules, err := Read(files[name])
+		rules, fs, err := ReadAll(files[name])
 		if err != nil {
 			rep.Read++
 			rep.Skipped = append(rep.Skipped, Skip{
 				Title: name, What: "could not be read", Why: err.Error(),
 			})
 			continue
+		}
+		for _, f := range fs {
+			filters = append(filters, f)
+			filterFiles = append(filterFiles, name)
 		}
 		for _, r := range rules {
 			rep.Read++
@@ -137,7 +150,17 @@ func Import(files map[string][]byte, pipe Pipeline) Report {
 				rep.Loud = append(rep.Loud, title(name, r))
 			}
 			rep.Rules = append(rep.Rules, c)
+			logsources = append(logsources, r.LogSource.Name())
+			titles = append(titles, r.Title)
 		}
+	}
+	rep.Bare = append([]detect.Rule(nil), rep.Rules...)
+	if len(filters) > 0 {
+		now := pipe.Now
+		if now.IsZero() {
+			now = time.Now()
+		}
+		rep.Filters = applyFilters(rep.Rules, logsources, titles, filters, filterFiles, pipe, now.UTC())
 	}
 	return rep
 }

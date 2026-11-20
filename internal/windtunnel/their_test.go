@@ -294,3 +294,66 @@ func TestTheirSigmaSummarizeCarriesTheAccounting(t *testing.T) {
 			"import report is a first-class result, not a footnote")
 	}
 }
+
+// withFilter is the fixture library plus one global filter.
+func withFilter(t *testing.T, filter string) string {
+	t.Helper()
+	dir := t.TempDir()
+	entries, err := os.ReadDir(theirFixtures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		b, err := os.ReadFile(filepath.Join(theirFixtures, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, e.Name()), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "mf_webhooks.yml"), []byte(filter), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+const webhookFilter = `title: Our integrations post to webhooks all day
+logsource:
+    product: otel
+    service: genai
+filter:
+    rules:
+        - their.egress-fresh-destination
+    selection:
+        tool: http_post
+    condition: selection
+owner: dana
+ticket: CHG-311
+`
+
+// An exception broad enough to take out the attack's own egress is named
+// beside the attack it hides: the library without its filters catches the
+// scenario, the library with them misses it, and the filter's events are
+// the scenario's.
+func TestAFilterThatHidesAnAttackIsNamed(t *testing.T) {
+	card := theirRun(t, withFilter(t, webhookFilter+"expires: 2027-03-01\n"), "agent.trifecta-mailroom-exfil")
+	if card.Rows[0].Outcome != OutcomeMissed {
+		t.Fatalf("the filtered library still caught the scenario: %s", card.Rows[0].Outcome)
+	}
+	fs := card.TheirSigma.Filters
+	if len(fs) != 1 || strings.Join(fs[0].Hid, ",") != "agent.trifecta-mailroom-exfil" ||
+		fs[0].Owner != "dana" || fs[0].Expired || len(fs[0].Applied) != 1 {
+		t.Fatalf("%+v", fs)
+	}
+	if !strings.Contains(card.Summarize(), "HIDES attack(s)") {
+		t.Error("the screen does not name the attack the filter hides")
+	}
+
+	// Past its expiry it is not applied, and the attack is caught again.
+	card = theirRun(t, withFilter(t, webhookFilter+"expires: 2026-10-01\n"), "agent.trifecta-mailroom-exfil")
+	if card.Rows[0].Outcome == OutcomeMissed || !card.TheirSigma.Filters[0].Expired ||
+		len(card.TheirSigma.Filters[0].Hid) != 0 {
+		t.Errorf("an expired filter: %s %+v", card.Rows[0].Outcome, card.TheirSigma.Filters)
+	}
+}

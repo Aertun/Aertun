@@ -469,6 +469,27 @@ func (c *Scorecard) Summarize() string {
 			b.WriteString(hang(fmt.Sprintf("      refused %q: ", s.Rule),
 				s.What+" — "+refusalWhy(s)))
 		}
+		for _, f := range ts.Filters {
+			life := "never expires"
+			switch {
+			case f.Expired:
+				life = "EXPIRED " + f.Expires + ", not applied"
+			case f.Expires != "":
+				life = "expires " + f.Expires
+			}
+			fmt.Fprintf(&b, "      filter %q: tunes %d rule(s), %s", f.Title, len(f.Applied), life)
+			if f.Owner != "" {
+				fmt.Fprintf(&b, ", owner %s", f.Owner)
+			}
+			b.WriteString("\n")
+			if len(f.Hid) > 0 {
+				fmt.Fprintf(&b, "        HIDES attack(s) the rules catch without it: %s\n",
+					strings.Join(f.Hid, ", "))
+			}
+			if len(f.Removed) > 0 {
+				fmt.Fprintf(&b, "        removes false positive(s) on: %s\n", strings.Join(f.Removed, ", "))
+			}
+		}
 	}
 	for _, s := range c.Scenarios {
 		fmt.Fprintf(&b, "      %-40s %s (twin %s)\n", s.ID,

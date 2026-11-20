@@ -257,6 +257,13 @@ lost and its arrival time used instead, long values cut where pipelines cut
 them — and reports, per fault,
 the catches that break and the benign workflows that start firing.
 
+Your Sigma global filters — the exceptions that tune many rules at once —
+are applied as the specification says, may carry an expiry, an owner and a
+ticket, and stop applying when they expire. The run replays your rules
+without them too, and names each filter beside any attack it hides and any
+benign false positive it removes: tuning judged by what it costs as well as
+by the noise it takes away.
+
 Run without `--sigma`, it scores Aertun's own rule pack instead. The six
 scenarios that ship were written beside those rules, so that result is
 self-graded — a regression test of the pack, not an independent

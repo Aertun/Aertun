@@ -4,6 +4,17 @@ Aertun NEWS
 Unreleased
 ==========
 
+* Sigma global filters (the meta filters of specification 2.1.0) are read
+  and applied: each filter's condition is added as "and not" to the rules
+  it names, where the log source matches exactly, and `rules: any` tunes
+  every rule with that log source.  Filters may carry `expires`, `owner`,
+  `ticket` and `approved_by`, which other Sigma tools ignore; a filter past
+  its expiry is not applied and is named, and one with no expiry is counted
+  as never expiring.  A file of filters used to be refused as malformed
+  rules.  In `windtunnel run --sigma`, a library whose filters tuned
+  anything is replayed again without them, and each filter is named beside
+  the attacks it hides and the benign false positives it removes.
+
 * Incidents involving AI systems have their own clocks.  Five decisions
   start them — ai-serious, ai-critical, ai-death, ai-breach, ai-imminent —
   under four new regimes: `aiact` (EU AI Act Article 73: fifteen days, two

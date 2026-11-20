@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/telemetry"
@@ -30,6 +31,9 @@ type Pipeline struct {
 	// Source overrides the source a rule reads, for a deployment whose
 	// connector is not named the way the rule's logsource is.
 	Source string `json:"source,omitempty"`
+	// Now is when a global filter's expiry is judged; zero means the
+	// present.
+	Now time.Time `json:"-"`
 }
 
 // native are the fields internal/telemetry normalises, which a rule may

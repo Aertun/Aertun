@@ -113,6 +113,11 @@ func Read(in []byte) ([]Rule, error) {
 	}
 	var out []Rule
 	for i, d := range docs {
+		// A global filter is tuning for rules, not a rule; ReadAll returns
+		// both.
+		if isFilter(d) {
+			continue
+		}
 		r, err := fromDoc(d)
 		if err != nil {
 			return nil, fmt.Errorf("document %d: %w", i+1, err)

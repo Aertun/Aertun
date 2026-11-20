@@ -12,8 +12,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/sigma"
+	"github.com/aertun/aertun/internal/telemetry"
 )
 
 // their-Sigma mode: the organisation's own Sigma rules, imported through the
@@ -99,13 +102,42 @@ type SigmaReport struct {
 	// because a library scored here deserves the same sentence an import
 	// prints.
 	Loud []string `json:"loud,omitempty"`
+	// Filters are the library's global filters (Sigma meta filters) and
+	// what each cost: the attacks it hid and the benign false positives it
+	// removed, found by replaying the library again without its filters.
+	Filters []FilterImpact `json:"filters,omitempty"`
+}
+
+// FilterImpact is one global filter and what it did to this run.
+type FilterImpact struct {
+	Title string `json:"title"`
+	ID    string `json:"id,omitempty"`
+	// Applied are the rules it tuned; Expired says it was past its expiry
+	// and not applied; NoExpiry that it never expires.
+	Applied  []string `json:"applied,omitempty"`
+	Expired  bool     `json:"expired,omitempty"`
+	NoExpiry bool     `json:"no_expiry,omitempty"`
+	Any      bool     `json:"any,omitempty"`
+	Expires  string   `json:"expires,omitempty"`
+	Owner    string   `json:"owner,omitempty"`
+	Ticket   string   `json:"ticket,omitempty"`
+	// Hid are the scenarios the unfiltered rules caught and the filtered
+	// ones missed, whose events this filter takes out.
+	Hid []string `json:"hid,omitempty"`
+	// Removed are the benign sessions the unfiltered rules fired on and the
+	// filtered ones did not, whose events this filter takes out.
+	Removed []string `json:"removed,omitempty"`
 }
 
 // theirSigma is their library as a runnable instrument plus the report of
 // what importing it did.
 type theirSigma struct {
-	ref    *Reference
-	report *SigmaReport
+	ref *Reference
+	// bare is the same library without its global filters, set only when
+	// a filter was applied; filters are the applied ones, compiled.
+	bare    *Reference
+	filters []sigma.FilterReport
+	report  *SigmaReport
 }
 
 // loadTheirSigma reads a directory of Sigma rules through the existing
@@ -116,7 +148,7 @@ type theirSigma struct {
 // to score with, and scoring it anyway would print an empty 100% — the
 // naked percentage this package exists to refuse. A library none of whose
 // rules import is the same refusal with the constructs named.
-func loadTheirSigma(dir string) (*theirSigma, error) {
+func loadTheirSigma(dir string, now time.Time) (*theirSigma, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("reading their Sigma rules: %w", err)
@@ -162,7 +194,9 @@ func loadTheirSigma(dir string) (*theirSigma, error) {
 	// The one importer, called once. Its skips are its own type with the
 	// construct named; they are carried to the scorecard verbatim rather
 	// than re-derived, because the importer's report IS the report.
-	rep := sigma.Import(files, sigma.Pipeline{})
+	// Filters' expiries are judged at the run's own moment, so a run
+	// repeated later scores the same library the same way.
+	rep := sigma.Import(files, sigma.Pipeline{Now: now})
 	report := &SigmaReport{Dir: dir, Digest: hex.EncodeToString(h.Sum(nil)),
 		Read: rep.Read, Imported: len(rep.Rules), Loud: rep.Loud,
 		Gaps: rep.Gaps()}
@@ -206,7 +240,34 @@ func loadTheirSigma(dir string) (*theirSigma, error) {
 	for _, r := range rep.Rules {
 		ref.ruleQuiet[strings.ToLower(r.ID)] = false
 	}
-	return &theirSigma{ref: ref, report: report}, nil
+	out := &theirSigma{ref: ref, report: report}
+	applied := false
+	for _, f := range rep.Filters {
+		report.Filters = append(report.Filters, FilterImpact{Title: f.Title, ID: f.ID, Applied: f.Applied,
+			Expired: f.Expired, NoExpiry: f.NoExpiry, Any: f.Any, Expires: f.Expires, Owner: f.Owner,
+			Ticket: f.Ticket})
+		applied = applied || len(f.Applied) > 0
+	}
+	if applied {
+		out.bare = &Reference{Name: ref.Name + " (without its filters)", Rules: rep.Bare,
+			Digest: ref.Digest, ruleQuiet: ref.ruleQuiet, corrIDs: ref.corrIDs}
+		out.filters = rep.Filters
+	}
+	return out, nil
+}
+
+// takesOut reports whether a compiled filter matches any of the events.
+func takesOut(f sigma.FilterReport, events []telemetry.Event) bool {
+	p, err := detect.Rule{ID: "filter", Sources: []string{f.Source}, When: f.Predicate}.Compile()
+	if err != nil {
+		return false
+	}
+	for _, e := range events {
+		if p.MatchesFields(e.Source, e.Fields()) {
+			return true
+		}
+	}
+	return false
 }
 
 // techniquesIntersect reports whether a scenario and one of their rules

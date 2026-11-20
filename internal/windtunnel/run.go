@@ -263,7 +263,7 @@ func Run(opts RunOptions) (*Scorecard, error) {
 				"is %s:DIR (or run --sigma DIR), where DIR is the "+
 				"organisation's Sigma rules", ModeTheirSigma, ModeTheirSigma)
 		}
-		loaded, err := loadTheirSigma(dir)
+		loaded, err := loadTheirSigma(dir, opts.Now)
 		if err != nil {
 			return nil, err
 		}
@@ -422,6 +422,12 @@ func Run(opts RunOptions) (*Scorecard, error) {
 		}
 		if card.Perturbation != nil {
 			card.Perturbation.Benign = pb
+		}
+	}
+	if theirs != nil && theirs.bare != nil {
+		if err := filterImpact(card, theirs, selected, base, into, opts.Seed, opts.Baseline,
+			opts.Now.UTC()); err != nil {
+			return nil, err
 		}
 	}
 	if err := card.aggregate(); err != nil {
