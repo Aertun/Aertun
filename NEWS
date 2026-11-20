@@ -4,6 +4,25 @@ Aertun NEWS
 Unreleased
 ==========
 
+* The Aertun Evidence Protocol, version 1: every party that sees an AI
+  agent's action can say so in a signed receipt, and a reconciliation of
+  those receipts says whether the parties agree.  Receipts are SCITT signed
+  statements (RFC 9943): COSE_Sign1 with CWT claims, signed with Ed25519
+  (RFC 9864, algorithm -19) or ML-DSA-65 (RFC 9964, -49), with the key's
+  RFC 9679 thumbprint as its kid.  The action digest is SHA-256 over the
+  resource, the tool and the RFC 8785 digest of the arguments, so the
+  agent, the gateway and the server compute it alike.  `aertun receipt
+  emit` makes one; `aertun receipt register` enters it in this
+  deployment's transparency log, which answers with an RFC 9942 receipt in
+  each algorithm, and verification requires both; `aertun receipt
+  reconcile` names every action an expected party never reported, every
+  gap or repeat in a party's sequence numbers and every action the parties
+  name different actors for, and signs the result; `aertun receipt verify`
+  checks any of them offline, and checks a reconciliation by doing it
+  again.  Statements and both receipts were verified by an independent
+  implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
+  ML-DSA-65).
+
 * Sigma global filters (the meta filters of specification 2.1.0) are read
   and applied: each filter's condition is added as "and not" to the rules
   it names, where the log source matches exactly, and `rules: any` tunes

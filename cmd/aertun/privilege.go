@@ -248,6 +248,15 @@ var commandNeeds = map[string]need{
 	// Checking a bundle's signatures and digests reads a file the caller
 	// named and opens no store.
 	"benign verify": {action: auth.ActView},
+	// A receipt log signs, in this deployment's name, that a statement was
+	// registered: tune, like a proof signed from the store, and register
+	// asks for it itself. Emitting a receipt or a reconciliation signs with
+	// a key the caller named and opens no store, the wind tunnel's weight;
+	// verifying reads files the caller named.
+	"receipt":           {action: auth.ActTune},
+	"receipt emit":      {action: auth.ActView},
+	"receipt verify":    {action: auth.ActView},
+	"receipt reconcile": {action: auth.ActView},
 	// A proof checks files the caller named against a corpus the caller
 	// named and signs with a key the caller named: it opens no store,
 	// contacts nobody and spends nothing, the wind tunnel's weight.
@@ -774,10 +783,11 @@ var commandAreas = map[string]string{
 	"siem": auth.AreaLog, "automate": auth.AreaSecurity, "inbound": auth.AreaSecurity,
 	"auditlog": auth.AreaLog, "compliance": auth.AreaLog, "bench": auth.AreaSecurity,
 	"windtunnel": auth.AreaSecurity, "proof": auth.AreaSecurity, "verdict": auth.AreaSecurity,
-	"chain": auth.AreaSecurity,
-	"mdr":   auth.AreaSecurity,
-	"twin":  auth.AreaSecurity,
-	"forge": auth.AreaSecurity, "forge verify": auth.AreaLog,
+	"chain":   auth.AreaSecurity,
+	"mdr":     auth.AreaSecurity,
+	"receipt": auth.AreaSecurity,
+	"twin":    auth.AreaSecurity,
+	"forge":   auth.AreaSecurity, "forge verify": auth.AreaLog,
 	"alert": auth.AreaSecurity,
 }
 

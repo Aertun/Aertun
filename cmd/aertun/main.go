@@ -85,6 +85,10 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun benign capture NAME --class C --source S --since T --until T --why "…" [--acknowledge RULE] [--raw FIELD]   a weird-but-benign session from your own store, checked against your rules and intelligence, sanitised, waiting for a second administrator
   aertun benign list | show NAME | revoke NAME --why "…" | renew NAME --expires 90d --why "…"   the sessions vouched for, and their lives
   aertun benign bundle --key F --out F | verify FILE --public-key F   the approved, unexpired sessions sealed in one signed file, for windtunnel run --baseline
+  aertun receipt emit --key F --issuer URI --vantage V --target URI --tool NAME [--args F] --out F   a signed receipt (SCITT, COSE) that a party saw an agent's action
+  aertun receipt register FILE --issuer-key ISSUER=F [--log-key F] --out F   entered in this deployment's transparency log, with its receipt in each algorithm
+  aertun receipt verify FILE --issuer-key ISSUER=F [--log-key F] [RECEIPT...]   checked offline; a reconciliation is checked by doing it again
+  aertun receipt reconcile FILE... --key F --issuer URI --from T --to T --expect ISSUER=VANTAGE... --issuer-key ISSUER=F --out F   every party's receipts held together: what some party never reported, gaps in their numbering, actors they disagree on
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
   aertun windtunnel run --sigma DIR --baseline BUNDLE --baseline-key F   and your estate's own vouched-for benign sessions: false positives per session, with Wilson bounds
   aertun windtunnel run --sigma DIR --perturb all   and again under pipeline faults (duplicates, reordering, clock skew, bursts, a dropped field, a lost event time, truncation): which catches break, which benign workflows fire
@@ -392,6 +396,8 @@ func main() {
 		err = cmdVendor(root, cmdArgs)
 	case "benign":
 		err = cmdBenign(root, cmdArgs)
+	case "receipt":
+		err = cmdReceipt(root, cmdArgs)
 	case "access":
 		err = cmdAccess(root, cmdArgs)
 	case "appsec":

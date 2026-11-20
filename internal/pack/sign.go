@@ -201,6 +201,30 @@ func (k *Key) DualSign(msg []byte, context string) (edSig, mlSig []byte, err err
 	return ed25519.Sign(ed, msg), mlSig, nil
 }
 
+// Halves are the key's two algorithms as plain private keys, for a format
+// that carries one algorithm per signature (COSE). Such a caller makes one
+// signature with each half and keeps both; neither half is a key on its own.
+func (k *Key) Halves() (ed25519.PrivateKey, *mldsa.PrivateKey, error) {
+	ml, err := mldsa.NewPrivateKey(mldsa.MLDSA65(), k.mlSeed)
+	if err != nil {
+		return nil, nil, fmt.Errorf("the ML-DSA key is unusable: %w", err)
+	}
+	return ed25519.NewKeyFromSeed(k.edSeed), ml, nil
+}
+
+// Halves are a published key's two public halves, checked for length.
+func (pub KeyPublic) Halves() (ed25519.PublicKey, *mldsa.PublicKey, error) {
+	ed, ml, err := pub.decode()
+	if err != nil {
+		return nil, nil, err
+	}
+	mlPub, err := mldsa.NewPublicKey(mldsa.MLDSA65(), ml)
+	if err != nil {
+		return nil, nil, fmt.Errorf("the ML-DSA public key is unreadable: %w", err)
+	}
+	return ed25519.PublicKey(ed), mlPub, nil
+}
+
 // VerifyMetadata checks both signatures over a body against a dual public
 // key. Both, always: a signature carrying one half is refused with its name
 // in the error, and there is no option to accept one, on the

@@ -208,6 +208,17 @@ var coverage = map[string]surfaces{
 			"agent able to vouch for its own activity could make itself " +
 			"invisible to the next rule written against it",
 	},
+	// The evidence protocol's receipts: emitted by a party, registered in
+	// this deployment's log, verified and reconciled offline.
+	"receipt": {
+		Why: "a receipt is a file one party hands another and anybody verifies " +
+			"offline, the way a proof is; the screens worth building are the " +
+			"log's and the reconciliations', once the agent interface emits " +
+			"receipts of its own",
+		NoMCP: "an agent able to register or reconcile receipts would be writing " +
+			"the evidence about its own actions; receipts for its calls are made " +
+			"by the parties that see them, never by the agent on their behalf",
+	},
 	"windtunnel": {
 		Why: "a scorecard is a document that carries its own digest and two " +
 			"signatures, read the way a benchmark's results are read — by " +

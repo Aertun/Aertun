@@ -255,8 +255,24 @@ func (l *Log) inclusion(hashes [][]byte, index int) [][]byte {
 // the tree size and the root, so an auditor can run it against a receipt without
 // the operator's cooperation and without seeing anything else in the log.
 func VerifyInclusion(leafHash []byte, index, size int, proof [][]byte, root []byte) error {
+	computed, err := RootFromInclusion(leafHash, index, size, proof)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(computed, root) {
+		return fmt.Errorf("root mismatch: computed %s, expected %s",
+			hex.EncodeToString(computed), hex.EncodeToString(root))
+	}
+	return nil
+}
+
+// RootFromInclusion is the root an inclusion proof leads to from a leaf,
+// for a verifier that is handed the proof and checks the root by other
+// means: a COSE receipt (RFC 9942) carries no root, and is a signature over
+// the one the proof computes.
+func RootFromInclusion(leafHash []byte, index, size int, proof [][]byte) ([]byte, error) {
 	if index < 0 || size < 0 || index >= size {
-		return fmt.Errorf("index %d outside a tree of %d", index, size)
+		return nil, fmt.Errorf("index %d outside a tree of %d", index, size)
 	}
 	// RFC 6962 section 2.1.1, and it has to be this algorithm rather than a
 	// mirror of the generator. The audit path is ordered leaf-to-root, so a
@@ -269,7 +285,7 @@ func VerifyInclusion(leafHash []byte, index, size int, proof [][]byte, root []by
 	used := 0
 	for _, p := range proof {
 		if sn == 0 {
-			return errors.New("proof is longer than the tree is deep")
+			return nil, errors.New("proof is longer than the tree is deep")
 		}
 		if fn%2 == 1 || fn == sn {
 			computed = HashNode(p, computed)
@@ -287,19 +303,15 @@ func VerifyInclusion(leafHash []byte, index, size int, proof [][]byte, root []by
 		used++
 	}
 	if sn != 0 {
-		return errors.New("proof is too short for a tree of this size")
+		return nil, errors.New("proof is too short for a tree of this size")
 	}
 	if used != len(proof) {
 		// A proof with unused hashes is malformed. Accepting it would let an
 		// attacker pad a valid proof, and a verifier that tolerates junk is one
 		// that has stopped checking the shape of what it is given.
-		return fmt.Errorf("proof has %d unused hash(es)", len(proof)-used)
+		return nil, fmt.Errorf("proof has %d unused hash(es)", len(proof)-used)
 	}
-	if !bytes.Equal(computed, root) {
-		return fmt.Errorf("root mismatch: computed %s, expected %s",
-			hex.EncodeToString(computed), hex.EncodeToString(root))
-	}
-	return nil
+	return computed, nil
 }
 
 // ConsistencyProof proves a tree of size m is a prefix of one of size n.

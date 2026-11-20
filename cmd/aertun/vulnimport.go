@@ -22,6 +22,7 @@ import (
 	"github.com/aertun/aertun/internal/atomicfile"
 	"github.com/aertun/aertun/internal/audit"
 	"github.com/aertun/aertun/internal/auth"
+	"github.com/aertun/aertun/internal/proof"
 	"github.com/aertun/aertun/internal/sca"
 	"github.com/aertun/aertun/internal/telemetry"
 	"github.com/aertun/aertun/internal/vuln"
@@ -494,21 +495,8 @@ func readBill(path string, asset telemetry.ID) ([]vuln.Component, int, error) {
 	return out, unplaced, nil
 }
 
-func readBounded(path string, limit int64) ([]byte, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	b, err := io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(b)) > limit {
-		return nil, fmt.Errorf("%s is larger than %d bytes", path, limit)
-	}
-	return b, nil
-}
+// readBounded reads a whole file, refusing one larger than limit.
+func readBounded(path string, limit int64) ([]byte, error) { return proof.ReadBounded(path, limit) }
 
 // readOSV walks a file, a directory or a zip of OSV records.
 func readOSV(path string, take func(sca.Record), rep *importReport) error {
