@@ -224,7 +224,8 @@ func windtunnelRun(args []string) error {
 		"the public half for the verifiers you hand the scorecard to")
 	out := fs.String("out", "", "write the scorecard document to FILE")
 	perturbAt := fs.String("perturb", "", "replay each scenario's session, and each benign "+
-		"session, again under pipeline faults: dup, reorder, skew, burst, drop-field "+
+		"session, again under pipeline faults: dup, reorder, skew, burst, drop-field, "+
+		"observed-time, truncate "+
 		"(comma-separated), or all — per kind, the attacks missed and the benign sessions firing")
 	baseline := fs.String("baseline", "", "a benign bundle (aertun benign bundle) of this "+
 		"estate's own vouched-for sessions: each is replayed into the base stream and every "+

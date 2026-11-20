@@ -252,7 +252,9 @@ change.
 `--perturb all` replays every attack and every benign session again under
 the faults real pipelines introduce — events delivered twice, delayed and
 reordered, one source's clock five minutes ahead, the work four times faster,
-a field the rules read removed as an upgrade would — and reports, per fault,
+a field the rules read removed as an upgrade would, the event's own time
+lost and its arrival time used instead, long values cut where pipelines cut
+them — and reports, per fault,
 the catches that break and the benign workflows that start firing.
 
 Run without `--sigma`, it scores Aertun's own rule pack instead. The six

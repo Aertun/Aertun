@@ -36,10 +36,38 @@ const (
 	PerturbSkew      = "skew"
 	PerturbBurst     = "burst"
 	PerturbDropField = "drop-field"
+	// PerturbObserved: the event's own time is lost and its arrival time
+	// stands in for it, as when a log carries no timestamp and the
+	// collector's observed time is used (OpenTelemetry's
+	// ObservedTimestamp fallback).
+	PerturbObserved = "observed-time"
+	// PerturbTruncate: long values cut where pipelines cut them — a raw
+	// field at 1,024 bytes, the keyword limit many indexes apply, and a
+	// message at 2,048, the length RFC 5424 receivers should accept.
+	PerturbTruncate = "truncate"
 )
 
 // PerturbKinds are the kinds in the order they are reported.
-var PerturbKinds = []string{PerturbDup, PerturbReorder, PerturbSkew, PerturbBurst, PerturbDropField}
+var PerturbKinds = []string{PerturbDup, PerturbReorder, PerturbSkew, PerturbBurst, PerturbDropField,
+	PerturbObserved, PerturbTruncate}
+
+// The truncation limits, in bytes.
+const (
+	truncateField   = 1024
+	truncateMessage = 2048
+)
+
+// cutAt cuts s to at most n bytes, at the start of a character so the
+// result stays valid text.
+func cutAt(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && n < len(s) && s[n]&0xC0 == 0x80 {
+		n--
+	}
+	return s[:n]
+}
 
 // The parameters, fixed so two runs are comparable: a quarter of events
 // delivered twice, a second apart; extra arrival delay up to twice the
@@ -182,6 +210,32 @@ func perturb(kind, id string, seed int64, events []telemetry.Event, lateness tim
 			c.Received = c.Time.Add(late)
 			out = append(out, c)
 		}
+	case PerturbObserved:
+		for _, e := range events {
+			c := copyEvent(e)
+			c.Time = c.Received
+			out = append(out, c)
+		}
+	case PerturbTruncate:
+		cut := 0
+		for _, e := range events {
+			c := copyEvent(e)
+			for k, v := range c.Raw {
+				if len(v) > truncateField {
+					c.Raw[k] = cutAt(v, truncateField)
+					cut++
+				}
+			}
+			if len(c.Message) > truncateMessage {
+				c.Message = cutAt(c.Message, truncateMessage)
+				cut++
+			}
+			out = append(out, c)
+		}
+		if cut == 0 {
+			return out, "no value long enough to be cut"
+		}
+		return out, fmt.Sprintf("%d value(s) cut", cut)
 	case PerturbDropField:
 		// The field the rules read that the most of the session's events
 		// carry: what an upgrade renaming one field takes from the rules.

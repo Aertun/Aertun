@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aertun/aertun/internal/correlate"
 	"github.com/aertun/aertun/internal/detect"
@@ -152,5 +153,24 @@ func TestABurstOfABenignWorkflowCrossesAThreshold(t *testing.T) {
 	if len(pb) != 1 || pb[0].Outcome != BenignFires || strings.Join(pb[0].Fired, ",") != "corr.many-queries" ||
 		card.Perturbation.BenignFires[0].Rate.K != 1 {
 		t.Errorf("%+v", pb)
+	}
+}
+
+// A lost event time takes the arrival time, and a long value is cut where a
+// pipeline cuts it, at a character boundary.
+func TestObservedTimeAndTruncation(t *testing.T) {
+	in := sessionOf(3, time.Minute)
+	in[0].Raw["command"] = strings.Repeat("é", 700) // 1,400 bytes
+	obs, _ := perturb(PerturbObserved, "s", 7, in, time.Second, nil)
+	if !obs[1].Time.Equal(in[1].Received) {
+		t.Error("observed-time kept the event's own time")
+	}
+	cut, note := perturb(PerturbTruncate, "s", 7, in, time.Second, nil)
+	v := cut[0].Raw["command"]
+	if len(v) > truncateField || len(v) < truncateField-1 || !utf8.ValidString(v) || note != "1 value(s) cut" {
+		t.Errorf("cut to %d bytes, valid %v, %q", len(v), utf8.ValidString(v), note)
+	}
+	if _, note := perturb(PerturbTruncate, "s", 7, sessionOf(2, time.Minute), time.Second, nil); note != "no value long enough to be cut" {
+		t.Errorf("%q", note)
 	}
 }
