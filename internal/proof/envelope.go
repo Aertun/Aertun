@@ -72,6 +72,10 @@ func pae(payloadType string, payload []byte) []byte {
 	return b.Bytes()
 }
 
+// PAE is DSSE's pre-authentication encoding, for another signed document
+// that uses the same envelope in its own context.
+func PAE(payloadType string, payload []byte) []byte { return pae(payloadType, payload) }
+
 // KeyID is the fingerprint proofs name a dual key by.
 func KeyID(pub pack.KeyPublic) (string, error) { return pack.KeyIDIn(Context, pub) }
 
