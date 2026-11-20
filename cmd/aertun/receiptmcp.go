@@ -74,15 +74,22 @@ func receiptMCPCall(root, resource string, c *Caller, params json.RawMessage, re
 	if resource == "" {
 		return
 	}
-	if err := appendCallReceipt(root, resource, c, params, rerr, time.Now()); err != nil {
+	kept, err := appendCallReceipt(root, resource, c, params, rerr, time.Now())
+	switch {
+	case err != nil:
+		callReceipts.Inc("failed")
 		fmt.Fprintf(os.Stderr, "%sthe receipt for an agent interface call was not kept: %v%s\n", red, err, reset)
+	case kept:
+		callReceipts.Inc("kept")
 	}
 }
 
-func appendCallReceipt(root, resource string, c *Caller, params json.RawMessage, rerr *mcp.Error, now time.Time) error {
+// appendCallReceipt appends one call's receipt, and says whether there was
+// one to append: none is kept until a receipt log is set up.
+func appendCallReceipt(root, resource string, c *Caller, params json.RawMessage, rerr *mcp.Error, now time.Time) (bool, error) {
 	l, err := openReceiptLog(root)
 	if err != nil || l == nil {
-		return err
+		return false, err
 	}
 	var p struct {
 		Name      string          `json:"name"`
@@ -90,11 +97,11 @@ func appendCallReceipt(root, resource string, c *Caller, params json.RawMessage,
 	}
 	if err := json.Unmarshal(params, &p); err != nil || p.Name == "" {
 		// Refused before it named a tool, so not a call to one.
-		return nil
+		return false, nil
 	}
 	args, err := aep.ArgsDigest(p.Arguments)
 	if err != nil {
-		return err
+		return false, err
 	}
 	outcome := "ok"
 	if rerr != nil {
@@ -111,8 +118,10 @@ func appendCallReceipt(root, resource string, c *Caller, params json.RawMessage,
 		At: now, Actor: actor, Grant: c.Run, Outcome: outcome}
 	b, err := aep.Emit(l.Signer(), resource, r, now)
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = l.Append(b, func(*scitt.Signed) error { return nil })
-	return err
+	if _, err := l.Append(b, func(*scitt.Signed) error { return nil }); err != nil {
+		return false, err
+	}
+	return true, nil
 }

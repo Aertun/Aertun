@@ -178,13 +178,14 @@ func auditStdioCall(root string, caller *Caller, params json.RawMessage, resp *m
 // gate); reads go on and are recorded here, which is what tells this
 // process the log is back.
 func auditMCPCall(root string, c *Caller, tool, operation string, rerr *mcp.Error) {
-	outcome := audit.Success
+	outcome, counted := audit.Success, "ok"
 	if rerr != nil {
-		outcome = audit.Failure
+		outcome, counted = audit.Failure, "error"
 		if rerr.Code == mcp.CodeRefused {
-			outcome = audit.Denied
+			outcome, counted = audit.Denied, "refused"
 		}
 	}
+	mcpCalls.Inc(counted)
 	detail := map[string]string{"tool": tool, "operation": operation, "client": c.Name}
 	if c.Agent != "" {
 		detail["agent"] = c.Agent

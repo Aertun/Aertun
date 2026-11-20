@@ -37,6 +37,15 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* `aertun serve` answers /metrics in the Prometheus text format: HTTP
+  responses by status class, agent-interface calls by outcome and the
+  receipts kept for them, scheduled job runs and when each last
+  succeeded, readiness, whether the audit log is taking records, the
+  receipt log's size, and the Go runtime.  It answers a bearer token
+  presented with the request (never one from the server's own
+  environment), refuses agents' tokens and key-bound ones, and names no
+  person, agent or tool.  /healthz and /readyz are unchanged.
+
 * Sigma global filters (the meta filters of specification 2.1.0) are read
   and applied: each filter's condition is added as "and not" to the rules
   it names, where the log source matches exactly, and `rules: any` tunes

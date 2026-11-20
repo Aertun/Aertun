@@ -400,8 +400,9 @@ func cmdServe(root string, args []string) error {
 	// The audit log out to a SIEM as it is written, on its own quicker
 	// timer; how it is going is kept where status reads it, and a failure
 	// is not written to the log it is failing to send.
-	go upkeep.Run(upkeepCtx, StreamEvery, func(upkeep.Job, int, error) {}, streamJob(root))
+	go upkeep.Run(upkeepCtx, StreamEvery, func(j upkeep.Job, _ int, err error) { noteUpkeep(j.Name, err) }, streamJob(root))
 	go upkeep.Run(upkeepCtx, upkeep.Every, func(j upkeep.Job, n int, err error) {
+		noteUpkeep(j.Name, err)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  %s%s: %v%s\n", dim, j.Name, err, reset)
 			return
@@ -580,12 +581,13 @@ func cmdServe(root string, args []string) error {
 	mountOAuthAS(mux, root, cfg, *addr, srv)
 	mountOTLP(mux, root)
 	mountCollector(mux, root)
+	mountMetrics(mux, root, cfg, *addr, srv.Ready)
 	mux.Handle("/", srv.Handler())
 
 	// Who each request came from is decided once, here, for everything
 	// behind: limits, placing a sign-in, the audit log (internal/clientip).
 	httpSrv := &http.Server{Addr: *addr,
-		Handler: clientip.Middleware(proxies(root, "admin.trusted_proxy"), mux)}
+		Handler: clientip.Middleware(proxies(root, "admin.trusted_proxy"), countResponses(mux))}
 
 	fmt.Printf("console on http://%s\n", *addr)
 	if base := cfg.Raw("admin.base_url"); base != "" {
