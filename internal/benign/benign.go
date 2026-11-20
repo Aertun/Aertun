@@ -139,6 +139,9 @@ type Session struct {
 	// VouchedBy and ApprovedBy are the two people, as pseudonyms.
 	VouchedBy  string `json:"vouched_by"`
 	ApprovedBy string `json:"approved_by,omitempty"`
+	// Alone says the store's only administrator approved their own capture
+	// after the waiting period: said, so nobody reads one person as two.
+	Alone bool `json:"alone,omitempty"`
 	// WhySHA256 is the digest of the reason given; the reason itself stays
 	// in the audit log.
 	WhySHA256 string `json:"why_sha256"`
@@ -185,8 +188,9 @@ func (s Session) Check() error {
 		return fmt.Errorf("session %s expires after its capture and within the limits", s.Name)
 	}
 	if !pseudoShape.MatchString(s.VouchedBy) || (s.ApprovedBy != "" && !pseudoShape.MatchString(s.ApprovedBy)) ||
-		(s.ApprovedBy != "" && s.ApprovedBy == s.VouchedBy) {
-		return fmt.Errorf("session %s is vouched for and approved by two different people", s.Name)
+		(s.ApprovedBy != "" && (s.ApprovedBy == s.VouchedBy) != s.Alone) || (s.Alone && s.ApprovedBy == "") {
+		return fmt.Errorf("session %s is approved by a second person, or by its only "+
+			"administrator alone and marked so", s.Name)
 	}
 	if !digestShape.MatchString(s.WhySHA256) || (s.Ticket != "" && !ValidTicket(s.Ticket)) {
 		return fmt.Errorf("session %s names a reason by its digest, and a ticket by its id", s.Name)

@@ -238,6 +238,16 @@ var commandNeeds = map[string]need{
 	// weight, a signed statement about a test this program ran, and the
 	// key it signs with is one the caller named on the command line.
 	"windtunnel": {action: auth.ActView},
+	// The benign register is read by anybody who can read detections.
+	// Capturing a session, renewing one and bundling them can block a rule
+	// change, so each asks for tune itself; revoking only narrows what a
+	// gate accepts and asks for respond; a capture or a renewal also waits
+	// for a second administrator (internal/dual). A row here may only narrow
+	// its parent, so the commands ask for the rest themselves.
+	"benign": {action: auth.ActView},
+	// Checking a bundle's signatures and digests reads a file the caller
+	// named and opens no store.
+	"benign verify": {action: auth.ActView},
 	// A proof checks files the caller named against a corpus the caller
 	// named and signs with a key the caller named: it opens no store,
 	// contacts nobody and spends nothing, the wind tunnel's weight.

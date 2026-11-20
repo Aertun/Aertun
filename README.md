@@ -390,7 +390,7 @@ Chrome with a WebAuthn virtual authenticator:
 | **HTTP and MCP** | 30 checks: sign-in and two factors, cross-site requests, rate limiting, security headers, cookies, OAuth metadata with PKCE, the agent interface's authorisation, refusals and proof verification. |
 | **OpenID Connect** | 13 checks against Keycloak 26 over HTTPS: sign-in with PKCE; one factor is asked for a passkey; an address outside the domain, a forged callback, a provider at a private address without `--reach`, and a certificate from an unknown authority are each refused. |
 | **SAML 2.0** | 7 checks against Keycloak 26: a signed assertion signs in, one factor is asked for a passkey, an address outside the domain is refused. |
-| **Test suite** | Ninety-seven packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
+| **Test suite** | One hundred and one packages with tests, run on every push; several walk the source and fail when a command has no screen and no written reason, or declares no privilege. |
 
 **Speed** — four CPUs of an Intel Core i5-1235U laptop under WSL2, Go
 1.27.4: the median of three runs of `go test -bench . -count 3` over

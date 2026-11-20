@@ -65,7 +65,19 @@ const (
 	// Signer is a key trusted to sign proofs in this store's name
 	// (internal/proofstore): every proof it signs is shown as trusted.
 	Signer = "signer"
+	// Benign is a session vouched for as weird-but-benign (internal/benign),
+	// or vouched for again: it can block a rule that would catch what it
+	// holds, so a second person agrees to it.
+	Benign = "benign"
 )
+
+// BenignChange is a Benign request: the session, whether it is approved
+// for the first time or renewed, and, for a renewal, its new expiry.
+type BenignChange struct {
+	Name    string    `json:"name"`
+	Action  string    `json:"action"`
+	Expires time.Time `json:"expires,omitzero"`
+}
 
 // SignerChange is a Signer request: the name, the public key document and
 // why it is to be trusted.
