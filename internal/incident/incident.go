@@ -117,10 +117,31 @@ const (
 	// exploited vulnerability is available. The Cyber Resilience Act's
 	// final report on the vulnerability runs from here.
 	Mitigated Trigger = "mitigated"
+	// AISerious: an incident involving an AI system was judged serious
+	// under the regime in scope. The EU AI Act's general fifteen days, the
+	// GPAI Code of Practice's fifteen, California SB 53's fifteen and New
+	// York's seventy-two hours run from here.
+	AISerious Trigger = "ai-serious"
+	// AICritical: the AI incident disrupted critical infrastructure
+	// seriously and irreversibly, or is a widespread infringement. Two
+	// days, under the AI Act and the Code of Practice.
+	AICritical Trigger = "ai-critical"
+	// AIDeath: a person's death was linked to the AI system, or is
+	// suspected to be. Ten days.
+	AIDeath Trigger = "ai-death"
+	// AIBreach: a serious cybersecurity breach of a general-purpose AI
+	// model, its weights exfiltrated among them. Five days under the Code
+	// of Practice.
+	AIBreach Trigger = "ai-breach"
+	// AIImminent: a critical safety incident poses an imminent risk of
+	// death or serious physical injury. California SB 53's twenty-four
+	// hours run from here.
+	AIImminent Trigger = "ai-imminent"
 )
 
 // Triggers is every decision that starts something.
-var Triggers = []Trigger{Aware, Major, Material, Personal, Health, Mitigated}
+var Triggers = []Trigger{Aware, Major, Material, Personal, Health, Mitigated,
+	AISerious, AICritical, AIDeath, AIBreach, AIImminent}
 
 // Means says what making this decision commits to, so somebody can see
 // what they are about to start before they start it.
@@ -149,6 +170,30 @@ func (t Trigger) Means() string {
 		return "a fix or mitigation for the actively exploited " +
 			"vulnerability is available to users. The final report on it " +
 			"is due fourteen days from here"
+	case AISerious:
+		return "an incident involving an AI system is serious as the regime " +
+			"in scope defines it: under the EU AI Act, a death or serious " +
+			"harm to health, critical infrastructure, fundamental rights, " +
+			"property or the environment (Article 3(49)); under SB 53 and " +
+			"New York's RAISE Act, a critical safety incident as each " +
+			"defines one. The clock runs from awareness of the incident, " +
+			"not from proving that the system caused it"
+	case AICritical:
+		return "the AI incident seriously and irreversibly disrupted the " +
+			"management or operation of critical infrastructure, or is a " +
+			"widespread infringement; the report is due two days from here"
+	case AIDeath:
+		return "a death is linked to the AI system, or the link is " +
+			"suspected; the report is due ten days from here, and " +
+			"suspicion is enough to start it"
+	case AIBreach:
+		return "a general-purpose AI model suffered a serious " +
+			"cybersecurity breach, such as its weights leaving the " +
+			"provider's control; the report is due five days from here"
+	case AIImminent:
+		return "a critical safety incident poses an imminent risk of death " +
+			"or serious physical injury; an appropriate authority is told " +
+			"within twenty-four hours"
 	}
 	return string(t)
 }

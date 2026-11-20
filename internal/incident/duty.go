@@ -186,6 +186,93 @@ var Obligations = []Obligation{
 		What:   "a breach notice",
 	},
 	{
+		Regime: "EU AI Act Article 73", Scope: "aiact", Needs: AISerious,
+		Within: 15 * 24 * time.Hour,
+		Who: "the market surveillance authority of the Member State " +
+			"where the incident occurred",
+		What: "a serious incident report",
+		Note: "fifteen days from awareness, and immediately once a causal " +
+			"link to the system is established or reasonably likely " +
+			"(Article 73(2)). For providers of high-risk systems; under the " +
+			"2026 Digital Omnibus those obligations apply from 2 December " +
+			"2027 (Annex III) and 2 August 2028 (Annex I), so rule it out " +
+			"with that reason before then",
+	},
+	{
+		Regime: "EU AI Act Article 73(3)", Scope: "aiact", Needs: AICritical,
+		Within: 2 * 24 * time.Hour,
+		Who: "the market surveillance authority of the Member State " +
+			"where the incident occurred",
+		What: "a serious incident report",
+		Note: "two days from awareness of a widespread infringement or a " +
+			"serious disruption of critical infrastructure",
+	},
+	{
+		Regime: "EU AI Act Article 73(4)", Scope: "aiact", Needs: AIDeath,
+		Within: 10 * 24 * time.Hour,
+		Who: "the market surveillance authority of the Member State " +
+			"where the incident occurred",
+		What: "a serious incident report",
+		Note: "ten days from awareness, and immediately once the link to " +
+			"the death is established or suspected",
+	},
+	{
+		Regime: "GPAI critical infrastructure", Scope: "gpai", Needs: AICritical,
+		Within: 2 * 24 * time.Hour,
+		Who:    "the AI Office and, as appropriate, national authorities",
+		What:   "an initial serious incident report",
+		Note: "the General-Purpose AI Code of Practice's shortest clock, " +
+			"for signatories providing a model with systemic risk; updates " +
+			"follow every four weeks and a final report within sixty days " +
+			"of resolution",
+	},
+	{
+		Regime: "GPAI cybersecurity breach", Scope: "gpai", Needs: AIBreach,
+		Within: 5 * 24 * time.Hour,
+		Who:    "the AI Office and, as appropriate, national authorities",
+		What:   "an initial serious incident report",
+	},
+	{
+		Regime: "GPAI death", Scope: "gpai", Needs: AIDeath,
+		Within: 10 * 24 * time.Hour,
+		Who:    "the AI Office and, as appropriate, national authorities",
+		What:   "an initial serious incident report",
+	},
+	{
+		Regime: "GPAI serious harm", Scope: "gpai", Needs: AISerious,
+		Within: 15 * 24 * time.Hour,
+		Who:    "the AI Office and, as appropriate, national authorities",
+		What:   "an initial serious incident report",
+		Note: "serious harm to health, fundamental rights, property or the " +
+			"environment",
+	},
+	{
+		Regime: "California SB 53", Scope: "sb53", Needs: AISerious,
+		Within: 15 * 24 * time.Hour,
+		Who:    "the California Office of Emergency Services",
+		What:   "a critical safety incident report",
+		Note: "for frontier developers, fifteen days from discovering the " +
+			"critical safety incident; in force since 1 January 2026",
+	},
+	{
+		Regime: "California SB 53 imminent risk", Scope: "sb53", Needs: AIImminent,
+		Within: 24 * time.Hour,
+		Who: "an appropriate authority, such as a law enforcement or " +
+			"public safety agency",
+		What: "a disclosure of the critical safety incident",
+	},
+	{
+		Regime: "New York RAISE Act", Scope: "raise", Needs: AISerious,
+		Within: 72 * time.Hour,
+		Who:    "the New York authority the Act designates",
+		What:   "a safety incident report",
+		Note: "seventy-two hours from learning of the safety incident, or of " +
+			"facts sufficient to believe one occurred, for large frontier " +
+			"developers from 1 January 2027. The 2026 amendments name the " +
+			"receiving office and a shorter window where harm is imminent: " +
+			"check them, which this table does not model",
+	},
+	{
 		Regime: "CIRCIA", Scope: "circia", Needs: Aware,
 		Within: 72 * time.Hour,
 		Who:    "CISA", What: "a covered cyber incident report",

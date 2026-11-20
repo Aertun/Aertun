@@ -4,6 +4,17 @@ Aertun NEWS
 Unreleased
 ==========
 
+* Incidents involving AI systems have their own clocks.  Five decisions
+  start them — ai-serious, ai-critical, ai-death, ai-breach, ai-imminent —
+  under four new regimes: `aiact` (EU AI Act Article 73: fifteen days, two
+  for critical infrastructure or a widespread infringement, ten for a
+  death), `gpai` (the General-Purpose AI Code of Practice: two, five, ten
+  and fifteen days by severity), `sb53` (California: fifteen days to the
+  Office of Emergency Services, twenty-four hours where death or serious
+  injury is imminent) and `raise` (New York, seventy-two hours, from
+  1 January 2027).  `aertun incident prove` signs them like any other
+  clock.
+
 * Your estate's own weird-but-benign workflows, measured.  `aertun benign
   capture` selects a real session from the event store, refuses it when the
   intelligence store, an open finding or an unacknowledged alert says it is

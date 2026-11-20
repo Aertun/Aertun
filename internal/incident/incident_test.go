@@ -554,3 +554,49 @@ func TestTheTimelineIsOrderedByTheIncidentNotTheClock(t *testing.T) {
 		t.Fatalf("the clocks won: %q", tl[len(tl)-1].What)
 	}
 }
+
+// An AI incident starts the AI regimes' own clocks from the decisions they
+// need: a death linked to the system starts the EU AI Act's and the Code of
+// Practice's ten days and nothing else; serious harm their fifteen; an
+// imminent risk under SB 53 twenty-four hours.
+func TestAnAIIncidentStartsTheAIRegimesClocks(t *testing.T) {
+	at := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	i, err := Declare("inc-ai-1", "an assistant's advice linked to a patient's death", Sev1, "ada",
+		at, "aiact", "gpai", "sb53")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := i.Decide(AIDeath, "ada", "the hospital's report links the advice to the death", at.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	due := map[string]time.Time{}
+	started := map[string]bool{}
+	for _, d := range i.Duties(at.Add(2 * time.Hour)) {
+		started[d.Regime] = d.Started
+		due[d.Regime] = d.Due
+	}
+	for _, r := range []string{"EU AI Act Article 73(4)", "GPAI death"} {
+		if !started[r] || !due[r].Equal(at.Add(time.Hour+10*24*time.Hour)) {
+			t.Errorf("%s: started %v, due %s", r, started[r], due[r])
+		}
+	}
+	for _, r := range []string{"EU AI Act Article 73", "GPAI serious harm", "California SB 53",
+		"California SB 53 imminent risk", "GPAI cybersecurity breach"} {
+		if started[r] {
+			t.Errorf("%s started on a decision it does not need", r)
+		}
+	}
+	if err := i.Decide(AIImminent, "ada", "the same advice is still being given", at.Add(3*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range i.Duties(at.Add(4 * time.Hour)) {
+		if d.Regime == "California SB 53 imminent risk" && !d.Due.Equal(at.Add(27*time.Hour)) {
+			t.Errorf("SB 53's imminent clock is due %s", d.Due)
+		}
+	}
+	for _, tr := range []Trigger{AISerious, AICritical, AIDeath, AIBreach, AIImminent} {
+		if tr.Means() == string(tr) {
+			t.Errorf("%s says nothing about what it starts", tr)
+		}
+	}
+}
