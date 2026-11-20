@@ -141,7 +141,7 @@ func TestBothRequired(t *testing.T) {
 			t.Fatal(err)
 		}
 		half, _ := scitt.Read(one)
-		if _, err := VerifyReceipts(half, l.PublicKey()); err == nil || !strings.Contains(err.Error(), "both are required") {
+		if _, err := VerifyReceipts(half, l.PublicKey()); err == nil || !strings.Contains(err.Error(), "one is required in each") {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

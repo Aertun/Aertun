@@ -271,6 +271,38 @@ measurement — and every screen and document that shows it says so. The
 scorecard's digest covers its RFC 8785 canonical form; it is signed only in
 CI, and `aertun windtunnel verify` checks a signed card offline.
 
+## The evidence protocol
+
+Every party that sees an AI agent's action can sign what it saw: the
+agent, its gateway, the server it called, a sandbox. The [Aertun Evidence
+Protocol](spec/aep/v1/README.md) is a profile of SCITT (RFC 9943). Each
+receipt is a COSE signed statement about one action digest, and every
+party computes that digest alike from the resource, the tool and the
+arguments. A reconciliation of the parties' receipts names what does not
+line up:
+- an action some party never reported;
+- a gap in a party's sequence numbers;
+- an action the parties name different actors for.
+
+Anyone can check a reconciliation offline by doing it again.
+
+```bash
+aertun receipt emit --key agent.key --issuer https://agent.example --vantage agent \
+  --target https://mcp.example/mcp --tool transfer_funds --args call.json --out r.cose
+aertun receipt register r.cose --issuer-key https://agent.example=agent.pub.json --out r.t.cose
+aertun receipt reconcile *.t.cose --key auditor.key --issuer https://auditor.example \
+  --from 2026-11-20T00:00:00Z --to 2026-11-21T00:00:00Z --expect https://agent.example=agent \
+  --expect https://mcp.example/mcp=target --issuer-key ... --out reconciliation.cose
+```
+
+The transparency log answers each registration with an RFC 9942 receipt
+in each of its algorithms, Ed25519 and ML-DSA-65, and both are required.
+Once a log is set up, Aertun's own agent interface receipts every call it
+answers. `aertun conform` runs the protocol's [test
+vectors](spec/aep/v1/vectors) against this verifier or any other.
+[STABILITY.md](STABILITY.md) says what will never change, and
+[THREAT_MODEL.md](THREAT_MODEL.md) says what is and is not defended.
+
 ## The evidence: a security-operations core
 
 A proof is only as good as the evidence it is held to, so Aertun keeps that

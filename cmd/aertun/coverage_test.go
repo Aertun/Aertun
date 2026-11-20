@@ -208,6 +208,14 @@ var coverage = map[string]surfaces{
 			"agent able to vouch for its own activity could make itself " +
 			"invisible to the next rule written against it",
 	},
+	// The evidence protocol's conformance suite, for implementers.
+	"conform": {
+		Why: "it is a test an implementer runs in their own build, on their own " +
+			"verifier, the way a compiler's test suite is run; it reads vectors " +
+			"and nothing in the store",
+		NoMCP: "it runs a command the caller names, which is a capability no agent " +
+			"interface should lend, and an agent has nothing to conform",
+	},
 	// The evidence protocol's receipts: emitted by a party, registered in
 	// this deployment's log, verified and reconciled offline.
 	"receipt": {

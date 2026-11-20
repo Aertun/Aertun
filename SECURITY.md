@@ -80,6 +80,13 @@ is false is a vulnerability even without a working exploit:
 - **A credential sealed is a credential kept.** Any way a connector's
   credential or a feed's secret is stored in the clear once a keyring exists,
   or read with a key other than the one it was sealed under.
+- **A receipt proves what it says.** Any evidence-protocol statement,
+  log receipt or reconciliation that is accepted when it should not be:
+  - `aertun receipt verify` or `aertun conform` passes one whose
+    signature, action digest, inclusion proof or recomputed reconciliation
+    does not hold;
+  - a log receipt in only one of the log's two algorithms counts as
+    registration.
 - **A connector reaches only what it declares.** Any request a connector or a
   feed makes to a host its manifest does not name, or to this machine's
   private network when it was not allowed to.
@@ -98,10 +105,11 @@ is false is a vulnerability even without a working exploit:
 
 | Version | Security fixes |
 |---|---|
+| 0.2.x | yes |
 | 0.1.x | yes |
 | `main` | yes: fixes land here first |
 
-Report against the latest 0.1 release or against `main`.
+Report against the latest 0.2 release or against `main`.
 
 ## Our own claims, tested
 
@@ -118,4 +126,5 @@ and a report is most useful when it makes one of those tests fail:
 - `internal/proof`, `cmd/aertun/proofcmd_test.go` — signed proofs
 - `internal/audit`, `internal/translog`, `internal/auditstream` — the chain, the tree, signed heads and the stream
 - `internal/pii`, `internal/model` — the privacy guard in front of a model
+- `internal/cbor`, `internal/cose`, `internal/scitt`, `internal/aep`, `internal/receiptlog`, `cmd/aertun/conformcmd_test.go` — the evidence protocol, its log and its test vectors
 - `internal/fetch`, `internal/egress`, `internal/connector` — what may be reached

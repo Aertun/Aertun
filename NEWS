@@ -23,7 +23,17 @@ Unreleased
   receipt from the target's vantage for every tool call it answers, on
   HTTP and on stdio (with admin.base_url set), and `aertun receipt export`
   writes the log's entries with their receipts on demand: an agent's own
-  receipts reconcile against the server's with no change to the agent.  Statements and both receipts were verified by an independent
+  receipts reconcile against the server's with no change to the agent.
+
+* The protocol is written down in spec/aep/v1, with its CDDL and fifteen
+  test vectors: valid receipts in each algorithm, a transparent statement,
+  agreeing and disagreeing reconciliations, and nine that a verifier must
+  refuse, each for its own reason.  Both algorithms sign
+  deterministically, and the suite requires the vectors to be reproduced
+  byte for byte.  `aertun conform` runs them against this verifier, or
+  against any other given as a command.  STABILITY.md says what never
+  changes (anything signed), and THREAT_MODEL.md what is and is not
+  defended.  Statements and both receipts were verified by an independent
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 

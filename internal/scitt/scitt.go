@@ -27,6 +27,7 @@
 package scitt
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -390,4 +391,61 @@ func VerifyReceipt(receipt, entry []byte, v cose.Verifier) (Inclusion, error) {
 	}
 	in.Root = root
 	return in, nil
+}
+
+// VerifyReceipts requires, for each key given, one receipt the statement
+// carries that the key verifies, all for the same tree from the same log;
+// receipts from other logs are passed over. With a log's two keys, one per
+// algorithm, it is the rule that a statement is registered only when both
+// say so. It returns the inclusions, one per key, in the keys' order.
+func VerifyReceipts(s *Signed, keys ...cose.Verifier) ([]Inclusion, error) {
+	if len(keys) == 0 {
+		return nil, errors.New("no log key to verify receipts with")
+	}
+	entry, err := s.Entry()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Inclusion, len(keys))
+	found := make([]bool, len(keys))
+	for i, r := range s.Receipts {
+		m, in, _, err := ReadReceipt(r)
+		if err != nil {
+			return nil, fmt.Errorf("receipt %d: %w", i+1, err)
+		}
+		for k, v := range keys {
+			if found[k] || !v.Accepts(in.Algorithm) {
+				continue
+			}
+			if kid := m.KeyID(); kid != nil && !bytes.Equal(kid, v.KeyID()) {
+				continue // another log's, in the same algorithm
+			}
+			got, err := VerifyReceipt(r, entry, v)
+			if err != nil {
+				return nil, fmt.Errorf("receipt %d: %w", i+1, err)
+			}
+			out[k], found[k] = got, true
+			break
+		}
+	}
+	for k := range keys {
+		if !found[k] {
+			return nil, fmt.Errorf("no receipt from the log in algorithm %d: one is required in each "+
+				"of the log's algorithms", algOf(keys[k]))
+		}
+		if !bytes.Equal(out[k].Root, out[0].Root) || out[k].Issuer != out[0].Issuer {
+			return nil, errors.New("the log's receipts are for different trees")
+		}
+	}
+	return out, nil
+}
+
+// algOf names the algorithm a key verifies, for a message.
+func algOf(v cose.Verifier) int64 {
+	for _, a := range []int64{cose.AlgEd25519, cose.AlgMLDSA65} {
+		if v.Accepts(a) {
+			return a
+		}
+	}
+	return 0
 }

@@ -1,0 +1,11 @@
+{
+  "name": "digest",
+  "description": "The action digest of a call: SHA-256 over the deterministic CBOR array [\"AEP-Action-v1\", target, tool, SHA-256(RFC 8785 JSON of the arguments)]. The arguments are given with whitespace and member order a canonicaliser removes.",
+  "kind": "digest",
+  "target": "https://mcp.example/mcp",
+  "tool": "transfer_funds",
+  "args": " { \"to\" : \"acct-7\", \"amount\" : 1.00E2 } ",
+  "args_digest": "279893550e9221088e55eb7e84edbcadd3289e3c080b83ee2a43c781d9b4b039",
+  "digest": "75ac16f38d14c572e17760fdb5967786b210355416faae67b74a98faccbac797",
+  "valid": true
+}

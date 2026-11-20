@@ -1,0 +1,61 @@
+; SPDX-FileCopyrightText: 2026 Rashik Adhikari
+; SPDX-License-Identifier: Apache-2.0
+;
+; The Aertun Evidence Protocol, version 1: payloads.
+; Statements are SCITT signed statements (RFC 9943); these are their
+; payloads, in deterministic CBOR (RFC 8949 section 4.2.1).
+
+; The action digest is SHA-256 over the deterministic encoding of:
+action-digest-input = [
+  domain: "AEP-Action-v1",
+  target: name,          ; RFC 8707 resource indicator of the server called
+  tool: name,            ; the tool or operation
+  args: digest,          ; SHA-256 of the RFC 8785 form of the JSON arguments;
+                         ; absent arguments are {}
+]
+
+; content type "application/vnd.aertun.aep.action+cbor"
+; CWT claims: iss = the party, sub = "aep:action:" + lowercase hex digest
+action-receipt = {
+  "v": 1,
+  "action": digest,      ; the action digest, recomputed by every reader
+  "target": name,
+  "tool": name,
+  "args": digest,
+  "vantage": "agent" / "gateway" / "target" / "sandbox",
+  "at": instant,         ; when this party saw the action
+  ? "actor": name,       ; who this party saw act
+  ? "grant": name,       ; the authority this party saw exercised
+  ? "outcome": "ok" / "error" / "refused",
+  ? "seq": uint,         ; this party's own sequence number
+}
+
+; content type "application/vnd.aertun.aep.reconciliation+cbor"
+; CWT claims: iss = the reconciler, sub = "aep:reconciliation:" + hex inputs
+reconciliation-receipt = {
+  "v": 1,
+  "from": instant,
+  "to": instant,
+  "tolerance_ms": uint .le 60000,
+  "expect": [2* party],                 ; sorted by issuer
+  "inputs": digest,                     ; SHA-256 over the sorted SHA-256 of each entry
+  "receipts": uint,
+  "actions": uint,
+  "complete": uint,
+  "gaps": [* gap],                      ; at most 200 listed
+  "gaps_total": uint,
+  "seq_gaps": [* seq-gap],
+  "actor_splits": [* actor-split],      ; at most 200 listed
+  "actor_splits_total": uint,
+  "verdict": "agree" / "disagree" / "inconclusive",
+}
+
+party = { "issuer": tstr, "vantage": "agent" / "gateway" / "target" / "sandbox" }
+gap = { "action": digest, "tool": name, "at": instant, "seen_by": [* tstr], "missing": [+ tstr] }
+seq-gap = { "issuer": tstr, "missing": [* [first: uint, last: uint]], "repeated": [* uint] }
+actor-split = { "action": digest, "at": instant, "actors": { + tstr => name } }
+
+digest = bstr .size 32
+name = tstr .size (1..2048)             ; no control characters
+instant = tstr                          ; RFC 3339 in UTC, "Z", fraction without
+                                        ; trailing zeros, as Go's RFC3339Nano writes it

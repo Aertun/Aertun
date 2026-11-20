@@ -35,7 +35,6 @@
 package receiptlog
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -384,48 +383,5 @@ func VerifyReceipts(s *scitt.Signed, logKey pack.KeyPublic) ([]scitt.Inclusion, 
 	if err != nil {
 		return nil, err
 	}
-	entry, err := s.Entry()
-	if err != nil {
-		return nil, err
-	}
-	edAt, mlAt := -1, -1
-	var out []scitt.Inclusion
-	for i, r := range s.Receipts {
-		m, in, _, err := scitt.ReadReceipt(r)
-		if err != nil {
-			return nil, fmt.Errorf("receipt %d: %w", i+1, err)
-		}
-		var v cose.Verifier
-		at := &mlAt
-		switch {
-		case ed.Accepts(in.Algorithm):
-			v, at = ed, &edAt
-		case ml.Accepts(in.Algorithm):
-			v = ml
-		default:
-			continue // another log's, in an algorithm this key has no half for
-		}
-		if kid := m.KeyID(); kid != nil && !bytes.Equal(kid, v.KeyID()) {
-			continue // another log's, in the same algorithm
-		}
-		got, err := scitt.VerifyReceipt(r, entry, v)
-		if err != nil {
-			return nil, fmt.Errorf("receipt %d: %w", i+1, err)
-		}
-		out = append(out, got)
-		*at = len(out) - 1
-	}
-	switch {
-	case edAt < 0 && mlAt < 0:
-		return nil, errors.New("no receipt from this log")
-	case edAt < 0:
-		return nil, errors.New("no Ed25519 receipt from this log: both are required, one per algorithm")
-	case mlAt < 0:
-		return nil, errors.New("no ML-DSA-65 receipt from this log: both are required, one per algorithm")
-	}
-	edIn, mlIn := out[edAt], out[mlAt]
-	if !bytes.Equal(edIn.Root, mlIn.Root) || edIn.Issuer != mlIn.Issuer {
-		return nil, errors.New("the log's two receipts are for different trees")
-	}
-	return out, nil
+	return scitt.VerifyReceipts(s, ed, ml)
 }
