@@ -48,7 +48,7 @@ func endpoint(t *testing.T) (*Endpoint, *[]called) {
 			return s, nil
 		},
 		SameOrigin: func(o string) bool { return o == "https://admin.example.org" },
-		Called: func(r *http.Request, c *Caller, tool, op string, err *Error) {
+		Called: func(r *http.Request, c *Caller, _ json.RawMessage, tool, op string, err *Error) {
 			calls = append(calls, called{tool, op})
 		},
 	}

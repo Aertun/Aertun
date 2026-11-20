@@ -20,21 +20,31 @@
 // Each entry is a four-byte big-endian length and the statement's bytes,
 // written and synced before any receipt for it is signed. So a record cut
 // short by a crash is one no receipt was ever issued for, and is dropped
-// the next time the log is opened; nothing else in the file is ever
-// rewritten. Registration holds an exclusive lock across processes, so a
-// command and a server registering at once append one after the other.
+// the next time the log is read; nothing else in the file is ever
+// rewritten, and a file found shorter than what was read from it is
+// refused. Every operation holds an exclusive lock across processes, so a
+// command and a server append one after the other.
+//
+// # Appending is cheap; receipts are on demand
+//
+// A server that appends a statement for every call it answers cannot
+// reread the log each time. So an opened log keeps its tree and reads only
+// what other processes appended since; Append signs nothing; and Receipts
+// proves an entry's inclusion in the log as it stands when asked, as SCITT
+// allows a receipt to be fetched after registration.
 package receiptlog
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aertun/aertun/internal/atomicfile"
@@ -51,7 +61,7 @@ const (
 	lockFile    = "lock"
 )
 
-// MaxLog bounds the entries file read into memory to rebuild the tree.
+// MaxLog bounds the entries file.
 const MaxLog = 1 << 30
 
 // Log is a receipt log in a directory.
@@ -61,6 +71,15 @@ type Log struct {
 	key    *pack.Key
 	ed     *cose.Ed25519
 	ml     *cose.MLDSA65
+
+	// What has been read of the entries file: the tree over it, each
+	// entry's offset, and each entry's index by its digest. Kept, so each
+	// operation reads only what other processes appended since.
+	mu      sync.Mutex
+	tree    *translog.Log
+	offsets []int64
+	leaves  map[[32]byte]int
+	read    int64
 }
 
 // Open opens the log in dir, creating it, its key and its name on first
@@ -119,7 +138,14 @@ func Open(dir, issuer string) (*Log, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Log{dir: dir, issuer: issuer, key: k, ed: ed, ml: ml}, nil
+	return &Log{dir: dir, issuer: issuer, key: k, ed: ed, ml: ml, tree: translog.New(),
+		leaves: map[[32]byte]int{}}, nil
+}
+
+// Exists reports whether a receipt log has been set up in dir.
+func Exists(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, issuerFile))
+	return err == nil
 }
 
 // Signers are a dual key's halves as COSE signers.
@@ -156,138 +182,198 @@ func Verifiers(pub pack.KeyPublic) (*cose.Ed25519, *cose.MLDSA65, error) {
 	return ed, ml, nil
 }
 
+// Signer is the log's Ed25519 half, for statements this deployment makes
+// about what it saw itself; verifiers check them with the log's key.
+func (l *Log) Signer() cose.Signer { return l.ed }
+
 // Issuer is the log's name.
 func (l *Log) Issuer() string { return l.issuer }
 
 // PublicKey is what a verifier of the log's receipts needs.
 func (l *Log) PublicKey() pack.KeyPublic { return l.key.PublicKey() }
 
-// load reads every entry and rebuilds the tree, dropping a last record a
-// crash cut short. The caller holds the lock.
-func (l *Log) load() (*translog.Log, [][]byte, error) {
-	path := filepath.Join(l.dir, entriesFile)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+// locked runs f holding the lock across processes and this log's own,
+// after reading whatever other processes appended since it last looked.
+func (l *Log) locked(f func(*os.File) error) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	unlock, err := atomicfile.Lock(filepath.Join(l.dir, lockFile))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	defer f.Close()
-	body, err := io.ReadAll(io.LimitReader(f, MaxLog+1))
+	defer unlock()
+	file, err := os.OpenFile(filepath.Join(l.dir, entriesFile), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	if len(body) > MaxLog {
-		return nil, nil, fmt.Errorf("the receipt log is past %d bytes, which this reads whole", MaxLog)
+	defer file.Close()
+	if err := l.catchUp(file); err != nil {
+		return err
 	}
-	tree := translog.New()
-	var entries [][]byte
+	return f(file)
+}
+
+// catchUp reads the records past what this log has read, adding each to
+// the tree, and drops a last record a crash cut short: one is written and
+// synced whole before any receipt for it is signed, so a partial one was
+// never receipted. The caller holds the lock, so no append is under way.
+func (l *Log) catchUp(f *os.File) error {
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	size := info.Size()
+	switch {
+	case size < l.read:
+		return fmt.Errorf("the receipt log is %d bytes and %d were read from it: it was rewritten, "+
+			"which an append-only log never is", size, l.read)
+	case size > MaxLog:
+		return fmt.Errorf("the receipt log is past %d bytes", MaxLog)
+	case size == l.read:
+		return nil
+	}
+	body := make([]byte, size-l.read)
+	if _, err := f.ReadAt(body, l.read); err != nil {
+		return err
+	}
 	at := 0
-	for at < len(body) {
-		if len(body)-at < 4 {
-			break
-		}
+	for len(body)-at >= 4 {
 		n := int(binary.BigEndian.Uint32(body[at:]))
 		if n == 0 || n > cose.MaxMessage {
-			return nil, nil, fmt.Errorf("the receipt log's record at byte %d claims %d bytes; the file is damaged", at, n)
+			return fmt.Errorf("the receipt log's record at byte %d claims %d bytes; the file is damaged",
+				l.read+int64(at), n)
 		}
 		if len(body)-at-4 < n {
 			break
 		}
 		e := body[at+4 : at+4+n]
-		tree.Append(e)
-		entries = append(entries, e)
+		l.offsets = append(l.offsets, l.read+int64(at))
+		l.leaves[sha256.Sum256(e)] = l.tree.Append(e)
 		at += 4 + n
 	}
-	if at < len(body) {
-		// Written but never synced whole, so never receipted.
-		if err := f.Truncate(int64(at)); err != nil {
-			return nil, nil, fmt.Errorf("cannot drop the record a crash cut short: %w", err)
+	l.read += int64(at)
+	if l.read < size {
+		if err := f.Truncate(l.read); err != nil {
+			return fmt.Errorf("cannot drop the record a crash cut short: %w", err)
 		}
 	}
-	return tree, entries, nil
+	return nil
+}
+
+// entryAt reads the entry at index. The caller holds the lock.
+func (l *Log) entryAt(f *os.File, index int) ([]byte, error) {
+	var n [4]byte
+	if _, err := f.ReadAt(n[:], l.offsets[index]); err != nil {
+		return nil, err
+	}
+	e := make([]byte, binary.BigEndian.Uint32(n[:]))
+	if _, err := f.ReadAt(e, l.offsets[index]+4); err != nil {
+		return nil, err
+	}
+	return e, nil
 }
 
 // Size is how many entries the log holds.
 func (l *Log) Size() (int, error) {
-	unlock, err := atomicfile.Lock(filepath.Join(l.dir, lockFile))
-	if err != nil {
-		return 0, err
-	}
-	defer unlock()
-	tree, _, err := l.load()
-	if err != nil {
-		return 0, err
-	}
-	return tree.Size(), nil
+	var n int
+	err := l.locked(func(*os.File) error { n = l.tree.Size(); return nil })
+	return n, err
 }
 
-// Register appends a statement admit accepts and returns it transparent,
-// carrying a receipt in each algorithm. A statement already in the log is
-// not appended again: it gets fresh receipts for where it already is.
-func (l *Log) Register(statement []byte, admit func(*scitt.Signed) error, now time.Time) ([]byte, error) {
+// Append adds a statement admit accepts, and returns its index. A
+// statement already in the log is not added again; its index is returned.
+func (l *Log) Append(statement []byte, admit func(*scitt.Signed) error) (int, error) {
 	s, err := scitt.Read(statement)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	if admit == nil {
-		return nil, errors.New("a statement is registered only under a policy that admits it")
+		return 0, errors.New("a statement is registered only under a policy that admits it")
 	}
 	if err := admit(s); err != nil {
-		return nil, fmt.Errorf("not admitted: %w", err)
+		return 0, fmt.Errorf("not admitted: %w", err)
 	}
 	entry, err := s.Entry()
 	if err != nil {
-		return nil, err
-	}
-	unlock, err := atomicfile.Lock(filepath.Join(l.dir, lockFile))
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	tree, entries, err := l.load()
-	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	index := -1
-	for i, e := range entries {
-		if bytes.Equal(e, entry) {
+	err = l.locked(func(f *os.File) error {
+		if i, ok := l.leaves[sha256.Sum256(entry)]; ok {
 			index = i
-			break
+			return nil
 		}
-	}
-	if index < 0 {
-		if err := l.append(entry); err != nil {
-			return nil, err
+		rec := binary.BigEndian.AppendUint32(nil, uint32(len(entry)))
+		rec = append(rec, entry...)
+		if _, err := f.WriteAt(rec, l.read); err != nil {
+			return err
 		}
-		index = tree.Append(entry)
-	}
-	size := tree.Size()
-	var receipts [][]byte
-	for _, signer := range []cose.Signer{l.ed, l.ml} {
-		r, err := scitt.IssueReceipt(signer, l.issuer, s.Subject, tree, entry, index, size, now)
-		if err != nil {
-			return nil, err
+		if err := f.Sync(); err != nil {
+			return err
 		}
-		receipts = append(receipts, r)
-	}
-	return scitt.Attach(entry, receipts...)
+		l.offsets = append(l.offsets, l.read)
+		index = l.tree.Append(entry)
+		l.leaves[sha256.Sum256(entry)] = index
+		l.read += int64(len(rec))
+		return nil
+	})
+	return index, err
 }
 
-func (l *Log) append(entry []byte) error {
-	f, err := os.OpenFile(filepath.Join(l.dir, entriesFile), os.O_WRONLY|os.O_APPEND, 0o600)
+// Receipts returns the entry at index as a transparent statement, with a
+// receipt in each algorithm for the log as it stands.
+func (l *Log) Receipts(index int, now time.Time) ([]byte, error) {
+	var out []byte
+	err := l.locked(func(f *os.File) error {
+		if index < 0 || index >= l.tree.Size() {
+			return fmt.Errorf("the log has no entry %d", index)
+		}
+		entry, err := l.entryAt(f, index)
+		if err != nil {
+			return err
+		}
+		s, err := scitt.Read(entry)
+		if err != nil {
+			return fmt.Errorf("entry %d: %w", index, err)
+		}
+		var receipts [][]byte
+		for _, signer := range []cose.Signer{l.ed, l.ml} {
+			r, err := scitt.IssueReceipt(signer, l.issuer, s.Subject, l.tree, entry, index, l.tree.Size(), now)
+			if err != nil {
+				return err
+			}
+			receipts = append(receipts, r)
+		}
+		out, err = scitt.Attach(entry, receipts...)
+		return err
+	})
+	return out, err
+}
+
+// Register appends a statement admit accepts and returns it transparent.
+func (l *Log) Register(statement []byte, admit func(*scitt.Signed) error, now time.Time) ([]byte, error) {
+	index, err := l.Append(statement, admit)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rec := binary.BigEndian.AppendUint32(nil, uint32(len(entry)))
-	rec = append(rec, entry...)
-	if _, err := f.Write(rec); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
+	return l.Receipts(index, now)
+}
+
+// Each calls f with every entry's index and bytes, in order, while holding
+// the lock; f must not call back into the log.
+func (l *Log) Each(f func(index int, entry []byte) error) error {
+	return l.locked(func(file *os.File) error {
+		for i := range l.offsets {
+			e, err := l.entryAt(file, i)
+			if err != nil {
+				return err
+			}
+			if err := f(i, e); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // VerifyReceipts checks a transparent statement's receipts against a log's

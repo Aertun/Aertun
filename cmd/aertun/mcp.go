@@ -132,8 +132,9 @@ func serveLines(srv *mcp.Server, r io.Reader, w io.Writer,
 	return in.Err()
 }
 
-// auditStdioCall writes the audit record for one tools/call on stdio: the
-// tool and operation the request named, and the answer the caller was given.
+// auditStdioCall writes the audit record for one tools/call on stdio, the
+// tool and operation the request named and the answer the caller was given,
+// and the call's receipt (receiptmcp.go).
 // The record itself is written by auditMCPCall, which the HTTP transport's
 // hook writes too, so nothing downstream can tell — or needs to tell — which
 // transport carried the call.
@@ -152,6 +153,7 @@ func auditStdioCall(root string, caller *Caller, params json.RawMessage, resp *m
 		operation = a.Operation
 	}
 	auditMCPCall(root, caller, p.Name, operation, resp.Error)
+	receiptMCPCall(root, stdioResource(root), caller, params, resp.Error)
 }
 
 // auditMCPCall writes the audit record for one tools/call, whichever
@@ -255,8 +257,9 @@ func mountMCP(mux *http.ServeMux, root string, cfg *config.Config, addr string) 
 			return buildMCP(root, c.Data.(*Caller)), nil
 		},
 		SameOrigin: func(o string) bool { return origins[o] },
-		Called: func(r *http.Request, c *mcp.Caller, tool, operation string, rerr *mcp.Error) {
+		Called: func(r *http.Request, c *mcp.Caller, params json.RawMessage, tool, operation string, rerr *mcp.Error) {
 			auditMCPCall(root, c.Data.(*Caller), tool, operation, rerr)
+			receiptMCPCall(root, origin+"/mcp", c.Data.(*Caller), params, rerr)
 		},
 	})
 	// The document a 401 points at: what this resource is, and the one

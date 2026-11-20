@@ -35,6 +35,7 @@ import (
 const receiptUsage = `usage:
   aertun receipt emit --key F --issuer URI --vantage agent|gateway|target|sandbox --target URI --tool NAME [--args F|-] [--at TIME] [--actor A] [--grant G] [--outcome ok|error|refused] [--seq N] [--alg ed25519|ml-dsa-65] [--public-key F] --out F
   aertun receipt register FILE --issuer-key ISSUER=F... [--log-name URI] [--log-key F] --out F
+  aertun receipt export --out DIR [--issuer URI] [--from TIME] [--to TIME] [--limit N] [--log-key F]
   aertun receipt verify FILE --issuer-key ISSUER=F... [--log-key F] [--args F] [RECEIPT...]
   aertun receipt reconcile FILE... --key F --issuer URI --from TIME --to TIME --expect ISSUER=VANTAGE... --issuer-key ISSUER=F... [--log-key F] [--tolerance 1s] [--alg ed25519|ml-dsa-65] --out F`
 
@@ -50,6 +51,8 @@ func cmdReceipt(root string, args []string) error {
 		return receiptEmit(args[1:])
 	case "register":
 		return receiptRegister(root, args[1:])
+	case "export":
+		return receiptExport(root, args[1:])
 	case "verify":
 		return receiptVerify(args[1:])
 	case "reconcile":
@@ -301,6 +304,98 @@ func receiptRegister(root string, args []string) error {
 	if !w.JSON(map[string]any{"log": l.Issuer(), "index": in[0].Index, "size": in[0].Size,
 		"root": hex.EncodeToString(in[0].Root), "issuer": s.Issuer, "subject": s.Subject}) {
 		w.Human("registered in %s at %d of %d, with a receipt in each algorithm\n", l.Issuer(), in[0].Index, in[0].Size)
+	}
+	return nil
+}
+
+// MaxExport bounds one export: each receipt is a proof over the whole log.
+const MaxExport = 10000
+
+func receiptExport(root string, args []string) error {
+	fs := flag.NewFlagSet("receipt export", flag.ContinueOnError)
+	outDir := fs.String("out", "", "the directory to write each statement into, with the log's receipts")
+	issuer := fs.String("issuer", "", "only statements from this issuer")
+	from := fs.String("from", "", "only statements issued at or after this time, RFC 3339")
+	to := fs.String("to", "", "only statements issued before this time, RFC 3339")
+	limit := fs.Int("limit", 1000, fmt.Sprintf("at most this many, up to %d", MaxExport))
+	logKeyAt := fs.String("log-key", "", "where to write the log's public key, which verifiers of its receipts need")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *outDir == "" || fs.NArg() != 0 {
+		return errors.New("receipt export needs --out DIR\n" + receiptUsage)
+	}
+	if *limit < 1 || *limit > MaxExport {
+		return fmt.Errorf("--limit is 1 to %d", MaxExport)
+	}
+	var since, until time.Time
+	var err error
+	if *from != "" {
+		if since, err = time.Parse(time.RFC3339Nano, *from); err != nil {
+			return fmt.Errorf("--from: %w", err)
+		}
+	}
+	if *to != "" {
+		if until, err = time.Parse(time.RFC3339Nano, *to); err != nil {
+			return fmt.Errorf("--to: %w", err)
+		}
+	}
+	caller := resolveCaller(root, flagToken)
+	// Tune, as register: each receipt is signed in this deployment's name.
+	if err := authorise(root, caller, auth.ActTune, auth.AreaSecurity); err != nil {
+		return err
+	}
+	dir := filepath.Join(root, "receipts")
+	if !receiptlog.Exists(dir) {
+		return errors.New("there is no receipt log here yet: aertun receipt register --log-name URI starts one")
+	}
+	l, err := receiptlog.Open(dir, "")
+	if err != nil {
+		return err
+	}
+	var picked []int
+	more := false
+	if err := l.Each(func(i int, entry []byte) error {
+		s, err := scitt.Read(entry)
+		if err != nil {
+			return fmt.Errorf("entry %d: %w", i, err)
+		}
+		if (*issuer != "" && s.Issuer != *issuer) || (!since.IsZero() && s.IssuedAt.Before(since)) ||
+			(!until.IsZero() && !s.IssuedAt.Before(until)) {
+			return nil
+		}
+		if len(picked) == *limit {
+			more = true
+			return nil
+		}
+		picked = append(picked, i)
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(*outDir, 0o700); err != nil {
+		return err
+	}
+	now := receiptNow()
+	for _, i := range picked {
+		tr, err := l.Receipts(i, now)
+		if err != nil {
+			return err
+		}
+		if err := atomicfile.Write(filepath.Join(*outDir, fmt.Sprintf("%08d.cose", i)), tr, 0o600); err != nil {
+			return err
+		}
+	}
+	if *logKeyAt != "" {
+		if err := pack.WritePublicKey(*logKeyAt, l.PublicKey()); err != nil {
+			return err
+		}
+	}
+	if !w.JSON(map[string]any{"log": l.Issuer(), "exported": len(picked), "more": more}) {
+		w.Human("%d statements from %s written to %s, each with a receipt in each algorithm\n", len(picked), l.Issuer(), *outDir)
+		if more {
+			w.Human("more match: narrow the window, or raise --limit\n")
+		}
 	}
 	return nil
 }

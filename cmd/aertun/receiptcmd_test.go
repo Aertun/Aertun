@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/aertun/aertun/internal/aep"
+	"github.com/aertun/aertun/internal/auth"
 	"github.com/aertun/aertun/internal/out"
 	"github.com/aertun/aertun/internal/pack"
+	"github.com/aertun/aertun/internal/receiptlog"
 	"github.com/aertun/aertun/internal/scitt"
 )
 
@@ -189,5 +192,114 @@ func TestRegisterRefuses(t *testing.T) {
 	}
 	if err := cmdReceipt(root, []string{"emit", "--key", parties[0].key}); err == nil {
 		t.Error("an emit with nothing to say was accepted")
+	}
+}
+
+// TestTheAgentInterfaceReceiptsItsCalls: with a receipt log set up, a call
+// an agent makes over stdio is appended as a receipt from the target's
+// vantage, exported with the log's two receipts on demand, verified with
+// the log's key, and reconciled against the agent's own receipt for the
+// same call: they agree.
+func TestTheAgentInterfaceReceiptsItsCalls(t *testing.T) {
+	root := caveatSite(t)
+	if err := cmdConfig(root, []string{"set", "admin.base_url", "https://aertun.test"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := receiptlog.Open(filepath.Join(root, "receipts"), "https://receipts.test"); err != nil {
+		t.Fatal(err)
+	}
+	c := runCaller(t, root, mintRun(t, root, "nightly-1", []string{"aertun_read"}, "", 0, -1))
+	at := time.Now().UTC()
+	in := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"aertun_read","arguments":{"operation":"list_findings"}}}` + "\n"
+	var out bytes.Buffer
+	if err := serveStdio(root, buildMCP(root, c), c, strings.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	// Export signs in the deployment's name: an administrator does it.
+	ts, err := loadTokens(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, _, err := ts.IssueScoped("cli", "dana@acme.example", auth.RoleAdmin, "/", time.Hour,
+		auth.RoleAdmin, auth.Scope{})
+	if err != nil || saveTokens(root, ts) != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AERTUN_TOKEN", secret)
+	dir := t.TempDir()
+	logKey := filepath.Join(dir, "log.json")
+	exported := filepath.Join(dir, "out")
+	if err := cmdReceipt(root, []string{"export", "--out", exported, "--issuer", "https://aertun.test/mcp",
+		"--log-key", logKey}); err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(exported, "*.cose"))
+	if len(files) != 1 {
+		t.Fatalf("%d receipts exported", len(files))
+	}
+	b, _ := os.ReadFile(files[0])
+	_, r, rerr := aep.ReadReceipt(b)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	if r.Vantage != "target" || r.Tool != "aertun_read" || r.Target != "https://aertun.test/mcp" ||
+		r.Actor != c.Agent || r.Grant != "nightly-1" || r.Outcome != "ok" {
+		t.Errorf("the interface's receipt: %+v (agent %q)", r, c.Agent)
+	}
+	iface := "https://aertun.test/mcp=" + logKey
+	if err := cmdReceipt("", []string{"verify", files[0], "--issuer-key", iface, "--log-key", logKey}); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+
+	// The agent's own account of the same call, from its own key.
+	_, parties := receiptSite(t)
+	agent := parties[0]
+	argsAt := filepath.Join(dir, "args.json")
+	os.WriteFile(argsAt, []byte(`{"operation": "list_findings"}`), 0o600)
+	mine := filepath.Join(dir, "agent.cose")
+	if err := cmdReceipt("", []string{"emit", "--key", agent.key, "--issuer", agent.issuer, "--vantage", "agent",
+		"--target", "https://aertun.test/mcp", "--tool", "aertun_read", "--args", argsAt,
+		"--at", at.Format(time.RFC3339Nano), "--out", mine}); err != nil {
+		t.Fatal(err)
+	}
+	key, _ := signingFiles(t)
+	err = cmdReceipt("", []string{"reconcile", mine, files[0], "--key", key, "--issuer", "https://auditor.test",
+		"--from", at.Add(-time.Minute).Format(time.RFC3339), "--to", at.Add(time.Minute).Format(time.RFC3339),
+		"--tolerance", "10s", "--expect", agent.issuer + "=agent", "--expect", "https://aertun.test/mcp=target",
+		"--issuer-key", agent.issuer + "=" + agent.pub, "--issuer-key", iface, "--out", filepath.Join(dir, "r.cose")})
+	if err != nil {
+		t.Fatalf("the agent and the interface do not agree: %v", err)
+	}
+}
+
+// TestTheHTTPInterfaceReceiptsItsCalls: over HTTP the receipt names the
+// resource the metadata names, the address the operator chose.
+func TestTheHTTPInterfaceReceiptsItsCalls(t *testing.T) {
+	base, root, _, analyst, _ := agentSite(t)
+	l, err := receiptlog.Open(filepath.Join(root, "receipts"), "https://receipts.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _, resp := agentCall{token: analyst, body: `{"jsonrpc":"2.0","id":1,"method":"tools/call",` +
+		`"params":{"name":"aertun_read","arguments":{"operation":"list_findings"}}}`}.do(t, base)
+	if code != 200 || resp.Error != nil {
+		t.Fatalf("%d %+v", code, resp.Error)
+	}
+	var got []aep.Receipt
+	if err := l.Each(func(_ int, e []byte) error {
+		s, r, err := aep.ReadReceipt(e)
+		if err != nil {
+			return err
+		}
+		if s.Issuer != base+"/mcp" {
+			t.Errorf("issued as %s", s.Issuer)
+		}
+		got = append(got, r)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Target != base+"/mcp" || got[0].Tool != "aertun_read" || got[0].Outcome != "ok" {
+		t.Errorf("%+v", got)
 	}
 }

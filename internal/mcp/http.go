@@ -116,9 +116,10 @@ type Endpoint struct {
 	// SameOrigin reports whether a browser Origin header may call this. A
 	// request with no Origin is not from a page and is not affected.
 	SameOrigin func(origin string) bool
-	// Called is told about each tools/call, for the audit log: the tool, the
+	// Called is told about each tools/call, for the audit log and the
+	// call's receipt: the call's parameters as received, the tool, the
 	// operation, and the error the caller was given, or nil.
-	Called func(r *http.Request, c *Caller, tool, operation string, err *Error)
+	Called func(r *http.Request, c *Caller, params json.RawMessage, tool, operation string, err *Error)
 }
 
 // ServeHTTP answers one request.
@@ -254,7 +255,7 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tool, op := callNames(req.Params)
 		result, rerr := srv.call(req.Params)
 		if e.Called != nil {
-			e.Called(r, caller, tool, op, rerr)
+			e.Called(r, caller, req.Params, tool, op, rerr)
 		}
 		if rerr != nil {
 			var se *ScopeError

@@ -19,7 +19,11 @@ Unreleased
   gap or repeat in a party's sequence numbers and every action the parties
   name different actors for, and signs the result; `aertun receipt verify`
   checks any of them offline, and checks a reconciliation by doing it
-  again.  Statements and both receipts were verified by an independent
+  again.  Once a receipt log is set up, the agent interface appends a
+  receipt from the target's vantage for every tool call it answers, on
+  HTTP and on stdio (with admin.base_url set), and `aertun receipt export`
+  writes the log's entries with their receipts on demand: an agent's own
+  receipts reconcile against the server's with no change to the agent.  Statements and both receipts were verified by an independent
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 

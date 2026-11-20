@@ -246,3 +246,50 @@ func TestKeyMode(t *testing.T) {
 		t.Errorf("a readable key: %v", err)
 	}
 }
+
+// TestAppendThenReceipts: appending signs nothing; receipts come when
+// asked, for the log as it stands then, and an opener sees what another
+// appended. A log that shrinks under an opener is refused.
+func TestAppendThenReceipts(t *testing.T) {
+	dir := t.TempDir()
+	a, _ := Open(dir, logName)
+	b, _ := Open(dir, "")
+	k := issuerKey(t)
+	i0, err := a.Append(statement(t, k, "x0"), admitAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i1, err := b.Append(statement(t, k, "x1"), admitAll)
+	if err != nil || i0 != 0 || i1 != 1 {
+		t.Fatalf("%v %d %d", err, i0, i1)
+	}
+	tr, err := a.Receipts(1, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := scitt.Read(tr)
+	in, err := VerifyReceipts(s, a.PublicKey())
+	if err != nil || in[0].Index != 1 || in[0].Size != 2 || s.Subject != "x1" {
+		t.Errorf("%v %+v %s", err, in, s.Subject)
+	}
+	if _, err := a.Receipts(2, now); err == nil {
+		t.Error("a receipt for an entry the log does not hold")
+	}
+	var subjects []string
+	if err := b.Each(func(i int, e []byte) error {
+		st, err := scitt.Read(e)
+		if err != nil {
+			return err
+		}
+		subjects = append(subjects, fmt.Sprint(i, st.Subject))
+		return nil
+	}); err != nil || strings.Join(subjects, ",") != "0x0,1x1" {
+		t.Errorf("each: %v %v", err, subjects)
+	}
+	path := filepath.Join(dir, entriesFile)
+	info, _ := os.Stat(path)
+	os.Truncate(path, info.Size()-10)
+	if _, err := a.Size(); err == nil || !strings.Contains(err.Error(), "rewritten") {
+		t.Errorf("a log that shrank: %v", err)
+	}
+}
