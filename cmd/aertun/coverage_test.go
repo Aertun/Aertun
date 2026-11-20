@@ -196,6 +196,18 @@ var coverage = map[string]surfaces{
 	// Breach simulation by replay: scripted malicious-agent sessions spliced
 	// into a recorded stream, scored against the reference pack, sealed and
 	// signed.
+	// The estate's weird-but-benign sessions: captured from the store,
+	// sanitised and sealed into a bundle the wind tunnel replays.
+	"benign": {
+		Why: "a capture is a precise selection — sources, a window, an " +
+			"actor — reviewed at the terminal beside the rules it is checked " +
+			"against, and its approval is the existing second-administrator " +
+			"screen; the bundle is a signed file a CI job reads",
+		NoMCP: "a session vouched for as benign can block a rule that would " +
+			"catch what it holds, so it is the shape of a suppression list; an " +
+			"agent able to vouch for its own activity could make itself " +
+			"invisible to the next rule written against it",
+	},
 	"windtunnel": {
 		Why: "a scorecard is a document that carries its own digest and two " +
 			"signatures, read the way a benchmark's results are read — by " +

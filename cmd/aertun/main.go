@@ -82,7 +82,12 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun vuln continuity BILL --key F [--out F] [--npm URL] [--pypi URL] [--goproxy URL]   each npm, PyPI and Go package held to the release before it: provenance, trusted publishing, source, publisher and install scripts kept; signed, the gate before an install
   aertun vuln commit REPORT | referee REPORT --source DIR [--asset DIR] --key F [--out F]   a vulnerability report's digest committed to the audit log; its cited files and functions, version, range, CVSS and novelty held to the source, signed
   aertun vuln vex-record --source NAME --since DATE [--until DATE] --tolerance R --key F [--out F]   that party's track record over the not-affected proofs kept here, each verified again as it is read, signed
+  aertun benign capture NAME --class C --source S --since T --until T --why "…" [--acknowledge RULE] [--raw FIELD]   a weird-but-benign session from your own store, checked against your rules and intelligence, sanitised, waiting for a second administrator
+  aertun benign list | show NAME | revoke NAME --why "…" | renew NAME --expires 90d --why "…"   the sessions vouched for, and their lives
+  aertun benign bundle --key F --out F | verify FILE --public-key F   the approved, unexpired sessions sealed in one signed file, for windtunnel run --baseline
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
+  aertun windtunnel run --sigma DIR --baseline BUNDLE --baseline-key F   and your estate's own vouched-for benign sessions: false positives per session, with Wilson bounds
+  aertun windtunnel diff OLD NEW [--accept FILE]   the gate: newly missed attacks, newly firing twins, and rules newly firing on a benign session unless accepted with a reason and an expiry
   aertun windtunnel run --score reference | list-scenarios | preflight | scorecard | diff OLD NEW | verify   the shipped pack, self-graded; signed only in CI; diff is the CI gate
   aertun bench run [--stub] [--out F] [--k N] | report FILE   the labelled corpus, and how the analyst scored on it
   aertun twin record --out FILE | help     what the agent interface would answer now, in one file under its digest, for aertun mcp --twin to replay
@@ -384,6 +389,8 @@ func main() {
 		err = cmdMDR(root, cmdArgs)
 	case "vendor":
 		err = cmdVendor(root, cmdArgs)
+	case "benign":
+		err = cmdBenign(root, cmdArgs)
 	case "access":
 		err = cmdAccess(root, cmdArgs)
 	case "appsec":

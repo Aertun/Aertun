@@ -119,6 +119,8 @@ func applyDual(root string, r dual.Request, by string) error {
 		return applyOwner(root, r, ch)
 	case dual.Token:
 		return nil
+	case dual.Benign:
+		return applyBenign(root, r, by)
 	case dual.Signer:
 		return applySigner(root, r)
 	}
