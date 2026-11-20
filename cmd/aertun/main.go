@@ -87,6 +87,7 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun benign bundle --key F --out F | verify FILE --public-key F   the approved, unexpired sessions sealed in one signed file, for windtunnel run --baseline
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
   aertun windtunnel run --sigma DIR --baseline BUNDLE --baseline-key F   and your estate's own vouched-for benign sessions: false positives per session, with Wilson bounds
+  aertun windtunnel run --sigma DIR --perturb all   and again under pipeline faults (duplicates, reordering, clock skew, bursts, a dropped field): which catches break, which benign workflows fire
   aertun windtunnel diff OLD NEW [--accept FILE]   the gate: newly missed attacks, newly firing twins, and rules newly firing on a benign session unless accepted with a reason and an expiry
   aertun windtunnel run --score reference | list-scenarios | preflight | scorecard | diff OLD NEW | verify   the shipped pack, self-graded; signed only in CI; diff is the CI gate
   aertun bench run [--stub] [--out F] [--k N] | report FILE   the labelled corpus, and how the analyst scored on it

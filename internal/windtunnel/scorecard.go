@@ -274,6 +274,10 @@ type Scorecard struct {
 	// would have seen, per session, with Wilson bounds.
 	Benign *BenignReport `json:"benign,omitempty"`
 
+	// Perturbation is the run under pipeline faults, when any were named
+	// (perturb.go): per kind, attacks missed and benign sessions firing.
+	Perturbation *PerturbReport `json:"perturbation,omitempty"`
+
 	// Scratch names where the scratch spools were written, so an operator
 	// can inspect the exact streams that were scored.
 	Scratch     string    `json:"scratch"`
@@ -555,6 +559,9 @@ func (c *Scorecard) Summarize() string {
 	if c.Benign != nil {
 		b.WriteString(summarizeBenign(c.Benign))
 		b.WriteString(hang("  ", c.Benign.Caveat))
+	}
+	if c.Perturbation != nil {
+		b.WriteString(summarizePerturb(c.Perturbation))
 	}
 	b.WriteString(hang("  ", c.Caveat))
 	sig := "unsigned: no key was supplied, and this document makes no claim " +

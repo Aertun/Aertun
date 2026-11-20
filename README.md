@@ -249,6 +249,12 @@ rule newly firing on a benign session, unless that exact pair is accepted in
 a file with a reason and an expiry (`--accept`), reviewed with the rule
 change.
 
+`--perturb all` replays every attack and every benign session again under
+the faults real pipelines introduce — events delivered twice, delayed and
+reordered, one source's clock five minutes ahead, the work four times faster,
+a field the rules read removed as an upgrade would — and reports, per fault,
+the catches that break and the benign workflows that start firing.
+
 Run without `--sigma`, it scores Aertun's own rule pack instead. The six
 scenarios that ship were written beside those rules, so that result is
 self-graded — a regression test of the pack, not an independent

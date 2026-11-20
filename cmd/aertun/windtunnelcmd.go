@@ -223,6 +223,9 @@ func windtunnelRun(args []string) error {
 	publicKey := fs.String("public-key", "", "with --key, where to write "+
 		"the public half for the verifiers you hand the scorecard to")
 	out := fs.String("out", "", "write the scorecard document to FILE")
+	perturbAt := fs.String("perturb", "", "replay each scenario's session, and each benign "+
+		"session, again under pipeline faults: dup, reorder, skew, burst, drop-field "+
+		"(comma-separated), or all — per kind, the attacks missed and the benign sessions firing")
 	baseline := fs.String("baseline", "", "a benign bundle (aertun benign bundle) of this "+
 		"estate's own vouched-for sessions: each is replayed into the base stream and every "+
 		"alert a measurable rule raises on it is a false positive, reported per session with "+
@@ -263,6 +266,11 @@ func windtunnelRun(args []string) error {
 	opts := windtunnel.RunOptions{Scenarios: ids, Base: *over, Into: *into,
 		Seed: *seed, ScoreMode: *score, Mutate: *mutate,
 		Now: time.Now().UTC()}
+	perturbs, err := windtunnel.ParsePerturb(*perturbAt)
+	if err != nil {
+		return err
+	}
+	opts.Perturb = perturbs
 	if (*baseline == "") != (*baselineKey == "") {
 		return fmt.Errorf("--baseline and --baseline-key go together: a bundle is " +
 			"replayed only once both its signatures hold under the key its signer published")

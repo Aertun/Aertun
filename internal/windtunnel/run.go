@@ -215,6 +215,10 @@ type RunOptions struct {
 	// sessions (internal/benign); nil runs no benign axis. Its sessions are
 	// respelled too when Mutate is set.
 	Baseline *benign.Bundle
+	// Perturb names the pipeline faults (perturb.go) each scenario's
+	// session, and each benign session, is replayed again under; empty runs
+	// none and writes no perturbation section.
+	Perturb []string
 }
 
 // Run splices, replays, joins and scores, and returns the sealed scorecard.
@@ -231,6 +235,12 @@ func Run(opts RunOptions) (*Scorecard, error) {
 				"is the safety story, by construction. Live targets arrive "+
 				"with phase 3's containment, and nothing in this build can "+
 				"be configured into them", opts.Base)
+		}
+	}
+	for _, k := range opts.Perturb {
+		if kindIndex(k) == len(PerturbKinds) {
+			return nil, fmt.Errorf("%q is not a perturbation; the set is %s", k,
+				strings.Join(PerturbKinds, ", "))
 		}
 	}
 	if opts.Mutate < 0 || opts.Mutate > MaxMutate {
@@ -381,11 +391,18 @@ func Run(opts RunOptions) (*Scorecard, error) {
 		card.Mutation = &MutationReport{Requested: opts.Mutate,
 			Caveat: mutationCaveat}
 	}
+	if len(opts.Perturb) > 0 {
+		card.Perturbation = &PerturbReport{Kinds: append([]string{}, opts.Perturb...),
+			Caveat: perturbCaveat}
+	}
 	for _, l := range selected {
-		row, mrow, err := runOne(l, ref, base, into, opts.Seed, ambient,
-			theirs != nil, opts.Mutate)
+		row, mrow, prows, err := runOne(l, ref, base, into, opts.Seed, ambient,
+			theirs != nil, opts.Mutate, opts.Perturb)
 		if err != nil {
 			return nil, err
+		}
+		if card.Perturbation != nil {
+			card.Perturbation.Rows = append(card.Perturbation.Rows, prows...)
 		}
 		if mrow != nil {
 			card.Mutation.Rows = append(card.Mutation.Rows, *mrow)
@@ -397,9 +414,14 @@ func Run(opts RunOptions) (*Scorecard, error) {
 			Blind: l.Scenario.Blind})
 	}
 	if opts.Baseline != nil {
-		card.Benign, err = runBenign(opts.Baseline, ref, base, into, ambient, opts.Mutate, opts.Now.UTC())
+		var pb []PerturbBenign
+		card.Benign, pb, err = runBenign(opts.Baseline, ref, base, into, ambient, opts.Mutate,
+			opts.Perturb, opts.Seed, opts.Now.UTC())
 		if err != nil {
 			return nil, err
+		}
+		if card.Perturbation != nil {
+			card.Perturbation.Benign = pb
 		}
 	}
 	if err := card.aggregate(); err != nil {
@@ -407,6 +429,9 @@ func Run(opts RunOptions) (*Scorecard, error) {
 	}
 	if card.Mutation != nil {
 		card.Mutation.tally()
+	}
+	if card.Perturbation != nil {
+		card.Perturbation.tally()
 	}
 	if err := card.seal(); err != nil {
 		return nil, err
@@ -465,16 +490,16 @@ func sessionOutcome(sc *Scenario, ref *Reference, attack,
 // instrument is their Sigma rules — and, when mutate is above zero, that
 // many respellings of the scenario's session as well.
 func runOne(l *Loaded, ref *Reference, base []telemetry.Event, into string,
-	seed int64, ambient *passResult, their bool, mutate int) (*Row,
-	*MutationRow, error) {
+	seed int64, ambient *passResult, their bool, mutate int, perturbs []string) (*Row,
+	*MutationRow, []PerturbRow, error) {
 
 	sc := l.Scenario
 	if err := Preflight(sc, base); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	anchor, err := DefaultAnchor(base)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	pass := func(steps []Step, suffix string) (*passResult, *Placed, error) {
@@ -492,11 +517,11 @@ func runOne(l *Loaded, ref *Reference, base []telemetry.Event, into string,
 
 	attack, placed, err := pass(sc.Steps, "")
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s: %w", sc.ID, err)
+		return nil, nil, nil, fmt.Errorf("%s: %w", sc.ID, err)
 	}
 	twinPass, twinPlaced, err := pass(sc.Twin.Steps, "--twin")
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s, its twin: %w", sc.ID, err)
+		return nil, nil, nil, fmt.Errorf("%s, its twin: %w", sc.ID, err)
 	}
 
 	row := &Row{Scenario: sc.ID, Digest: l.Digest, Family: sc.Family,
@@ -533,15 +558,23 @@ func runOne(l *Loaded, ref *Reference, base []telemetry.Event, into string,
 		row.Twin.Outcome = TwinFalseFire
 	}
 	row.Twin.SessionEvents = len(twinPlaced.Events)
+	var prows []PerturbRow
+	if len(perturbs) > 0 {
+		prows, err = perturbScenario(l, ref, base, into, placed, ambient, their,
+			row.Outcome, perturbs, seed)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
 	if mutate == 0 {
-		return row, nil, nil
+		return row, nil, prows, nil
 	}
 	mrow, err := runVariants(l, ref, base, into, placed, ambient, their,
 		row.Outcome, mutate)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return row, mrow, nil
+	return row, mrow, prows, nil
 }
 
 // scoreExpect joins one expectation to what the replay found. The join is

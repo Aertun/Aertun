@@ -156,23 +156,23 @@ func fires(p, ambient *passResult) map[string]bool {
 // runBenign replays every live session of a bundle and reports the benign
 // axis.
 func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into string,
-	ambient *passResult, mutate int, now time.Time) (*BenignReport, error) {
+	ambient *passResult, mutate int, perturbs []string, seed int64, now time.Time) (*BenignReport, []PerturbBenign, error) {
 
 	anchor, err := DefaultAnchor(base)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	digests := make(map[string]string, len(ref.Rules))
 	for _, r := range ref.Rules {
 		d, derr := benign.RuleDigest(r)
 		if derr != nil {
-			return nil, derr
+			return nil, nil, derr
 		}
 		digests[r.ID] = d
 	}
 	live, expired := b.Live(now)
 	if len(live) == 0 {
-		return nil, fmt.Errorf("every session in the bundle has expired; a baseline nobody " +
+		return nil, nil, fmt.Errorf("every session in the bundle has expired; a baseline nobody " +
 			"vouches for any longer measures nothing — renew them, or capture the workflows again")
 	}
 	rep := &BenignReport{Bundle: b.Digest, Signer: b.Signer, Policy: b.Manifest.Policy, Caveat: benignCaveat}
@@ -180,6 +180,9 @@ func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into st
 		rep.Expired = append(rep.Expired, s.Name)
 	}
 	type tally struct{ k, n int }
+	var perturbed []PerturbBenign
+	lateness := latenessHistogram(base).quantile(0.99)
+	reads := readFields(ref)
 	perRule, perClass := map[string]*tally{}, map[string]*tally{}
 	gapWhy, gapCount := map[string]string{}, map[string]int{}
 	var mk, mn, k, n int
@@ -238,7 +241,7 @@ func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into st
 		events := shiftTo(b.Events[s.Name], anchor)
 		res, err := replaySession(base, events, ref, filepath.Join(into, "benign--"+sanitize(s.Name)))
 		if err != nil {
-			return nil, fmt.Errorf("benign session %s: %w", s.Name, err)
+			return nil, nil, fmt.Errorf("benign session %s: %w", s.Name, err)
 		}
 		fired := map[string]bool{}
 		for id := range fires(res, ambient) {
@@ -276,7 +279,7 @@ func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into st
 				vres, verr := replaySession(base, v, ref,
 					filepath.Join(into, fmt.Sprintf("benign--%s--m%d", sanitize(s.Name), i+1)))
 				if verr != nil {
-					return nil, verr
+					return nil, nil, verr
 				}
 				for id := range fires(vres, ambient) {
 					if measurable[id] {
@@ -290,6 +293,26 @@ func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into st
 				mk += vk
 				mn += len(variants)
 			}
+		}
+		for _, kind := range perturbs {
+			pev, note := perturb(kind, s.Name, seed, events, lateness, reads)
+			pres, perr := replaySession(base, pev, ref,
+				filepath.Join(into, "perturbed", "benign--"+sanitize(s.Name)+"--"+kind))
+			if perr != nil {
+				return nil, nil, perr
+			}
+			pf := map[string]bool{}
+			for id := range fires(pres, ambient) {
+				if measurable[id] {
+					pf[id] = true
+				}
+			}
+			out := BenignQuiet
+			if len(pf) > 0 {
+				out = BenignFires
+			}
+			perturbed = append(perturbed, PerturbBenign{Session: s.Name, Kind: kind,
+				Original: row.Outcome, Outcome: out, Fired: keys(pf), Note: note})
 		}
 		rep.Sessions = append(rep.Sessions, row)
 	}
@@ -309,7 +332,7 @@ func runBenign(b *benign.Bundle, ref *Reference, base []telemetry.Event, into st
 		rep.Gaps = append(rep.Gaps, BenignGap{Rule: id, Sessions: gapCount[id], Why: gapWhy[id]})
 	}
 	sort.Slice(rep.Sessions, func(i, j int) bool { return rep.Sessions[i].Name < rep.Sessions[j].Name })
-	return rep, nil
+	return rep, perturbed, nil
 }
 
 func keys(m map[string]bool) []string {

@@ -15,6 +15,15 @@ Unreleased
   `aertun benign bundle` seals approved sessions into a dual-signed,
   content-addressed file, and `aertun benign verify` checks one offline.
 
+* `aertun windtunnel run --perturb all` (or a list of dup, reorder, skew,
+  burst, drop-field) replays each scenario's session and each benign session
+  again under the faults real pipelines put into telemetry: a quarter of
+  events delivered twice, extra arrival delay up to twice the stream's own
+  lateness, the busiest source's clock five minutes ahead, the session four
+  times faster, and the field the rules read most removed.  Per fault it
+  reports the attacks missed, the catches that broke, and the benign
+  sessions that started firing, with Wilson bounds.
+
 * `aertun windtunnel run --baseline BUNDLE --baseline-key F` replays each
   benign session and reports the false positives the rules raise on it, per
   session, per rule and per class, with Wilson bounds, and respells the
