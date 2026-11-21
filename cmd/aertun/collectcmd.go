@@ -20,6 +20,7 @@ import (
 	"github.com/aertun/aertun/internal/audit"
 	"github.com/aertun/aertun/internal/auth"
 	"github.com/aertun/aertun/internal/connector"
+	"github.com/aertun/aertun/internal/deadletter"
 	"github.com/aertun/aertun/internal/source"
 	"github.com/aertun/aertun/internal/spool"
 	"github.com/aertun/aertun/internal/telemetry"
@@ -68,6 +69,13 @@ type collectStatus struct {
 	Seen []string `json:"seen,omitempty"`
 	// learned says the read taught the alias table something.
 	learned bool
+	// refused are the records the mapping turned away, kept as dead
+	// letters once what did map is stored.
+	refused []deadletter.Refused
+}
+
+func deadLetters(root string) deadletter.Store {
+	return deadletter.Store{Dir: filepath.Join(root, "deadletter")}
 }
 
 // maxSeen is how many recent record digests are remembered per source.
@@ -340,7 +348,7 @@ func digestOf(doc any) string {
 // already stored. It fills the counts of st. The page goes in as one batch:
 // every event is validated before any is written, so a bad record refuses
 // the page rather than storing half of it around the failure.
-func storeRecords(sp *spool.Spool, s source.Source, docs []any,
+func storeRecords(root string, sp *spool.Spool, s source.Source, docs []any,
 	st *collectStatus, aliases map[string]alias, now time.Time) error {
 
 	before := slices.Clone(st.Seen)
@@ -352,7 +360,9 @@ func storeRecords(sp *spool.Spool, s source.Source, docs []any,
 		return err
 	}
 	st.Stored += len(events)
-	return nil
+	// Kept once the batch is stored, so a read asked again does not keep
+	// its refusals twice.
+	return deadLetters(root).Add(s.Issuer+"/"+s.Stream, st.refused, now)
 }
 
 // mapRecords is storeRecords without the store: the events that are new and
@@ -376,9 +386,12 @@ func mapRecords(s source.Source, docs []any, st *collectStatus,
 		e, missed := s.Map(doc)
 		if len(missed) > 0 {
 			st.Missed++
+			var paths []string
 			for _, m := range missed {
 				missing[m.Path]++
+				paths = append(paths, m.Path)
 			}
+			st.refused = append(st.refused, deadletter.Refused{Record: doc, Missing: paths})
 			continue
 		}
 		e.Received = now
@@ -388,6 +401,7 @@ func mapRecords(s source.Source, docs []any, st *collectStatus,
 		if err := e.Validate(); err != nil {
 			st.Missed++
 			missing["(not a usable event)"]++
+			st.refused = append(st.refused, deadletter.Refused{Record: doc, Missing: []string{"(not a usable event)"}})
 			continue
 		}
 		out = append(out, e)
@@ -492,7 +506,7 @@ func collectOne(root string, c collectable, sp *spool.Spool,
 	for _, rec := range out.Records {
 		docs = append(docs, unflatten(rec))
 	}
-	if err := storeRecords(sp, c.S, docs, &st, aliases, now); err != nil {
+	if err := storeRecords(root, sp, c.S, docs, &st, aliases, now); err != nil {
 		// The checkpoint stays where it was, so the next read asks again
 		// for what this one could not store; what was stored is known by
 		// its digest and is not stored twice.
@@ -703,7 +717,7 @@ func collectFile(root string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := storeRecords(sp, s, docs, &st, aliases, now); err != nil {
+	if err := storeRecords(root, sp, s, docs, &st, aliases, now); err != nil {
 		return err
 	}
 	if st.learned {

@@ -35,7 +35,8 @@
 // nearly every earlier event carried is missing from most of today's, when
 // it is four times later than usual and an hour or more, when more than one
 // event in a hundred is stamped ahead of its arrival, or when more than one
-// in twenty is a duplicate. A spike in volume, or a backfill of old events,
+// in twenty is a duplicate, or when the mapping turned away more than one
+// record in twenty. A spike in volume, or a backfill of old events,
 // is a notice: it says something changed, and takes nothing away from what
 // the source's silence means.
 //
@@ -104,6 +105,9 @@ type Day struct {
 	// Sampled counts events from a sampler that drops some by design (a
 	// non-zero OpenTelemetry sampling threshold).
 	Sampled int `json:"sampled,omitempty"`
+	// Refused counts the records the source's mapping turned away that
+	// day (internal/deadletter): set when the day is judged, never kept.
+	Refused int `json:"refused,omitempty"`
 	// Late is a histogram of arrival minus event time, for events less
 	// than a week late: bucket n holds delays under 2^n seconds and at
 	// least 2^(n-1). Older arrivals are Stale.
@@ -340,6 +344,10 @@ func Judge(day Day, earlier []Day) Verdict {
 			add("field-lost", true, "carried by nearly every earlier event and by under half today: %s",
 				strings.Join(lost, ", "))
 		}
+	}
+	if day.Refused > 0 && float64(day.Refused) > DupRatio*float64(day.Events+day.Refused) {
+		add("refused", true, "the mapping turned away %d of %d records (aertun telemetry dead-letter)",
+			day.Refused, day.Events+day.Refused)
 	}
 	if day.Events > 0 && len(lates) > 0 {
 		p95 := day.Quantile(0.95)

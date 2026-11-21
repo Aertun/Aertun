@@ -166,3 +166,23 @@ func TestWitness(t *testing.T) {
 		t.Errorf("a learning day: %+v", v)
 	}
 }
+
+// TestRefused: a day on which the mapping turned away one record in twenty
+// or more is degraded, even when what did map looks ordinary.
+func TestRefused(t *testing.T) {
+	a := NewAccumulator()
+	for d := range 10 {
+		usual(a, day0.AddDate(0, 0, d), 100, nil)
+	}
+	hist, _ := History("okta/system-log", a.Days(), DateOf(day0), DateOf(day0.AddDate(0, 0, 9)))
+	last := hist[len(hist)-1]
+	last.Refused = 30
+	v := Judge(last, hist[:len(hist)-1])
+	if v.Status != Degraded || reasons(v) != "refused" || v.Witness {
+		t.Errorf("%+v", v)
+	}
+	last.Refused = 2
+	if v := Judge(last, hist[:len(hist)-1]); v.Status != OK {
+		t.Errorf("two refused in a hundred: %+v", v)
+	}
+}

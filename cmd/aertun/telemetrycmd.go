@@ -38,9 +38,11 @@ func cmdTelemetry(root string, args []string) error {
 		return telemetryFields(args[1:])
 	case "quality":
 		return telemetryQuality(root, args[1:])
+	case "dead-letter":
+		return telemetryDeadLetter(root, args[1:])
 	default:
 		return fmt.Errorf(
-			"unknown telemetry command %q; try check, fields or quality", args[0])
+			"unknown telemetry command %q; try check, fields, quality or dead-letter", args[0])
 	}
 }
 

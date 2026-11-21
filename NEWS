@@ -64,6 +64,19 @@ Unreleased
   server's receipt; the test suite reconciles one against Aertun's own
   agent interface.  `aertun receipt init` sets up the receipt log.
 
+* Dead letters.  A record a source's mapping turns away (a required field
+  absent, a time it cannot read, an event that would not be usable) is no
+  longer only counted: it is kept, whole, because a mapping usually breaks
+  when the source renames a field and the fixed mapping needs the new one.
+  Values the secret detector recognises are masked first; a record over
+  64 KiB is counted and not kept; each source keeps at most 1,000 for 14
+  days, in files only the store's owner can read.  `aertun telemetry
+  dead-letter` lists them with the paths they lacked, `replay SOURCE`
+  maps them again with the current mapping and stores what now maps, and
+  `purge SOURCE` removes them; the daily counts outlive the records, and
+  the source-quality ledger now degrades a day on which the mapping turned
+  away one record in twenty or more.
+
 * A source-quality ledger.  For each source and each day (by arrival, so
   a finished day never changes and is measured once), it counts events,
   duplicates, lateness, events stamped ahead of their arrival, backfills,

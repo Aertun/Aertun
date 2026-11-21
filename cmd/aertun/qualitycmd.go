@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,7 +16,10 @@ import (
 
 	"github.com/aertun/aertun/internal/atomicfile"
 	"github.com/aertun/aertun/internal/audit"
+	"github.com/aertun/aertun/internal/auth"
+	"github.com/aertun/aertun/internal/deadletter"
 	"github.com/aertun/aertun/internal/quality"
+	"github.com/aertun/aertun/internal/spool"
 	"github.com/aertun/aertun/internal/telemetry"
 	"github.com/aertun/aertun/internal/upkeep"
 )
@@ -110,6 +114,32 @@ func judgeQuality(root string, first, last time.Time, baseline int, only string)
 	if err != nil {
 		return nil, err
 	}
+	// What the mappings turned away, by source and day, from the dead
+	// letters' counts: added to each day when it is judged.
+	dead, err := deadLetters(root).Sources()
+	if err != nil {
+		return nil, err
+	}
+	refused := map[string]map[string]int{}
+	for _, d := range dead {
+		refused[d.Source] = d.Refused
+	}
+	seenDay := map[string]bool{}
+	for i := range days {
+		days[i].Refused = refused[days[i].Source][days[i].Date]
+		seenDay[days[i].Source+"|"+days[i].Date] = true
+	}
+	// A day whose every record was turned away has no events and is a
+	// day all the same.
+	for src, byDay := range refused {
+		for date, n := range byDay {
+			t, err := time.Parse("2006-01-02", date)
+			if err != nil || seenDay[src+"|"+date] || t.Before(first.AddDate(0, 0, -baseline)) || t.After(last) {
+				continue
+			}
+			days = append(days, quality.Day{Source: src, Date: date, Refused: n, Fields: map[string]int{}})
+		}
+	}
 	sources := map[string]bool{}
 	for _, d := range days {
 		sources[d.Source] = true
@@ -131,7 +161,7 @@ func judgeQuality(root string, first, last time.Time, baseline int, only string)
 		// source is learning, never silent before it existed.
 		firstSeen := len(hist)
 		for i, d := range hist {
-			if d.Events > 0 {
+			if d.Events > 0 || d.Refused > 0 {
 				firstSeen = i
 				break
 			}
@@ -256,4 +286,98 @@ func recordDegraded(root string, now time.Time) (int, error) {
 		return nil
 	})
 	return n, err
+}
+
+// telemetryDeadLetter shows, replays and purges what mappings turned away.
+func telemetryDeadLetter(root string, args []string) error {
+	store := deadLetters(root)
+	if len(args) == 0 || args[0] == "list" {
+		all, err := store.Sources()
+		if err != nil {
+			return err
+		}
+		if w.JSON(map[string]any{"sources": all}) {
+			return nil
+		}
+		if len(all) == 0 {
+			w.Human("no mapping has turned anything away\n")
+			return nil
+		}
+		for _, d := range all {
+			total := 0
+			for _, n := range d.Refused {
+				total += n
+			}
+			w.Human("%-32s %d held, %d refused in the last %d days, %d not kept\n", d.Source, d.Held, total,
+				deadletter.CountDays, d.Dropped)
+			for i, p := range d.Missing {
+				if i == 5 {
+					break
+				}
+				w.Human("    %s missing from %d\n", p.Path, p.Count)
+			}
+		}
+		return nil
+	}
+	if len(args) != 2 || (args[0] != "replay" && args[0] != "purge") {
+		return errors.New("usage: aertun telemetry dead-letter [list] | replay SOURCE | purge SOURCE")
+	}
+	name := args[1]
+	caller := resolveCaller(root, flagToken)
+	// Both change the event store or what it may yet hold: tune.
+	if err := authorise(root, caller, auth.ActTune, auth.AreaSecurity); err != nil {
+		return err
+	}
+	if args[0] == "purge" {
+		n, err := store.Purge(name)
+		if err != nil {
+			return err
+		}
+		record(root, caller.auditRecord("deadletter.purged", "/sources/"+name, audit.Success,
+			map[string]string{"source": name, "records": fmt.Sprint(n)}))
+		w.Human("%d records from %s removed; the counts remain\n", n, name)
+		return nil
+	}
+	src, err := findSource(root, name)
+	if err != nil {
+		return err
+	}
+	sp, err := openSpool(root, spool.Options{})
+	if err != nil {
+		return err
+	}
+	defer sp.Close()
+	now := time.Now().UTC()
+	taken, left, err := store.Replay(name, func(e deadletter.Entry) (bool, error) {
+		var doc any
+		if err := json.Unmarshal(e.Record, &doc); err != nil {
+			return false, nil
+		}
+		ev, missed := src.Map(doc)
+		if len(missed) > 0 {
+			return false, nil
+		}
+		ev.Received = now
+		if ev.Raw == nil {
+			ev.Raw = map[string]string{}
+		}
+		// When it first arrived, which the event's own arrival no longer is.
+		ev.Raw["dead_letter_at"] = e.At.Format(time.RFC3339)
+		if ev.Validate() != nil {
+			return false, nil
+		}
+		if _, err := sp.Append(ev); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	record(root, caller.auditRecord("deadletter.replayed", "/sources/"+name, audit.Success,
+		map[string]string{"source": name, "stored": fmt.Sprint(taken), "left": fmt.Sprint(left)}))
+	if err != nil {
+		return err
+	}
+	if !w.JSON(map[string]any{"source": name, "stored": taken, "left": left}) {
+		w.Human("%d records from %s now map and are stored; %d still do not\n", taken, name, left)
+	}
+	return nil
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/aertun/aertun/internal/audit"
 	"github.com/aertun/aertun/internal/automate"
 	"github.com/aertun/aertun/internal/collector"
+	"github.com/aertun/aertun/internal/deadletter"
 	"github.com/aertun/aertun/internal/detect"
 	"github.com/aertun/aertun/internal/fetch"
 	"github.com/aertun/aertun/internal/inbound"
@@ -489,12 +490,14 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	// What mapping found counts once the events are stored: a delivery
 	// tried again is neither counted twice nor remembered as seen before
 	// it is.
+	var refused []deadletter.Refused
 	if mapped != nil && appended {
 		st.Seen, st.Records, st.Known, st.Missed = mapped.Seen, st.Records+mapped.Records,
 			st.Known+mapped.Known, st.Missed+mapped.Missed
 		if mapped.Field != "" {
 			st.Field = mapped.Field
 		}
+		refused = mapped.refused
 	}
 	if serr != nil {
 		st.Error = serr.Error()
@@ -515,6 +518,15 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	s.signals = append(s.signals, sigs...)
 	s.dirty = true
 	s.mu.Unlock()
+	if len(refused) > 0 {
+		if src, err := s.mapping(p.feed); err == nil {
+			if err := deadLetters(s.root).Add(src.Issuer+"/"+src.Stream, refused, p.at); err != nil {
+				record(s.root, audit.Record{Action: "inbound.store", Resource: "/feeds/" + p.feed.Name,
+					Outcome: audit.Failure, Principal: automateBy, Kind: audit.KindService, Verified: true,
+					Detail: map[string]string{"error": onOneLine("dead letters: " + err.Error())}})
+			}
+		}
+	}
 	return stored, learned, serr != nil
 }
 
