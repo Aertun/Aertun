@@ -621,5 +621,5 @@ func cmdServe(root string, args []string) error {
 
 // upkeepJobs is everything the server does on its timer.
 func upkeepJobs(root string) []upkeep.Job {
-	return []upkeep.Job{estateJob(root), collectJob(root), detectJob(root)}
+	return []upkeep.Job{estateJob(root), collectJob(root), detectJob(root), qualityJob(root)}
 }

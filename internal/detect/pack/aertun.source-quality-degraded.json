@@ -1,0 +1,105 @@
+{
+  "id": "aertun.source-quality-degraded",
+  "title": "A source's data arrived degraded: silent, thinner, later, malformed or duplicated",
+  "why": "a source that falls silent, loses a field nearly every event carried, arrives far later than usual, stamps events ahead of their arrival or repeats them is one whose silence no longer means nothing happened: rules that read it may match nothing and say nothing, and an attacker who blocks or bends a log wants exactly that (`aertun telemetry quality` shows each day and why)",
+  "blind": "degradation on the current day, which is judged once it is over; a source with fewer than three earlier days, or fewer than twenty events on a usual day; and a change that keeps volume, fields, lateness and timestamps within their usual range while altering what the events say",
+  "sources": [
+    "aertun/audit",
+    "stream/audit"
+  ],
+  "severity": 3,
+  "when": {
+    "all": [
+      {
+        "match": {
+          "field": "raw.action",
+          "op": "equals",
+          "values": [
+            "source.degraded"
+          ]
+        }
+      }
+    ]
+  },
+  "technique": [
+    "T1562.006"
+  ],
+  "fixtures": [
+    {
+      "name": "a source silent on a day it usually sends thousands",
+      "match": true,
+      "event": {
+        "source": "aertun/audit",
+        "time": "2026-11-21T00:05:00Z",
+        "received": "2026-11-21T00:05:01Z",
+        "class": 6003,
+        "disposition": 2,
+        "actor": {
+          "issuer": "aertun",
+          "value": "aertun"
+        },
+        "message": "source.degraded",
+        "raw": {
+          "action": "source.degraded",
+          "outcome": "failure",
+          "resource": "/sources/okta/system-log",
+          "kind": "service",
+          "source": "okta/system-log",
+          "date": "2026-11-20",
+          "reasons": "silent",
+          "events": "0",
+          "usual": "4210"
+        }
+      }
+    },
+    {
+      "name": "a parser that stopped filling a field",
+      "match": true,
+      "event": {
+        "source": "aertun/audit",
+        "time": "2026-11-21T00:05:00Z",
+        "received": "2026-11-21T00:05:01Z",
+        "class": 6003,
+        "disposition": 2,
+        "actor": {
+          "issuer": "aertun",
+          "value": "aertun"
+        },
+        "message": "source.degraded",
+        "raw": {
+          "action": "source.degraded",
+          "outcome": "failure",
+          "resource": "/sources/aws/cloudtrail",
+          "kind": "service",
+          "source": "aws/cloudtrail",
+          "date": "2026-11-20",
+          "reasons": "field-lost",
+          "events": "9120",
+          "usual": "9433"
+        }
+      }
+    },
+    {
+      "name": "a backup taken",
+      "match": false,
+      "event": {
+        "source": "aertun/audit",
+        "time": "2026-11-21T00:05:00Z",
+        "received": "2026-11-21T00:05:01Z",
+        "class": 6003,
+        "disposition": 1,
+        "actor": {
+          "issuer": "aertun",
+          "value": "p_1a2b3c"
+        },
+        "message": "store.backed-up",
+        "raw": {
+          "action": "store.backed-up",
+          "outcome": "success",
+          "resource": "/",
+          "kind": "human"
+        }
+      }
+    }
+  ]
+}

@@ -114,6 +114,7 @@ Collecting what happens
   aertun collect status | auto 15m|off     what each source did last, and the schedule
   aertun source list | add MAPPING.json --sample RECORDS.json | check --source S RECORDS.json
   aertun telemetry check [FILE] | fields [FILE]   can a source's events be used, and what a rule may name
+  aertun telemetry quality [--days 7] [--source S]   each source's days judged against its own: silent, thinner, a field lost, later, clocks ahead, duplicated
   aertun inbound list | add okta|webhook|ssf|stream NAME | connect NAME | verify NAME | status NAME
   aertun inbound rotate NAME | on NAME | off NAME | remove NAME | help
   aertun inbound prove NAME --key F [--at TIME] [--public-key F] [--out F]   another site's audit log, received on a stream feed: complete and unforked up to a time, held against every tree head it signed, signed

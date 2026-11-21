@@ -37,6 +37,19 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* A source-quality ledger.  For each source and each day (by arrival, so
+  a finished day never changes and is measured once), it counts events,
+  duplicates, lateness, events stamped ahead of their arrival, backfills,
+  and which fields events carried, and judges the day against the
+  source's own previous fourteen: silent, under half its usual volume,
+  a field nearly every earlier event carried gone from most of today's,
+  four times later than usual, clocks ahead, or one event in twenty
+  repeated is degraded; a spike or a backfill is a notice; a day as quiet
+  as the same weekday last week is quiet by habit.  `aertun telemetry
+  quality` shows it; the server records each newly degraded day in the
+  audit log, and the new rule aertun.source-quality-degraded (ATT&CK
+  T1562.006) opens a finding on it.
+
 * `aertun backup` writes the whole store, keys and secrets included, into
   one file encrypted with AES-256-GCM under a passphrase (PBKDF2-SHA-256,
   600,000 iterations), in authenticated chunks that cannot be reordered or
