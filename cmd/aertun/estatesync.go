@@ -226,7 +226,21 @@ func estateSync(root string, now time.Time, caller *Caller,
 			rep.Tools = append(rep.Tools, t)
 			continue
 		}
-		out, failed, rerr := runConnector(root, m, nil, false, true, false, caller)
+		out, failed, rerr := runConnector(root, m, nil, false, true, true, caller)
+		// The estate reads what a tool holds, and stores no events: an
+		// event endpoint's checkpoint moved here would have scheduled
+		// collection start after events it never stored. Only the
+		// checkpoints of what the estate keeps move.
+		if rerr == nil {
+			keep := map[string]connector.State{}
+			for key, mark := range out.marks {
+				_, name, _ := strings.Cut(key, "/")
+				if e, ok := m.Endpoint(name); ok && e.Produces != connector.Events {
+					keep[key] = mark
+				}
+			}
+			rerr = commitMarks(root, keep)
+		}
 		t.Records, t.Requests = len(out.Records), out.Requests
 		for _, r := range out.Runs {
 			if r["complete"] == false || r["error"] != nil {

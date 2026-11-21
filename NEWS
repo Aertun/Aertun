@@ -42,16 +42,28 @@ Unreleased
   good.  The connector's checkpoint was saved before the records were
   stored, and their digests were remembered as seen, so the next read
   started after them and would have skipped them anyway.  The checkpoint
-  is now saved only once the records are stored, and a failed store
-  forgets their digests; the next read asks again.  Affects 0.1 and 0.2.
+  is now saved only once every record is stored, and exactly the records
+  written are remembered: the next read asks again for the rest, and a
+  store that wrote its lines and then failed to save its index stores
+  nothing twice.  Present since 0.1.0.
+
+* Fixed: the scheduled estate sync, which reads every endpoint of a tool,
+  moved the checkpoint of its event endpoints (Okta's system log, for one)
+  without storing their events, so scheduled collection then started after
+  events nobody stored.  It now moves only the checkpoints of what the
+  estate keeps.  Checkpoints are also merged into the file as it is when
+  saved, so one reader no longer undoes another's.  Present since 0.1.0.
 
 * Fixed: a pushed delivery (a webhook, an Okta event hook, a shared signal,
   another site's audit stream) whose store failed after the sender had
   been told it was received was dropped.  It now waits in the queue and is
-  tried again on each pass, neither counted nor remembered as seen until
-  it is stored, and its automation signals are raised once, when it is.
-  After ten failed tries it is given up on with an inbound.dropped record
-  in the audit log, never silently.  Affects 0.1 and 0.2.
+  tried again on every pass and at least every thirty seconds, with what
+  was already written counted as stored and only the rest tried again;
+  nothing of it is counted, remembered or signalled until it is stored,
+  and its automation signals are raised once.  A delivery that fails for
+  an hour, or is still waiting when the server stops, is given up on with
+  an inbound.dropped record in the audit log, never silently.  Present
+  since 0.1.0.
 
 * `aertun hook claude-code`: Claude Code under this deployment's kill
   switch, with a receipt for everything it does.  Run as its PreToolUse,

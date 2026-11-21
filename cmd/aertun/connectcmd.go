@@ -620,15 +620,10 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 			// Only on a complete run. See internal/connector on why a
 			// checkpoint that advances after a partial read loses records
 			// without ever reporting it.
-			mark := connector.State{Watermark: r.Result.Watermark, At: time.Now().UTC()}
-			if hold {
-				if out.marks == nil {
-					out.marks = map[string]connector.State{}
-				}
-				out.marks[key] = mark
-			} else {
-				states[key] = mark
+			if out.marks == nil {
+				out.marks = map[string]connector.State{}
 			}
+			out.marks[key] = connector.State{Watermark: r.Result.Watermark, At: time.Now().UTC()}
 		}
 		if r.Asked {
 			for _, rec := range r.Result.Records {
@@ -647,8 +642,12 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 			"waited": r.Result.Waited.String(), "asked": r.Asked,
 		})
 	}
-	if err := saveStates(root, states); err != nil {
-		return out, failed, err
+	// Merged into the file as it is now, never the copy read at the start:
+	// another reader may have moved another endpoint's checkpoint since.
+	if !hold {
+		if err := commitMarks(root, out.marks); err != nil {
+			return out, failed, err
+		}
 	}
 	if save {
 		if err := saveSnapshot(root, m, reads, time.Now().UTC()); err != nil {
