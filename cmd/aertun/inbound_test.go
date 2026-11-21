@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -413,5 +415,67 @@ func TestVerificationNeedsTheStateThatWasAskedFor(t *testing.T) {
 	inb.ServeHTTP(httptest.NewRecorder(), r)
 	if feeds, _ := loadFeeds(root); !feeds["signals"].Verified.IsZero() {
 		t.Error("a verification event with another state verified the stream")
+	}
+}
+
+// TestADeliveryWhoseStoreFailedIsTriedAgain: the sender was told the
+// delivery was received; the store then refused it. It waits in the queue,
+// nothing about it is remembered as seen or counted, and the next pass
+// stores it. After maxStoreTries it is given up on, with a record saying
+// so, never silently.
+func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	t.Setenv("HOME", t.TempDir())
+	root := connectStore(t)
+	f, _, err := makeFeed(root, "webhook", "hook", map[string]string{"mapping": "okta/system"}, "boss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inb := newInboundServer(root)
+	doc := oktaLogEvent("w-9", "user.session.start", "ada@acme.example", "")
+	dir := filepath.Join(t.TempDir(), "spool")
+	sp, err := spool.Open(dir, spool.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sp.Close()
+	inb.queue = []pushed{{feed: f, docs: []any{doc}, at: time.Now().UTC()}}
+	os.Chmod(dir, 0o500)
+	if n := inb.drain(sp); n != 0 {
+		t.Fatalf("%d stored into a read-only store", n)
+	}
+	os.Chmod(dir, 0o700)
+	if len(inb.queue) != 1 || inb.queue[0].tries != 1 {
+		t.Fatalf("the delivery did not wait for another try: %+v", inb.queue)
+	}
+	if st := inb.statusOf("hook"); len(st.Seen) != 0 || st.Records != 0 || st.Error == "" {
+		t.Errorf("a delivery never stored is counted or remembered: %+v", st)
+	}
+	if n := inb.drain(sp); n != 1 {
+		t.Fatalf("the second try stored %d", n)
+	}
+	if len(inb.queue) != 0 {
+		t.Error("a stored delivery is still queued")
+	}
+	// One that never stores is given up on, loudly.
+	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-10", "user.session.start", "bo@acme.example", "")},
+		at: time.Now().UTC(), tries: maxStoreTries - 1}}
+	os.Chmod(dir, 0o500)
+	inb.drain(sp)
+	os.Chmod(dir, 0o700)
+	if len(inb.queue) != 0 {
+		t.Error("a delivery past its tries is still queued")
+	}
+	events, _ := audit.Read(auditPath(root))
+	dropped := 0
+	for _, e := range events {
+		if e.Action == "inbound.dropped" {
+			dropped++
+		}
+	}
+	if dropped != 1 {
+		t.Errorf("%d records of a delivery given up on", dropped)
 	}
 }

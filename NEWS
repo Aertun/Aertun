@@ -15,6 +15,14 @@ format, flag or proof changes.
   is now saved only once the records are stored, and a failed store
   forgets their digests; the next read asks again.  Present since 0.1.0.
 
+* Fixed: a pushed delivery (a webhook, an Okta event hook, a shared signal,
+  another site's audit stream) whose store failed after the sender had
+  been told it was received was dropped.  It now waits in the queue and is
+  tried again on each pass, neither counted nor remembered as seen until
+  it is stored, and its automation signals are raised once, when it is.
+  After ten failed tries it is given up on with an inbound.dropped record
+  in the audit log, never silently.  Present since 0.1.0.
+
 Version 0.2.0
 =============
 
