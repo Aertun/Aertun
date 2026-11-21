@@ -1511,3 +1511,29 @@ func TestABatchOverMidnightStoresWhatItCan(t *testing.T) {
 		t.Errorf("read back %s", got)
 	}
 }
+
+// TestABatchRollsWhenItsSegmentIsFull: a segment that fills part way
+// through a batch rolls there, as it always has one event at a time, and
+// each event is named for the segment it went in.
+func TestABatchRollsWhenItsSegmentIsFull(t *testing.T) {
+	c := &clock{at: base}
+	s, dir := openAt(t, c, Options{SegmentBytes: 1})
+	defer s.Close()
+	into, err := s.AppendBatch([]telemetry.Event{event(base, base, "one"),
+		event(base, base.Add(time.Second), "two"), event(base, base.Add(2*time.Second), "three")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	segs := s.Segments()
+	if len(segs) != 3 || into[0] == into[1] || into[1] == into[2] {
+		t.Fatalf("three events over a full segment: %d segments, into %v", len(segs), into)
+	}
+	for i, seg := range segs {
+		if seg.Events != 1 || seg.Name != into[i] {
+			t.Errorf("segment %d: %+v", i, seg)
+		}
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "one,two,three" {
+		t.Errorf("read back %s", got)
+	}
+}
