@@ -559,7 +559,7 @@ func otelGenAI() Source {
 			"tokens_out", "conversation", "trace_id", "span_id", "span_name",
 			"service", "agent_name", "system", "duration_ms", "prompt_bytes",
 			"completion_bytes", "content_events", "content_bytes", "via",
-			"gateway_key", "team"},
+			"gateway_key", "team", "sampling_threshold"},
 		// SDKs batch (five seconds by default) and a collector adds its own
 		// queue, so a couple of minutes covers the push without pretending
 		// the stream is a batch import.

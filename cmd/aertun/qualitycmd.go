@@ -191,7 +191,11 @@ func telemetryQuality(root string, args []string) error {
 		if *source != "" {
 			label = v.Date
 		}
-		w.Human("%-10s %-32s %6d events (usual %d)\n", v.Status, label, v.Events, v.Usual)
+		witness := ""
+		if !v.Witness && v.Status != quality.Learning {
+			witness = "  its silence is no evidence"
+		}
+		w.Human("%-10s %-32s %6d events (usual %d)%s\n", v.Status, label, v.Events, v.Usual, witness)
 		for _, r := range v.Reasons {
 			w.Human("             %s: %s\n", r.Code, r.Detail)
 		}

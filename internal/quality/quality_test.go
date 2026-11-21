@@ -140,3 +140,29 @@ func TestQuantileAndDuplicatesBound(t *testing.T) {
 		t.Errorf("%+v", d)
 	}
 }
+
+// TestWitness: an ordinary day is a witness; a sampled one is a notice and
+// not a witness; a degraded one or a learning one is not a witness.
+func TestWitness(t *testing.T) {
+	a := NewAccumulator()
+	for d := range 9 {
+		usual(a, day0.AddDate(0, 0, d), 100, nil)
+	}
+	if v := judgeLast(t, a, 9); !v.Witness {
+		t.Errorf("an ordinary day: %+v", v)
+	}
+	usual(a, day0.AddDate(0, 0, 9), 100, func(e *telemetry.Event, i int) {
+		e.Raw["sampling_threshold"] = "8"
+	})
+	if v := judgeLast(t, a, 10); v.Witness || v.Status != Notice || reasons(v) != "sampled" {
+		t.Errorf("a sampled day: %+v", v)
+	}
+	b := NewAccumulator()
+	usual(b, day0, 100, func(e *telemetry.Event, i int) { e.Raw["sampling_threshold"] = "0" })
+	if d := b.Days()[0]; d.Sampled != 0 {
+		t.Errorf("a threshold of zero keeps every span, and is not sampling: %d", d.Sampled)
+	}
+	if v := judgeLast(t, b, 1); v.Witness || v.Status != Learning {
+		t.Errorf("a learning day: %+v", v)
+	}
+}

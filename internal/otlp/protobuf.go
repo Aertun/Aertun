@@ -295,6 +295,8 @@ func (d *budget) pbSpan(b []byte) (span, error) {
 			sp.TraceID, err = id(wt, r, 16)
 		case 2:
 			sp.SpanID, err = id(wt, r, 8)
+		case 3:
+			sp.TraceState, err = str(wt, r)
 		case 5:
 			sp.Name, err = str(wt, r)
 		case 7:

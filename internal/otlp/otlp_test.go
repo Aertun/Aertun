@@ -753,3 +753,33 @@ func TestAnAgentsOwnIdIsKeptOverTheGatewaysKey(t *testing.T) {
 		t.Errorf("actor %+v via %q key %q", got.Actor, got.Raw["via"], got.Raw["gateway_key"])
 	}
 }
+
+// TestTheSamplingThresholdIsTheOnlyThingReadFromTracestate: OpenTelemetry's
+// consistent probability sampling writes "th" under "ot"; that is kept, in
+// the strict shape the specification gives it, and nothing else is.
+func TestTheSamplingThresholdIsTheOnlyThingReadFromTracestate(t *testing.T) {
+	for in, want := range map[string]string{
+		"ot=th:8": "8",
+		"vendor=abc,ot=rv:0123456789abcd;th:fd70": "fd70",
+		"ot=th:0":                             "0",
+		"ot=th:ZZ":                            "",
+		"ot=th:123456789abcdef":               "",
+		"ot=rv:abc":                           "",
+		"vendor=th:8":                         "",
+		"":                                    "",
+		strings.Repeat("x", 600) + ",ot=th:8": "",
+	} {
+		if got := samplingThreshold(in); got != want {
+			t.Errorf("%.40q: %q, want %q", in, got, want)
+		}
+	}
+	rs := &resourceSpans{}
+	sp := &span{TraceID: "t", SpanID: "s", Name: "execute_tool", StartTimeUnixNano: "1700000000000000000",
+		TraceState: "ot=th:c", Attributes: []attribute{{Key: "gen_ai.operation.name", Value: &attrValue{StringValue: ptr("execute_tool")}}}}
+	rec, ok := record(rs, sp)
+	if !ok || rec["sampling_threshold"] != "c" {
+		t.Errorf("%v %v", ok, rec)
+	}
+}
+
+func ptr(s string) *string { return &s }

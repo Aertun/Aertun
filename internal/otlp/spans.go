@@ -40,9 +40,12 @@ type scopeSpans struct {
 }
 
 type span struct {
-	TraceID           string      `json:"traceId"`
-	SpanID            string      `json:"spanId"`
-	Name              string      `json:"name"`
+	TraceID string `json:"traceId"`
+	SpanID  string `json:"spanId"`
+	Name    string `json:"name"`
+	// TraceState is the W3C tracestate; only OpenTelemetry's sampling
+	// threshold is read from it (samplingThreshold).
+	TraceState        string      `json:"traceState"`
 	StartTimeUnixNano json.Number `json:"startTimeUnixNano"`
 	EndTimeUnixNano   json.Number `json:"endTimeUnixNano"`
 	Status            *spanStatus `json:"status"`
@@ -290,6 +293,9 @@ func record(rs *resourceSpans, sp *span) (map[string]any, bool) {
 	if service != "" {
 		out["service"] = service
 	}
+	if th := samplingThreshold(sp.TraceState); th != "" {
+		out["sampling_threshold"] = th
+	}
 	if via != "" {
 		out["via"] = via
 	}
@@ -305,6 +311,35 @@ func record(rs *resourceSpans, sp *span) (map[string]any, bool) {
 		}
 	}
 	return out, true
+}
+
+// samplingThreshold is the rejection threshold OpenTelemetry's consistent
+// probability sampling writes into a span's tracestate (the "th" sub-key of
+// the "ot" entry): 1 to 14 hex digits, "0" when every span is kept. A span
+// that carries a non-zero one comes from a source that drops spans by
+// design, whose silence is no evidence that nothing happened. Anything
+// else in the tracestate is another vendor's and is not read.
+func samplingThreshold(tracestate string) string {
+	if len(tracestate) > 512 {
+		return ""
+	}
+	for _, member := range strings.Split(tracestate, ",") {
+		key, value, ok := strings.Cut(strings.TrimSpace(member), "=")
+		if !ok || key != "ot" {
+			continue
+		}
+		for _, sub := range strings.Split(value, ";") {
+			th, ok := strings.CutPrefix(sub, "th:")
+			if !ok || len(th) == 0 || len(th) > 14 {
+				continue
+			}
+			if strings.Trim(th, "0123456789abcdef") != "" {
+				return ""
+			}
+			return th
+		}
+	}
+	return ""
 }
 
 // walks every span in a request with the resource it belongs to.

@@ -56,8 +56,12 @@ Unreleased
   a field nearly every earlier event carried gone from most of today's,
   four times later than usual, clocks ahead, or one event in twenty
   repeated is degraded; a spike or a backfill is a notice; a day as quiet
-  as the same weekday last week is quiet by habit.  `aertun telemetry
-  quality` shows it; the server records each newly degraded day in the
+  as the same weekday last week is quiet by habit.  A day is a witness,
+  its silence evidence that nothing happened, only when it is judged, not
+  degraded, and not sampled: the OTLP receiver now keeps OpenTelemetry's
+  sampling threshold from a span's tracestate (and nothing else from it),
+  and a source that drops spans by design is a notice every day and never
+  a witness.  `aertun telemetry quality` shows it; the server records each newly degraded day in the
   audit log, and the new rule aertun.source-quality-degraded (ATT&CK
   T1562.006) opens a finding on it.
 

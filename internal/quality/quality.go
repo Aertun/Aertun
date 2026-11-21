@@ -38,6 +38,13 @@
 // in twenty is a duplicate. A spike in volume, or a backfill of old events,
 // is a notice: it says something changed, and takes nothing away from what
 // the source's silence means.
+//
+// A day is a witness when its silence can count as evidence that nothing
+// happened: judged (not learning), not degraded, and with no event from a
+// sampler that drops spans by design (OpenTelemetry's consistent
+// probability sampling writes its threshold into the tracestate). A
+// sampled source is a notice every day, never a finding, and never a
+// witness.
 package quality
 
 import (
@@ -94,6 +101,9 @@ type Day struct {
 	DupUnmeasured bool `json:"dup_unmeasured,omitempty"`
 	Ahead         int  `json:"ahead"`
 	Stale         int  `json:"stale"`
+	// Sampled counts events from a sampler that drops some by design (a
+	// non-zero OpenTelemetry sampling threshold).
+	Sampled int `json:"sampled,omitempty"`
 	// Late is a histogram of arrival minus event time, for events less
 	// than a week late: bucket n holds delays under 2^n seconds and at
 	// least 2^(n-1). Older arrivals are Stale.
@@ -167,6 +177,9 @@ func (a *Accumulator) Add(e telemetry.Event) {
 		d.Late[bucket(delay)]++
 	default:
 		d.Late[0]++
+	}
+	if th := e.Raw["sampling_threshold"]; strings.TrimLeft(th, "0") != "" {
+		d.Sampled++
 	}
 	for _, f := range fieldsOf(e) {
 		if _, tracked := d.Fields[f]; tracked || len(d.Fields) < MaxFields {
@@ -261,6 +274,9 @@ type Verdict struct {
 	Events  int      `json:"events"`
 	Usual   int      `json:"usual"`
 	Reasons []Reason `json:"reasons,omitempty"`
+	// Witness says the source's silence that day can count as evidence
+	// that nothing happened: judged, not degraded, and not sampled.
+	Witness bool `json:"witness"`
 }
 
 func median(xs []int) int {
@@ -341,6 +357,10 @@ func Judge(day Day, earlier []Day) Verdict {
 		if float64(day.Stale) > StaleRatio*float64(day.Events) {
 			add("backfill", false, "%d of %d events arrived a week or more after they happened", day.Stale, day.Events)
 		}
+		if day.Sampled > 0 {
+			add("sampled", false, "%d of %d events come from a sampler that drops some by design, so its "+
+				"silence is not evidence that nothing happened", day.Sampled, day.Events)
+		}
 	}
 	for _, r := range v.Reasons {
 		if r.Degrades {
@@ -349,6 +369,7 @@ func Judge(day Day, earlier []Day) Verdict {
 		}
 		v.Status = Notice
 	}
+	v.Witness = v.Status != Degraded && day.Sampled == 0
 	return v
 }
 
