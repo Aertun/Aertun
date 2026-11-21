@@ -4,7 +4,7 @@
 # Run Aertun in a workflow: a proof as a CI gate, a rule checked before it
 # merges, a proof's verification result for the policy that deploys.
 #
-#   - uses: Aertun/Aertun@v0.2.0
+#   - uses: Aertun/Aertun@v0.2.1
 #     with:
 #       args: |
 #         proof
@@ -30,7 +30,7 @@ inputs:
     required: true
   version:
     description: The Aertun release to run
-    default: "0.2.0"
+    default: "0.2.1"
   verify-attestation:
     description: Check the binary's build attestation with gh before running it ("true" or "false")
     default: "true"
@@ -49,7 +49,7 @@ runs:
       run: |
         set -euo pipefail
         case "$AERTUN_VERSION" in
-          *[!0-9.]*|"") echo "version is a release number such as 0.2.0" >&2; exit 2 ;;
+          *[!0-9.]*|"") echo "version is a release number such as 0.2.1" >&2; exit 2 ;;
         esac
         case "$RUNNER_OS" in
           Linux) os=linux ;; macOS) os=darwin ;; Windows) os=windows ;;
