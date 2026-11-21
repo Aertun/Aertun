@@ -511,6 +511,23 @@ func connectRun(root string, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "%s%d request(s) to %s%s\n", dim, out.Requests,
 		m.Name, reset)
+	// A run moves the checkpoints scheduled collection reads from, so the
+	// events it printed are not collected again: said, so a run made only
+	// to try a connector is not a gap nobody noticed.
+	var moved []string
+	for key := range out.marks {
+		if _, name, ok := strings.Cut(key, "/"); ok {
+			if e, found := m.Endpoint(name); found && e.Produces == connector.Events {
+				moved = append(moved, key)
+			}
+		}
+	}
+	if len(moved) > 0 {
+		sort.Strings(moved)
+		fmt.Fprintf(os.Stderr, "%sthe checkpoint of %s moved past what was printed: scheduled "+
+			"collection will not read those events, and they are in the store only if what was printed "+
+			"was put there%s\n", yellow, strings.Join(moved, ", "), reset)
+	}
 	return failed
 }
 

@@ -56,7 +56,9 @@ Unreleased
   events nobody stored.  It now keeps checkpoints of its own, and the two
   never move each other's.  Checkpoints are also merged into the file as
   it is when saved, so one reader no longer undoes another's.  Present
-  since 0.1.0.
+  since 0.1.0.  `aertun connect run`, which moves collection's checkpoints
+  as it always has (what it prints is meant for the store), now says so
+  when it moves an event endpoint's.
 
 * Fixed: a pushed delivery (a webhook, an Okta event hook, a shared signal,
   another site's audit stream) whose store failed after the sender had

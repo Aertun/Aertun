@@ -505,3 +505,34 @@ func TestAReadWhoseStoreFailedIsAskedAgain(t *testing.T) {
 		t.Errorf("%d events stored for three records", n)
 	}
 }
+
+// TestAConnectorRunSaysItMovedTheLogsCheckpoint: running a connector by
+// hand moves the checkpoint scheduled collection reads from; it says so,
+// naming the event endpoint, so a run made to try a connector is not a
+// silent gap.
+func TestAConnectorRunSaysItMovedTheLogsCheckpoint(t *testing.T) {
+	now := time.Now().UTC()
+	tool := &fakeTool{answer: func(r *http.Request) (int, string, http.Header) {
+		if r.URL.Path != "/api/v1/logs" {
+			return 200, "[]", nil
+		}
+		return 200, "[" + oktaEvent("e1", "dana", "SUCCESS", now.Add(-time.Hour)) + "]", nil
+	}}
+	root := collectSite(t, tool)
+	r, wr, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, savedOut := os.Stderr, os.Stdout
+	os.Stderr, os.Stdout = wr, wr
+	runErr := cmdConnect(root, []string{"run", "okta", "system"})
+	os.Stderr, os.Stdout = saved, savedOut
+	wr.Close()
+	said, _ := io.ReadAll(r)
+	if runErr != nil {
+		t.Fatal(runErr)
+	}
+	if !strings.Contains(string(said), "the checkpoint of okta/system moved") {
+		t.Errorf("the run did not say it moved the log's checkpoint:\n%s", said)
+	}
+}
