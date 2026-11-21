@@ -126,6 +126,17 @@ func tree(events []Event) (*translog.Log, error) {
 	return l, nil
 }
 
+// Roots returns the Merkle root the log had at each of the sizes given, in
+// one pass: what a restored log is held to, against every head it signed
+// and every root it anchored.
+func Roots(events []Event, sizes []int) ([]string, error) {
+	l, err := tree(events)
+	if err != nil {
+		return nil, err
+	}
+	return l.RootsAt(sizes)
+}
+
 // TreeHead returns a commitment to the log as it stands.
 func TreeHead(events []Event, now time.Time) (Head, error) {
 	l, err := tree(events)

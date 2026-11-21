@@ -87,6 +87,11 @@ is false is a vulnerability even without a working exploit:
     does not hold;
   - a log receipt in only one of the log's two algorithms counts as
     registration.
+- **A backup is sealed.** Any way to read a backup without its passphrase;
+  to restore one that was changed, reordered or cut short; to make a restore
+  write outside the directory it was given or over a store; or to have
+  `aertun restore` accept an audit log that does not match the head at
+  backup, a head the log signed, or a root it anchored.
 - **A connector reaches only what it declares.** Any request a connector or a
   feed makes to a host its manifest does not name, or to this machine's
   private network when it was not allowed to.
@@ -127,4 +132,5 @@ and a report is most useful when it makes one of those tests fail:
 - `internal/audit`, `internal/translog`, `internal/auditstream` — the chain, the tree, signed heads and the stream
 - `internal/pii`, `internal/model` — the privacy guard in front of a model
 - `internal/cbor`, `internal/cose`, `internal/scitt`, `internal/aep`, `internal/receiptlog`, `cmd/aertun/conformcmd_test.go` — the evidence protocol, its log and its test vectors
+- `internal/backup`, `cmd/aertun/backupcmd_test.go` — backups and the restore drill
 - `internal/fetch`, `internal/egress`, `internal/connector` — what may be reached

@@ -37,6 +37,17 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* `aertun backup` writes the whole store, keys and secrets included, into
+  one file encrypted with AES-256-GCM under a passphrase (PBKDF2-SHA-256,
+  600,000 iterations), in authenticated chunks that cannot be reordered or
+  cut short unnoticed.  The server need not stop: the audit and receipt
+  logs are measured under their locks and copied as whole prefixes.
+  `aertun restore` goes into a new directory only, refuses names that
+  would escape it and anything but files and directories, holds every file
+  to the manifest, and then holds the audit log to the head recorded at
+  backup, to every head it signed and to every root it anchored.  The test
+  suite runs the restore drill on every change.
+
 * `aertun serve` answers /metrics in the Prometheus text format: HTTP
   responses by status class, agent-interface calls by outcome and the
   receipts kept for them, scheduled job runs and when each last

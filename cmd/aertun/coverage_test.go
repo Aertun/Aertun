@@ -208,6 +208,20 @@ var coverage = map[string]surfaces{
 			"agent able to vouch for its own activity could make itself " +
 			"invisible to the next rule written against it",
 	},
+	// Backups and restores, at the terminal of the machine that holds them.
+	"backup": {
+		Why: "a backup is a file written where the operator chooses, under a " +
+			"passphrase they keep; a page that offered it would put every secret " +
+			"of the store one click from a browser",
+		NoMCP: "a backup holds every key and secret the store has, and nothing an " +
+			"agent does needs one",
+	},
+	"restore": {
+		Why: "it runs on the machine the store is being rebuilt on, before any " +
+			"console exists there to show a page",
+		NoMCP: "it builds a new store from a file and a passphrase, which no agent " +
+			"holds or needs",
+	},
 	// The evidence protocol's conformance suite, for implementers.
 	"conform": {
 		Why: "it is a test an implementer runs in their own build, on their own " +

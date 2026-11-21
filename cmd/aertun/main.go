@@ -90,6 +90,8 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun receipt export --out DIR [--issuer URI] [--from T] [--to T]   the log's entries with their receipts, among them the agent interface's own for every call it answered
   aertun receipt verify FILE --issuer-key ISSUER=F [--log-key F] [RECEIPT...]   checked offline; a reconciliation is checked by doing it again
   aertun receipt reconcile FILE... --key F --issuer URI --from T --to T --expect ISSUER=VANTAGE... --issuer-key ISSUER=F --out F   every party's receipts held together: what some party never reported, gaps in their numbering, actors they disagree on
+  aertun backup --out FILE [--passphrase-file F]   the whole store in one encrypted file (AES-256-GCM, a PBKDF2 passphrase), the logs copied as they stood
+  aertun restore FILE --to DIR [--passphrase-file F]   into a new directory, then the audit log held to the head at backup, every signed head and every anchored root
   aertun conform [--vectors DIR] [--verifier "CMD ARG..."]   the protocol's test vectors, against this verifier or another; exit 0 when every one is decided as the protocol requires
   aertun windtunnel run --sigma DIR [--mutate N] [--out F]   replay agent attacks against your own Sigma rules: the primary mode
   aertun windtunnel run --sigma DIR --baseline BUNDLE --baseline-key F   and your estate's own vouched-for benign sessions: false positives per session, with Wilson bounds
@@ -402,6 +404,10 @@ func main() {
 		err = cmdReceipt(root, cmdArgs)
 	case "conform":
 		err = cmdConform(cmdArgs)
+	case "backup":
+		err = cmdBackup(root, cmdArgs)
+	case "restore":
+		err = cmdRestore(cmdArgs)
 	case "access":
 		err = cmdAccess(root, cmdArgs)
 	case "appsec":

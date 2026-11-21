@@ -248,6 +248,12 @@ var commandNeeds = map[string]need{
 	// Checking a bundle's signatures and digests reads a file the caller
 	// named and opens no store.
 	"benign verify": {action: auth.ActView},
+	// A backup holds every secret the store has: an administrator's, and
+	// the command asks for it again itself. A restore writes a new
+	// directory from a file and a passphrase the caller holds, and opens no
+	// store: whoever has both could decrypt the file without this program.
+	"backup":  {action: auth.ActGrant},
+	"restore": {why: "it writes a new directory from a backup file and its passphrase, both the caller's, and opens no store"},
 	// Conformance reads vectors and runs a verifier the caller named, as
 	// the caller could run it themselves: it opens no store and signs
 	// nothing.

@@ -80,7 +80,7 @@ Checking the build
 
      make check
 
-That runs the whole test suite: one hundred and seven packages, including several that
+That runs the whole test suite: one hundred and eight packages, including several that
 walk this program's own source and fail when a command has no screen or no
 machine interface without a written reason, or declares no privilege.
 
@@ -112,6 +112,38 @@ Give that token to the scrape as its bearer credential.  Agents' tokens
 are refused there.  The metrics count by closed words only (status
 classes, outcomes, job names) and name no person, agent or tool.
 
+
+Backups
+=======
+
+     aertun backup --out /backups/aertun-$(date +%F).aertun-backup --passphrase-file /etc/aertun/backup-pass
+     aertun restore /backups/aertun-2026-11-20.aertun-backup --to /srv/aertun-restored --passphrase-file F
+
+A backup is the whole store, keys and secrets included, in one file
+encrypted with AES-256-GCM under a key derived from the passphrase (PBKDF2
+with SHA-256, 600,000 iterations).  The passphrase is at least fifteen
+characters, read from a 0600 file or AERTUN_BACKUP_PASSPHRASE; keep it
+apart from the backups, because without it they cannot be read.  Taking
+one is an administrator's act and is recorded in the audit log.
+
+The server need not stop.  The audit log and the receipt log are measured
+under their locks and copied to exactly that length, so each is a whole
+prefix; everything else is written whole by design.
+
+A restore goes into a new, empty directory and never over a store.  It
+then rebuilds the audit log's chain and Merkle tree and holds them to the
+head recorded at backup, to every head the log signed, and to every root
+it anchored in Bitcoin, and it checks the receipt log.  A restore that
+fails those checks says so and the directory must not be put in service;
+one that fails part way leaves the directory empty.  An audit log kept in
+another directory is restored beside the store.
+
+Recovery point: whatever was written since the last backup, so schedule
+backups as often as you can afford to lose (hourly, from cron or a timer).
+Recovery time: one read of the file and one rebuild of the audit tree;
+measure your own with `time aertun restore` on a copy, and repeat it, since
+a backup nobody has restored is a hope.  The test suite restores one on
+every change.
 
 Licence
 =======

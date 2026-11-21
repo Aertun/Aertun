@@ -279,6 +279,16 @@ func (l *Log) Size() (int, error) {
 	return n, err
 }
 
+// Measure is how many entries the log holds and the length of the file
+// that holds them, read under the lock: a copy of that many bytes is the
+// log as it stood, whatever is appended while it is made.
+func (l *Log) Measure() (int, int64, error) {
+	var n int
+	var size int64
+	err := l.locked(func(*os.File) error { n, size = l.tree.Size(), l.read; return nil })
+	return n, size, err
+}
+
 // Append adds a statement admit accepts, and returns its index. A
 // statement already in the log is not added again; its index is returned.
 func (l *Log) Append(statement []byte, admit func(*scitt.Signed) error) (int, error) {
