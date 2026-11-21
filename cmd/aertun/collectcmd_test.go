@@ -420,3 +420,61 @@ func TestOnePersonIsJoinedAcrossPlatformsByTheAddressTheyShare(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestAReadWhoseStoreFailedIsAskedAgain: the tool answered, and the store
+// could not take what it said. The checkpoint stays where it was and the
+// records are not remembered as seen, so the next read asks again and
+// stores them; before, the checkpoint moved first and they were lost.
+func TestAReadWhoseStoreFailedIsAskedAgain(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	now := time.Now().UTC()
+	page := "[" + oktaEvent("e1", "dana", "SUCCESS", now.Add(-2*time.Hour)) + "," +
+		oktaEvent("e2", "sam", "FAILURE", now.Add(-time.Hour)) + "]"
+	tool := &fakeTool{answer: func(r *http.Request) (int, string, http.Header) {
+		if r.URL.Path != "/api/v1/logs" {
+			return 200, "[]", nil
+		}
+		return 200, page, nil
+	}}
+	root := collectSite(t, tool)
+	todo, _, err := collectables(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c collectable
+	for _, x := range todo {
+		if x.name() == "okta/system" {
+			c = x
+		}
+	}
+	if c.name() != "okta/system" {
+		t.Fatal("no okta/system to collect")
+	}
+	dir := filepath.Join(t.TempDir(), "spool")
+	sp, err := spool.Open(dir, spool.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sp.Close()
+	os.Chmod(dir, 0o500)
+	caller := resolveCaller(root, "")
+	st := collectOne(root, c, sp, collectStatus{}, map[string]alias{}, caller, now)
+	os.Chmod(dir, 0o700)
+	if st.Error == "" {
+		t.Fatal("the store accepted events into a read-only directory, so this test tests nothing")
+	}
+	if len(st.Seen) != 0 {
+		t.Errorf("records that were never stored are remembered as seen: %d", len(st.Seen))
+	}
+	firstAsk := tool.asked[0]
+	tool.asked = nil
+	st = collectOne(root, c, sp, st, map[string]alias{}, caller, now)
+	if st.Error != "" || st.Stored != 2 {
+		t.Fatalf("the read asked again: %+v", st)
+	}
+	if tool.asked[0] != firstAsk {
+		t.Errorf("the second read did not start where the failed one did:\n%s\n%s", firstAsk, tool.asked[0])
+	}
+}

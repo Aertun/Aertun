@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -342,8 +343,12 @@ func digestOf(doc any) string {
 func storeRecords(sp *spool.Spool, s source.Source, docs []any,
 	st *collectStatus, aliases map[string]alias, now time.Time) error {
 
+	before := slices.Clone(st.Seen)
 	events := mapRecords(s, docs, st, aliases, now)
 	if _, err := sp.AppendBatch(events); err != nil {
+		// Nothing stored is nothing known: remembered, these records would
+		// be skipped as seen when the read is asked again.
+		st.Seen = before
 		return err
 	}
 	st.Stored += len(events)
@@ -475,7 +480,7 @@ func collectOne(root string, c collectable, sp *spool.Spool,
 		}
 	}
 	out, failed, err := runConnector(root, c.M, []string{c.E.Name}, false,
-		false, caller)
+		false, true, caller)
 	if err == nil {
 		err = failed
 	}
@@ -488,6 +493,13 @@ func collectOne(root string, c collectable, sp *spool.Spool,
 		docs = append(docs, unflatten(rec))
 	}
 	if err := storeRecords(sp, c.S, docs, &st, aliases, now); err != nil {
+		// The checkpoint stays where it was, so the next read asks again
+		// for what this one could not store; what was stored is known by
+		// its digest and is not stored twice.
+		st.Error = err.Error()
+		return st
+	}
+	if err := commitMarks(root, out.marks); err != nil {
 		st.Error = err.Error()
 		return st
 	}

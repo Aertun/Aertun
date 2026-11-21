@@ -37,6 +37,14 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* Fixed: a scheduled collection whose read succeeded and whose store then
+  failed (a full disk, the event store refusing) lost those records for
+  good.  The connector's checkpoint was saved before the records were
+  stored, and their digests were remembered as seen, so the next read
+  started after them and would have skipped them anyway.  The checkpoint
+  is now saved only once the records are stored, and a failed store
+  forgets their digests; the next read asks again.  Affects 0.1 and 0.2.
+
 * `aertun hook claude-code`: Claude Code under this deployment's kill
   switch, with a receipt for everything it does.  Run as its PreToolUse,
   PostToolUse and PostToolUseFailure hook, it refuses every tool call of an
