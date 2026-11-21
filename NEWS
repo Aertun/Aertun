@@ -71,6 +71,15 @@ Unreleased
   an inbound.dropped record in the audit log, never silently.  Present
   since 0.1.0.
 
+* A second implementation: verifiers/python, a verifier for the evidence
+  protocol in one file of Python's standard library (its own CBOR, COSE,
+  Ed25519, ML-DSA-65 from FIPS 204, RFC 9162 proofs, RFC 8785 canonical
+  JSON and reconciliation, sharing no code with the Go one).  It decides
+  all fifteen test vectors as the protocol requires under `aertun
+  conform`, and its tests hold ML-DSA-65 to Go's signatures with each part
+  tampered and refuse every bit flipped in a statement; the Go suite runs
+  both wherever python3 is installed.
+
 * `aertun hook claude-code`: Claude Code under this deployment's kill
   switch, with a receipt for everything it does.  Run as its PreToolUse,
   PostToolUse and PostToolUseFailure hook, it refuses every tool call of an

@@ -225,6 +225,10 @@ arguments needed.
 vectors. The verifier is given one vector file per run and must exit 0
 exactly when it accepts the vector.
 
+Two verifiers conform today: the Go one in this repository (`aertun
+conform` with no `--verifier`), and [the Python one](../../../verifiers/python),
+standard library only, which shares no code with it.
+
 An implementation conforms as a **producer** when its statements pass a
 conforming verifier, and its action digests match vector 01's
 construction.
