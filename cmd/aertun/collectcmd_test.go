@@ -478,19 +478,20 @@ func TestAReadWhoseStoreFailedIsAskedAgain(t *testing.T) {
 		t.Errorf("the second read did not start where the failed one did:\n%s\n%s", firstAsk, tool.asked[0])
 	}
 
-	// The lines reach the open segment and only the index save fails: the
-	// records are stored, remembered, and not stored again by the next read.
+	// The index cannot be saved: the store takes the line back out, so
+	// nothing is stored or remembered, the checkpoint stays, and the next
+	// read stores the record once.
 	page = "[" + oktaEvent("e1", "dana", "SUCCESS", now.Add(-2*time.Hour)) + "," +
 		oktaEvent("e2", "sam", "FAILURE", now.Add(-time.Hour)) + "," +
 		oktaEvent("e3", "kim", "SUCCESS", now.Add(-30*time.Minute)) + "]"
 	os.Chmod(dir, 0o500)
 	st = collectOne(root, c, sp, st, map[string]alias{}, caller, now)
 	os.Chmod(dir, 0o700)
-	if st.Error == "" || st.Stored != 1 {
-		t.Fatalf("the index save did not fail as this case needs, or the record was not counted: %+v", st)
+	if st.Error == "" || st.Stored != 0 || len(st.Seen) != 2 {
+		t.Fatalf("the index save did not fail as this case needs, or the record was kept: %+v", st)
 	}
 	st = collectOne(root, c, sp, st, map[string]alias{}, caller, now)
-	if st.Error != "" || st.Stored != 0 || st.Known != 3 {
+	if st.Error != "" || st.Stored != 1 || st.Known != 2 {
 		t.Errorf("the read after: %+v", st)
 	}
 	n := 0

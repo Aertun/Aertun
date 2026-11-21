@@ -510,7 +510,7 @@ func collectOne(root string, c collectable, sp *spool.Spool,
 		}
 	}
 	out, failed, err := runConnector(root, c.M, []string{c.E.Name}, false,
-		false, true, caller)
+		false, true, "", caller)
 	if err == nil {
 		err = failed
 	}

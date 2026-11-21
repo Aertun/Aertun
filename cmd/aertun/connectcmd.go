@@ -476,7 +476,7 @@ func connectRun(root string, args []string) error {
 	if err := authorise(root, caller, auth.ActGrant, "/"); err != nil {
 		return err
 	}
-	out, failed, err := runConnector(root, m, names, *full, *save, false, caller)
+	out, failed, err := runConnector(root, m, names, *full, *save, false, "", caller)
 	if err != nil {
 		return err
 	}
@@ -531,12 +531,15 @@ type connectOut struct {
 // there is one place those rules live. It returns the first endpoint that
 // failed separately from an error that stopped the run.
 //
+// Checkpoints are kept under scope: the estate sync keeps its own
+// ("estate:"), so its reads and collection's never move each other's.
+//
 // With hold, the checkpoints the run reached are returned in out.marks and
 // not saved: a caller that stores what was read saves them only once it
 // is stored (commitMarks), because a checkpoint saved first and a store
 // that then failed is a read nobody will ever repeat.
 func runConnector(root string, m connector.Manifest, names []string, full,
-	save, hold bool, caller *Caller) (connectOut, error, error) {
+	save, hold bool, scope string, caller *Caller) (connectOut, error, error) {
 
 	held, err := loadSecrets(root)
 	if err != nil {
@@ -576,7 +579,7 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 	from := map[string]connector.State{}
 	if !full {
 		for _, e := range m.Endpoints {
-			from[e.Name] = states[m.Name+"/"+e.Name]
+			from[e.Name] = states[scope+m.Name+"/"+e.Name]
 		}
 	}
 
@@ -623,7 +626,7 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 			if out.marks == nil {
 				out.marks = map[string]connector.State{}
 			}
-			out.marks[key] = connector.State{Watermark: r.Result.Watermark, At: time.Now().UTC()}
+			out.marks[scope+key] = connector.State{Watermark: r.Result.Watermark, At: time.Now().UTC()}
 		}
 		if r.Asked {
 			for _, rec := range r.Result.Records {
