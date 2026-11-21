@@ -476,7 +476,7 @@ func connectRun(root string, args []string) error {
 	if err := authorise(root, caller, auth.ActGrant, "/"); err != nil {
 		return err
 	}
-	out, failed, err := runConnector(root, m, names, *full, *save, caller)
+	out, failed, err := runConnector(root, m, names, *full, *save, false, "", caller)
 	if err != nil {
 		return err
 	}
@@ -511,6 +511,23 @@ func connectRun(root string, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "%s%d request(s) to %s%s\n", dim, out.Requests,
 		m.Name, reset)
+	// A run moves the checkpoints scheduled collection reads from, so the
+	// events it printed are not collected again: said, so a run made only
+	// to try a connector is not a gap nobody noticed.
+	var moved []string
+	for key := range out.marks {
+		if _, name, ok := strings.Cut(key, "/"); ok {
+			if e, found := m.Endpoint(name); found && e.Produces == connector.Events {
+				moved = append(moved, key)
+			}
+		}
+	}
+	if len(moved) > 0 {
+		sort.Strings(moved)
+		fmt.Fprintf(os.Stderr, "%sthe checkpoint of %s moved past what was printed: scheduled "+
+			"collection will not read those events, and they are in the store only if what was printed "+
+			"was put there%s\n", yellow, strings.Join(moved, ", "), reset)
+	}
 	return failed
 }
 
@@ -520,6 +537,9 @@ type connectOut struct {
 	Records   []map[string]string `json:"records"`
 	Runs      []map[string]any    `json:"runs"`
 	Requests  int                 `json:"requests"`
+	// marks are the checkpoints a held run reached and did not save: the
+	// caller saves them once what was read is safely stored.
+	marks map[string]connector.State
 }
 
 // runConnector reads a connector's endpoints — all of them when names is
@@ -527,8 +547,16 @@ type connectOut struct {
 // tool's latest read. The command and the scheduled sync both come here, so
 // there is one place those rules live. It returns the first endpoint that
 // failed separately from an error that stopped the run.
+//
+// Checkpoints are kept under scope: the estate sync keeps its own
+// ("estate:"), so its reads and collection's never move each other's.
+//
+// With hold, the checkpoints the run reached are returned in out.marks and
+// not saved: a caller that stores what was read saves them only once it
+// is stored (commitMarks), because a checkpoint saved first and a store
+// that then failed is a read nobody will ever repeat.
 func runConnector(root string, m connector.Manifest, names []string, full,
-	save bool, caller *Caller) (connectOut, error, error) {
+	save, hold bool, scope string, caller *Caller) (connectOut, error, error) {
 
 	held, err := loadSecrets(root)
 	if err != nil {
@@ -568,7 +596,7 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 	from := map[string]connector.State{}
 	if !full {
 		for _, e := range m.Endpoints {
-			from[e.Name] = states[m.Name+"/"+e.Name]
+			from[e.Name] = states[scope+m.Name+"/"+e.Name]
 		}
 	}
 
@@ -612,9 +640,10 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 			// Only on a complete run. See internal/connector on why a
 			// checkpoint that advances after a partial read loses records
 			// without ever reporting it.
-			states[key] = connector.State{
-				Watermark: r.Result.Watermark, At: time.Now().UTC(),
+			if out.marks == nil {
+				out.marks = map[string]connector.State{}
 			}
+			out.marks[scope+key] = connector.State{Watermark: r.Result.Watermark, At: time.Now().UTC()}
 		}
 		if r.Asked {
 			for _, rec := range r.Result.Records {
@@ -633,8 +662,12 @@ func runConnector(root string, m connector.Manifest, names []string, full,
 			"waited": r.Result.Waited.String(), "asked": r.Asked,
 		})
 	}
-	if err := saveStates(root, states); err != nil {
-		return out, failed, err
+	// Merged into the file as it is now, never the copy read at the start:
+	// another reader may have moved another endpoint's checkpoint since.
+	if !hold {
+		if err := commitMarks(root, out.marks); err != nil {
+			return out, failed, err
+		}
 	}
 	if save {
 		if err := saveSnapshot(root, m, reads, time.Now().UTC()); err != nil {
@@ -853,6 +886,22 @@ func loadStates(root string) (map[string]connector.State, error) {
 		return nil, fmt.Errorf("%s is unreadable: %w", statePath(root), uerr)
 	}
 	return out, nil
+}
+
+// commitMarks saves the checkpoints a held run reached, over whatever the
+// file holds now.
+func commitMarks(root string, marks map[string]connector.State) error {
+	if len(marks) == 0 {
+		return nil
+	}
+	states, err := loadStates(root)
+	if err != nil {
+		return err
+	}
+	for k, v := range marks {
+		states[k] = v
+	}
+	return saveStates(root, states)
 }
 
 func saveStates(root string, states map[string]connector.State) error {

@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -413,5 +415,108 @@ func TestVerificationNeedsTheStateThatWasAskedFor(t *testing.T) {
 	inb.ServeHTTP(httptest.NewRecorder(), r)
 	if feeds, _ := loadFeeds(root); !feeds["signals"].Verified.IsZero() {
 		t.Error("a verification event with another state verified the stream")
+	}
+}
+
+// TestADeliveryWhoseStoreFailedIsTriedAgain: the sender was told the
+// delivery was received; the store then refused it. Nothing written, it
+// waits, uncounted and not remembered, and the next pass stores it. All of
+// it written and only the index save failing, it is stored: not tried
+// again, not stored twice. One that fails for storeRetryFor is given up on,
+// with a record saying so, never silently. Its signals are raised once.
+func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	t.Setenv("HOME", t.TempDir())
+	root := connectStore(t)
+	f, _, err := makeFeed(root, "okta", "okta", nil, "boss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inb := newInboundServer(root)
+	dir := filepath.Join(t.TempDir(), "spool")
+	sp, err := spool.Open(dir, spool.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sp.Close()
+	stored := func() map[string]int {
+		n := map[string]int{}
+		sp.Range(time.Time{}, time.Time{}, func(e telemetry.Event) error {
+			n[e.Actor.Value]++
+			return nil
+		})
+		return n
+	}
+
+	// Nothing can be written (no segment yet, and the directory is closed).
+	suspend := oktaLogEvent("w-1", "user.lifecycle.suspend", "admin@acme.example", "ivo@acme.example")
+	inb.queue = []pushed{{feed: f, docs: []any{suspend}, at: time.Now().UTC()}}
+	os.Chmod(dir, 0o500)
+	if n := inb.drain(sp); n != 0 {
+		t.Fatalf("%d stored into a read-only store", n)
+	}
+	os.Chmod(dir, 0o700)
+	if len(inb.queue) != 1 || inb.queue[0].tries != 1 || inb.queue[0].failedAt.IsZero() || inb.failing != 1 {
+		t.Fatalf("the delivery did not wait for another try: %+v (failing %d)", inb.queue, inb.failing)
+	}
+	if st := inb.statusOf("okta"); len(st.Seen) != 0 || st.Records != 0 || st.Error == "" || st.Signals != 0 {
+		t.Errorf("a delivery never stored is counted, remembered or signalled: %+v", st)
+	}
+	if len(inb.signals) != 0 {
+		t.Errorf("%d signals raised for a delivery not stored", len(inb.signals))
+	}
+	if n := inb.drain(sp); n != 1 || len(inb.queue) != 0 || inb.failing != 0 {
+		t.Fatalf("the second try stored %d, %d still queued, %d failing", n, len(inb.queue), inb.failing)
+	}
+	if len(inb.signals) != 1 || inb.statusOf("okta").Signals != 1 {
+		t.Errorf("the suspension raised %d signals, want one", len(inb.signals))
+	}
+
+	// The index cannot be saved: the store takes the line back out, so the
+	// delivery is not stored and waits; the next pass stores it once, and
+	// the same records delivered again are known.
+	os.Chmod(dir, 0o500)
+	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
+		at: time.Now().UTC()}}
+	inb.drain(sp)
+	os.Chmod(dir, 0o700)
+	if inb.statusOf("okta").Error == "" {
+		t.Fatal("the index save did not fail, so this case tests nothing")
+	}
+	if len(inb.queue) != 1 || stored()["00u-bo@acme.example"] != 0 {
+		t.Fatalf("a delivery the store took back is stored or not waiting: %v %+v", stored(), inb.queue)
+	}
+	inb.drain(sp)
+	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
+		at: time.Now().UTC()}}
+	inb.drain(sp)
+	if got := stored(); got["00u-bo@acme.example"] != 1 || len(inb.queue) != 0 {
+		t.Errorf("stored %v, %d queued: the delivery tried again was not stored exactly once", got, len(inb.queue))
+	}
+
+	// One that fails for storeRetryFor is given up on, loudly.
+	sp.Close()
+	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-3", "user.session.start", "cy@acme.example", "")},
+		at: time.Now().UTC(), tries: 40, failedAt: time.Now().Add(-storeRetryFor - time.Minute)}}
+	os.Chmod(dir, 0o500)
+	inb.drain(sp)
+	os.Chmod(dir, 0o700)
+	if len(inb.queue) != 0 {
+		t.Error("a delivery past its time is still queued")
+	}
+	events, _ := audit.Read(auditPath(root))
+	dropped := 0
+	for _, e := range events {
+		if e.Action == "inbound.dropped" && e.Detail["records"] == "1" {
+			dropped++
+		}
+	}
+	if dropped != 1 {
+		t.Errorf("%d records of a delivery given up on", dropped)
+	}
+	if got := stored(); got["00u-cy@acme.example"] != 0 {
+		t.Errorf("a delivery recorded as dropped was stored: %v", got)
 	}
 }

@@ -1366,3 +1366,174 @@ func TestConcurrentRetentionAndAppendKeepTheIndexWhole(t *testing.T) {
 			"%v %v", bad, verr)
 	}
 }
+
+// messages reads every event a fresh handle on dir can find, from a time.
+func messages(t *testing.T, dir string, from time.Time) []string {
+	t.Helper()
+	s, err := Open(dir, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Release()
+	var out []string
+	if err := s.Range(from, time.Time{}, func(e telemetry.Event) error {
+		out = append(out, e.Message)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// TestABatchWhoseIndexWillNotSaveIsNotStored: the lines are written to the
+// open segment and the index cannot be saved. Nothing of the batch is
+// stored, the segment is cut back, and the next batch, once the index
+// saves, is read with everything before it: nothing lost, nothing twice.
+func TestABatchWhoseIndexWillNotSaveIsNotStored(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	c := &clock{at: base}
+	s, dir := openAt(t, c, Options{})
+	defer s.Close()
+	if _, err := s.AppendBatch([]telemetry.Event{event(base, base, "a")}); err != nil {
+		t.Fatal(err)
+	}
+	seg := filepath.Join(dir, s.Segments()[0].Name)
+	size := func() int64 { st, _ := os.Stat(seg); return st.Size() }
+	before := size()
+	os.Chmod(dir, 0o500)
+	c.at = base.Add(time.Minute)
+	into, err := s.AppendBatch([]telemetry.Event{event(c.at, c.at, "b")})
+	os.Chmod(dir, 0o700)
+	if err == nil {
+		t.Fatal("the index saved into a read-only directory, so this tests nothing")
+	}
+	if len(into) != 0 || size() != before || s.Segments()[0].Events != 1 {
+		t.Fatalf("a batch that was not stored: into %v, segment %d bytes (was %d), %d events",
+			into, size(), before, s.Segments()[0].Events)
+	}
+	c.at = base.Add(2 * time.Minute)
+	if _, err := s.AppendBatch([]telemetry.Event{event(c.at, c.at, "b"), event(c.at, c.at, "c")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "a,b,c" {
+		t.Errorf("read back %s", got)
+	}
+	if got := strings.Join(messages(t, dir, base.Add(30*time.Second)), ","); got != "b,c" {
+		t.Errorf("read from after a: %s", got)
+	}
+}
+
+// TestFailuresAcrossHandlesLoseNothing: four passes, each a new handle
+// released after it, with the index failing to save on the second and
+// third. What failed is not stored, what succeeded is read, and trying the
+// failed ones again stores each once.
+func TestFailuresAcrossHandlesLoseNothing(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	dir := t.TempDir()
+	pass := func(msg string, broken bool) error {
+		s, err := Open(dir, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if broken {
+			os.Chmod(dir, 0o500)
+			defer os.Chmod(dir, 0o700)
+		}
+		at := base.Add(time.Duration(len(msg)) * time.Second)
+		_, err = s.AppendBatch([]telemetry.Event{event(at, time.Now().UTC(), msg)})
+		s.Release()
+		return err
+	}
+	for _, p := range []struct {
+		msg    string
+		broken bool
+	}{{"a", false}, {"bb", true}, {"ccc", true}, {"dddd", false}} {
+		err := pass(p.msg, p.broken)
+		if p.broken != (err != nil) {
+			t.Fatalf("%s: broken %v, err %v", p.msg, p.broken, err)
+		}
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "a,dddd" {
+		t.Fatalf("after two failed passes: %s", got)
+	}
+	for _, m := range []string{"bb", "ccc"} {
+		if err := pass(m, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := messages(t, dir, time.Time{})
+	if strings.Join(got, ",") != "a,dddd,bb,ccc" {
+		t.Errorf("after trying again: %v", got)
+	}
+}
+
+// TestABatchOverMidnightStoresWhatItCan: the day's events are stored in
+// their segment, the next day's segment cannot be made, and the segments
+// returned say exactly which were stored.
+func TestABatchOverMidnightStoresWhatItCan(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	c := &clock{at: base}
+	s, dir := openAt(t, c, Options{})
+	defer s.Close()
+	if _, err := s.AppendBatch([]telemetry.Event{event(base, base, "first")}); err != nil {
+		t.Fatal(err)
+	}
+	next := base.Add(24 * time.Hour)
+	batch := []telemetry.Event{event(base.Add(time.Second), base.Add(time.Second), "before midnight"),
+		event(next, next, "after midnight")}
+	// The open segment can still be written; no new one can be made, nor
+	// the index saved.
+	os.Chmod(dir, 0o500)
+	into, err := s.AppendBatch(batch)
+	os.Chmod(dir, 0o700)
+	if err == nil {
+		t.Fatal("a new segment was made in a read-only directory, so this tests nothing")
+	}
+	if len(into) != 0 {
+		// The run before midnight could not save its index either, so
+		// nothing is stored.
+		t.Fatalf("into %v", into)
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "first" {
+		t.Errorf("read back %s", got)
+	}
+	into, err = s.AppendBatch(batch)
+	if err != nil || len(into) != 2 {
+		t.Fatalf("trying again: %v %v", into, err)
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "first,before midnight,after midnight" {
+		t.Errorf("read back %s", got)
+	}
+}
+
+// TestABatchRollsWhenItsSegmentIsFull: a segment that fills part way
+// through a batch rolls there, as it always has one event at a time, and
+// each event is named for the segment it went in.
+func TestABatchRollsWhenItsSegmentIsFull(t *testing.T) {
+	c := &clock{at: base}
+	s, dir := openAt(t, c, Options{SegmentBytes: 1})
+	defer s.Close()
+	into, err := s.AppendBatch([]telemetry.Event{event(base, base, "one"),
+		event(base, base.Add(time.Second), "two"), event(base, base.Add(2*time.Second), "three")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	segs := s.Segments()
+	if len(segs) != 3 || into[0] == into[1] || into[1] == into[2] {
+		t.Fatalf("three events over a full segment: %d segments, into %v", len(segs), into)
+	}
+	for i, seg := range segs {
+		if seg.Events != 1 || seg.Name != into[i] {
+			t.Errorf("segment %d: %+v", i, seg)
+		}
+	}
+	if got := strings.Join(messages(t, dir, time.Time{}), ","); got != "one,two,three" {
+		t.Errorf("read back %s", got)
+	}
+}

@@ -192,6 +192,21 @@ type index struct {
 	Ahead int64 `json:"ahead,omitempty"`
 }
 
+// clone is a copy of the index that shares nothing with it, for putting
+// back after a batch that could not be stored.
+func (x index) clone() index {
+	c := x
+	c.Segments = append([]Segment(nil), x.Segments...)
+	c.Holds = append([]Hold(nil), x.Holds...)
+	if x.Late != nil {
+		c.Late = make(map[int]int64, len(x.Late))
+		for k, v := range x.Late {
+			c.Late[k] = v
+		}
+	}
+	return c
+}
+
 // Spool is an open store.
 type Spool struct {
 	dir  string
@@ -322,15 +337,20 @@ func (s *Spool) Append(e telemetry.Event) (string, error) {
 // event: a push source hands over hundreds of
 // events together, and a store that fsyncs an index per line caps the estate
 // at the speed of the disk's willingness to flush, not the speed events
-// arrive. A segment that rolls mid-batch seals — and saves — as rolling
-// always does; everything else is one save at the end.
+// arrive.
 //
-// The batch is prepared before the first line is written: an event that
-// cannot be validated or marshalled refuses the whole batch rather than
-// half-storing it, so a caller that retries retries all of it, where a caller
-// retrying a half-failed loop of Appends would store the half that succeeded
-// twice. A failure while the lines are being written leaves the same torn
-// tail a failed single Append leaves, and is recovered from the same way.
+// Stored whole, a segment at a time. The batch is prepared before the
+// first line is written: an event that cannot be validated or marshalled
+// refuses the whole batch. It then goes in by runs, each the events that
+// belong in one segment — a segment rolls at the end of a day, or once it
+// is full, as it always has — and each run is written, synced and saved
+// into the index, or, if any of that fails, cut back out of its segment and
+// the index put back as it was. The segments returned are exactly the
+// events stored, in order; an error returns those stored before it, and a
+// caller trying again with the rest stores each event once. Before, lines
+// written and then an index that would not save were left in a file the
+// saved index did not describe — unread, or skipped by a read starting
+// after the stale arrival time — while the caller could not tell.
 func (s *Spool) AppendBatch(events []telemetry.Event) ([]string, error) {
 	if len(events) == 0 {
 		return nil, nil
@@ -363,35 +383,62 @@ func (s *Spool) AppendBatch(events []telemetry.Event) ([]string, error) {
 	}
 	defer unlock()
 	into := make([]string, len(events))
-	for i, e := range stamped {
-		if err := s.ensure(e.Received); err != nil {
-			return into, err
+	stored := 0
+	for stored < len(stamped) {
+		if err := s.ensure(stamped[stored].Received); err != nil {
+			return into[:stored], err
 		}
-		if _, err := s.open.Write(append(lines[i], '\n')); err != nil {
-			return into, err
+		info, err := s.open.Stat()
+		if err != nil {
+			return into[:stored], err
 		}
-		seg := &s.idx.Segments[s.cur]
-		seg.Events++
-		seg.Bytes += int64(len(lines[i])) + 1
-		seg.Last = e.Received
-		if seg.Earliest.IsZero() || e.Time.Before(seg.Earliest) {
-			seg.Earliest = e.Time
+		before, beforeSize := s.idx.clone(), info.Size()
+		var buf []byte
+		end := stored
+		for end < len(stamped) {
+			e := stamped[end]
+			seg := &s.idx.Segments[s.cur]
+			// The rest goes in the next segment, as ensure would roll it.
+			if end > stored && (seg.First.UTC().Format("20060102") != e.Received.UTC().Format("20060102") ||
+				seg.Bytes >= s.opt.SegmentBytes) {
+				break
+			}
+			buf = append(append(buf, lines[end]...), '\n')
+			seg.Events++
+			seg.Bytes += int64(len(lines[end])) + 1
+			seg.Last = e.Received
+			if seg.Earliest.IsZero() || e.Time.Before(seg.Earliest) {
+				seg.Earliest = e.Time
+			}
+			if e.Time.After(seg.Latest) {
+				seg.Latest = e.Time
+			}
+			s.observe(e.Lateness())
+			into[end] = seg.Name
+			end++
 		}
-		if e.Time.After(seg.Latest) {
-			seg.Latest = e.Time
+		// The lines reach the disk before the index that counts them does:
+		// an index saved first, then a crash, would count events the
+		// segment never received.
+		_, err = s.open.Write(buf)
+		if err == nil {
+			err = s.open.Sync()
 		}
-		s.observe(e.Lateness())
-		into[i] = seg.Name
+		if err == nil {
+			err = s.save()
+		}
+		if err != nil {
+			s.idx = before
+			if terr := s.open.Truncate(beforeSize); terr != nil {
+				return into[:stored], fmt.Errorf("%w; and the run could not be taken back out of %s, so "+
+					"some of it may be stored: %v", err, s.idx.Segments[s.cur].Name, terr)
+			}
+			_ = s.open.Sync()
+			return into[:stored], err
+		}
+		stored = end
 	}
-	// The lines reach the disk before the index that counts them does:
-	// an index saved first, then a crash, would count events the segment
-	// never received.
-	if s.open != nil {
-		if err := s.open.Sync(); err != nil {
-			return into, err
-		}
-	}
-	return into, s.save()
+	return into, nil
 }
 
 // observe records one arrival delay in the histogram.
