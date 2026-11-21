@@ -425,8 +425,9 @@ func (s *inboundServer) drain(sp *spool.Spool) int {
 }
 
 // store maps one delivery into events and appends them, and turns what it
-// says into signals for the automations. It reports a store that failed,
-// so the delivery can be tried again, with nothing about it remembered as
+// says into signals for the automations. It reports a delivery whose
+// events were not stored (its mapping could not be loaded, or the append
+// failed), so it can be tried again, with nothing about it remembered as
 // seen.
 func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alias) (int, bool, bool) {
 	s.mu.Lock()
@@ -527,7 +528,11 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 			}
 		}
 	}
-	return stored, learned, serr != nil
+	// Tried again only when its events were not stored. A seal that failed
+	// after they were is reported, as it always was: trying the delivery
+	// again would store a shared signal's event and raise its automation
+	// signals a second time.
+	return stored, learned, !appended
 }
 
 // queueSeal takes a delivery's records' digests to be sealed with the feed's
