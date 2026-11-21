@@ -208,6 +208,14 @@ var coverage = map[string]surfaces{
 			"agent able to vouch for its own activity could make itself " +
 			"invisible to the next rule written against it",
 	},
+	// A coding agent's hook, run by the agent's host on every tool call.
+	"hook": {
+		Why: "it is run by the agent's host, not by a person: what it records is " +
+			"on the receipt screens of whoever reconciles, and the kill switch it " +
+			"obeys is on the agents board",
+		NoMCP: "it is the agent's own host speaking, on the agent's own tool calls; " +
+			"an MCP operation for it would let an agent receipt calls it never made",
+	},
 	// Backups and restores, at the terminal of the machine that holds them.
 	"backup": {
 		Why: "a backup is a file written where the operator chooses, under a " +

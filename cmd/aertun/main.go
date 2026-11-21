@@ -85,11 +85,13 @@ Proving AI security work: checked against evidence the AI did not write, then si
   aertun benign capture NAME --class C --source S --since T --until T --why "…" [--acknowledge RULE] [--raw FIELD]   a weird-but-benign session from your own store, checked against your rules and intelligence, sanitised, waiting for a second administrator
   aertun benign list | show NAME | revoke NAME --why "…" | renew NAME --expires 90d --why "…"   the sessions vouched for, and their lives
   aertun benign bundle --key F --out F | verify FILE --public-key F   the approved, unexpired sessions sealed in one signed file, for windtunnel run --baseline
+  aertun receipt init --log-name URI [--log-key F]   set up this deployment's receipt log; from then on the agent interface receipts every call
   aertun receipt emit --key F --issuer URI --vantage V --target URI --tool NAME [--args F] --out F   a signed receipt (SCITT, COSE) that a party saw an agent's action
   aertun receipt register FILE --issuer-key ISSUER=F [--log-key F] --out F   entered in this deployment's transparency log, with its receipt in each algorithm
   aertun receipt export --out DIR [--issuer URI] [--from T] [--to T]   the log's entries with their receipts, among them the agent interface's own for every call it answered
   aertun receipt verify FILE --issuer-key ISSUER=F [--log-key F] [RECEIPT...]   checked offline; a reconciliation is checked by doing it again
   aertun receipt reconcile FILE... --key F --issuer URI --from T --to T --expect ISSUER=VANTAGE... --issuer-key ISSUER=F --out F   every party's receipts held together: what some party never reported, gaps in their numbering, actors they disagree on
+  aertun hook claude-code --agent NAME --key F --issuer URI [--mcp SERVER=URL]   a Claude Code hook: the kill switch refuses a disabled agent's tool calls, and every call it makes gets a signed receipt
   aertun backup --out FILE [--passphrase-file F]   the whole store in one encrypted file (AES-256-GCM, a PBKDF2 passphrase), the logs copied as they stood
   aertun restore FILE --to DIR [--passphrase-file F]   into a new directory, then the audit log held to the head at backup, every signed head and every anchored root
   aertun conform [--vectors DIR] [--verifier "CMD ARG..."]   the protocol's test vectors, against this verifier or another; exit 0 when every one is decided as the protocol requires
@@ -405,6 +407,8 @@ func main() {
 		err = cmdReceipt(root, cmdArgs)
 	case "conform":
 		err = cmdConform(cmdArgs)
+	case "hook":
+		err = cmdHook(root, cmdArgs)
 	case "backup":
 		err = cmdBackup(root, cmdArgs)
 	case "restore":
@@ -483,6 +487,12 @@ func main() {
 		var usage errUsage
 		if errors.As(err, &usage) {
 			os.Exit(out.ExitUsage)
+		}
+		// A hook's refusal: exit 2 is the one status Claude Code treats as
+		// "do not run this tool"; every other lets the call go ahead.
+		var deny errHookDeny
+		if errors.As(err, &deny) {
+			os.Exit(2)
 		}
 		os.Exit(out.ExitFailure)
 	}

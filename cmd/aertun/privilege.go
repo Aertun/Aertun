@@ -248,6 +248,12 @@ var commandNeeds = map[string]need{
 	// Checking a bundle's signatures and digests reads a file the caller
 	// named and opens no store.
 	"benign verify": {action: auth.ActView},
+	// A coding agent's hook reads the agent registry, the kill switch it
+	// obeys, and appends the agent's own receipts, signed with the agent's
+	// key, to the receipt log: the agent speaking for itself, which every
+	// reconciliation then holds against what others saw. It runs as the
+	// agent, on every tool call, with no token to present.
+	"hook": {why: "it is the agent's own account, signed with the agent's key and appended where every other party's receipts are held against it; the kill switch it reads can only refuse"},
 	// A backup holds every secret the store has: an administrator's, and
 	// the command asks for it again itself. A restore writes a new
 	// directory from a file and a passphrase the caller holds, and opens no

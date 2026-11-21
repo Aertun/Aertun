@@ -57,6 +57,9 @@ func qualityDays(root string, first, last time.Time) ([]quality.Day, error) {
 	if len(missing) == 0 {
 		return out, nil
 	}
+	if _, err := os.Stat(spoolDir(root)); errors.Is(err, os.ErrNotExist) {
+		return out, nil // nothing has arrived yet
+	}
 	sp, err := openSpoolReadOnly(root)
 	if err != nil {
 		return nil, err

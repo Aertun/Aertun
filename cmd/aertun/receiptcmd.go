@@ -33,6 +33,7 @@ import (
 // receipt of its own, whether they agree and where they do not.
 
 const receiptUsage = `usage:
+  aertun receipt init --log-name URI [--log-key F]
   aertun receipt emit --key F --issuer URI --vantage agent|gateway|target|sandbox --target URI --tool NAME [--args F|-] [--at TIME] [--actor A] [--grant G] [--outcome ok|error|refused] [--seq N] [--alg ed25519|ml-dsa-65] [--public-key F] --out F
   aertun receipt register FILE --issuer-key ISSUER=F... [--log-name URI] [--log-key F] --out F
   aertun receipt export --out DIR [--issuer URI] [--from TIME] [--to TIME] [--limit N] [--log-key F]
@@ -47,6 +48,8 @@ func cmdReceipt(root string, args []string) error {
 		return errors.New(receiptUsage)
 	}
 	switch args[0] {
+	case "init":
+		return receiptInit(root, args[1:])
 	case "emit":
 		return receiptEmit(args[1:])
 	case "register":
@@ -59,6 +62,51 @@ func cmdReceipt(root string, args []string) error {
 		return receiptReconcile(args[1:])
 	}
 	return fmt.Errorf("unknown receipt command %q\n%s", args[0], receiptUsage)
+}
+
+// receiptInit sets up this deployment's receipt log: its name, and a key
+// of its own. From then on the agent interface receipts every call it
+// answers, and `aertun hook` has somewhere to put an agent's receipts.
+func receiptInit(root string, args []string) error {
+	fs := flag.NewFlagSet("receipt init", flag.ContinueOnError)
+	logName := fs.String("log-name", "", "the log's name in its receipts, a URI")
+	logKeyAt := fs.String("log-key", "", "where to write the log's public key, which verifiers of its receipts need")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *logName == "" || fs.NArg() != 0 {
+		return errors.New("receipt init needs --log-name URI\n" + receiptUsage)
+	}
+	caller := resolveCaller(root, flagToken)
+	// Tune, as register: the log signs in this deployment's name.
+	if err := authorise(root, caller, auth.ActTune, auth.AreaSecurity); err != nil {
+		return err
+	}
+	dir := filepath.Join(root, "receipts")
+	existed := receiptlog.Exists(dir)
+	l, err := receiptlog.Open(dir, *logName)
+	if err != nil {
+		return err
+	}
+	if *logKeyAt != "" {
+		if err := pack.WritePublicKey(*logKeyAt, l.PublicKey()); err != nil {
+			return err
+		}
+	}
+	if !existed {
+		if err := recordE(root, caller.auditRecord("receipt.log-created", "/receipts", audit.Success,
+			map[string]string{"log": l.Issuer()})); err != nil {
+			return err
+		}
+	}
+	if !w.JSON(map[string]any{"log": l.Issuer(), "created": !existed}) {
+		if existed {
+			w.Human("the receipt log %s is already set up\n", l.Issuer())
+		} else {
+			w.Human("the receipt log %s is set up: the agent interface now receipts every call it answers\n", l.Issuer())
+		}
+	}
+	return nil
 }
 
 // signerFor is one half of a dual key, as the statement's one algorithm.

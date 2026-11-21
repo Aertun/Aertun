@@ -295,6 +295,28 @@ aertun receipt reconcile *.t.cose --key auditor.key --issuer https://auditor.exa
   --expect https://mcp.example/mcp=target --issuer-key ... --out reconciliation.cose
 ```
 
+**Five minutes to a coding agent with a kill switch and receipts.** Register
+the agent, set up the log, and add one command to Claude Code's hooks
+(`~/.claude/settings.json`, or a project's `.claude/settings.json`):
+
+```bash
+aertun agent add claude-code --owner you@example.com --allow aertun_read
+aertun receipt init --log-name https://aertun.example/receipts
+```
+
+```json
+{"hooks": {
+  "PreToolUse":         [{"matcher": "*", "hooks": [{"type": "command", "command": "aertun hook claude-code --agent claude-code --key ~/.aertun/agent.key --issuer https://you.example/claude-code --mcp aertun=https://aertun.example/mcp"}]}],
+  "PostToolUse":        [{"matcher": "*", "hooks": [{"type": "command", "command": "...the same command..."}]}],
+  "PostToolUseFailure": [{"matcher": "*", "hooks": [{"type": "command", "command": "...the same command..."}]}]}}
+```
+
+Every tool call the agent makes then gets a signed receipt in its own
+numbered sequence. `aertun agent disable claude-code --why "…"` refuses its
+next call, and every call after it. A call to an MCP server that receipts
+its own side, as Aertun's agent interface does, reconciles against the
+server's account.
+
 The transparency log answers each registration with an RFC 9942 receipt
 in each of its algorithms, Ed25519 and ML-DSA-65, and both are required.
 Once a log is set up, Aertun's own agent interface receipts every call it

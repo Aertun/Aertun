@@ -303,3 +303,25 @@ func TestTheHTTPInterfaceReceiptsItsCalls(t *testing.T) {
 		t.Errorf("%+v", got)
 	}
 }
+
+// TestReceiptInit: a log is set up once under a name, its key written for
+// verifiers; a second init under another name is refused.
+func TestReceiptInit(t *testing.T) {
+	root, _ := receiptSite(t)
+	key := filepath.Join(t.TempDir(), "log.json")
+	if err := cmdReceipt(root, []string{"init", "--log-name", "https://receipts.test", "--log-key", key}); err != nil {
+		t.Fatal(err)
+	}
+	if !receiptlog.Exists(filepath.Join(root, "receipts")) {
+		t.Fatal("no log was set up")
+	}
+	if _, err := pack.LoadPublicKey(key); err != nil {
+		t.Errorf("the log's key: %v", err)
+	}
+	if err := cmdReceipt(root, []string{"init", "--log-name", "https://receipts.test"}); err != nil {
+		t.Errorf("init again under the same name: %v", err)
+	}
+	if err := cmdReceipt(root, []string{"init", "--log-name", "https://other.test"}); err == nil {
+		t.Error("a log was renamed")
+	}
+}

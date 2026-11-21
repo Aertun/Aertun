@@ -37,6 +37,17 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* `aertun hook claude-code`: Claude Code under this deployment's kill
+  switch, with a receipt for everything it does.  Run as its PreToolUse,
+  PostToolUse and PostToolUseFailure hook, it refuses every tool call of an
+  agent that is disabled, unregistered, or whose registry cannot be read
+  (exit 2, the one status that stops a call), and after each call signs an
+  AEP receipt from the agent's vantage, in the agent's own sequence, with
+  the outcome.  An MCP tool is receipted under the server's resource and
+  its own tool name (--mcp SERVER=URL), so it reconciles against the
+  server's receipt; the test suite reconciles one against Aertun's own
+  agent interface.  `aertun receipt init` sets up the receipt log.
+
 * A source-quality ledger.  For each source and each day (by arrival, so
   a finished day never changes and is measured once), it counts events,
   duplicates, lateness, events stamped ahead of their arrival, backfills,
