@@ -226,7 +226,7 @@ func estateSync(root string, now time.Time, caller *Caller,
 			rep.Tools = append(rep.Tools, t)
 			continue
 		}
-		out, failed, rerr := runConnector(root, m, nil, false, true, caller)
+		out, failed, rerr := runConnector(root, m, nil, false, true, false, caller)
 		t.Records, t.Requests = len(out.Records), out.Requests
 		for _, r := range out.Runs {
 			if r["complete"] == false || r["error"] != nil {

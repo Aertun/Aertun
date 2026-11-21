@@ -1,6 +1,20 @@
 Aertun NEWS
 ***********
 
+Version 0.2.1
+=============
+
+Two fixes, both for evidence that could be lost after it had arrived.  No
+format, flag or proof changes.
+
+* Fixed: a scheduled collection whose read succeeded and whose store then
+  failed (a full disk, the event store refusing) lost those records for
+  good.  The connector's checkpoint was saved before the records were
+  stored, and their digests were remembered as seen, so the next read
+  started after them and would have skipped them anyway.  The checkpoint
+  is now saved only once the records are stored, and a failed store
+  forgets their digests; the next read asks again.  Present since 0.1.0.
+
 Version 0.2.0
 =============
 
