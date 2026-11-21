@@ -98,10 +98,11 @@ is false is a vulnerability even without a working exploit:
 
 | Version | Security fixes |
 |---|---|
+| 0.2.x | yes |
 | 0.1.x | yes |
 | `main` | yes: fixes land here first |
 
-Report against the latest 0.1 release or against `main`.
+Report against the latest 0.2 release or against `main`.
 
 ## Our own claims, tested
 
