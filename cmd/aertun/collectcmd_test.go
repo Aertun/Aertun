@@ -477,4 +477,30 @@ func TestAReadWhoseStoreFailedIsAskedAgain(t *testing.T) {
 	if tool.asked[0] != firstAsk {
 		t.Errorf("the second read did not start where the failed one did:\n%s\n%s", firstAsk, tool.asked[0])
 	}
+
+	// The lines reach the open segment and only the index save fails: the
+	// records are stored, remembered, and not stored again by the next read.
+	page = "[" + oktaEvent("e1", "dana", "SUCCESS", now.Add(-2*time.Hour)) + "," +
+		oktaEvent("e2", "sam", "FAILURE", now.Add(-time.Hour)) + "," +
+		oktaEvent("e3", "kim", "SUCCESS", now.Add(-30*time.Minute)) + "]"
+	os.Chmod(dir, 0o500)
+	st = collectOne(root, c, sp, st, map[string]alias{}, caller, now)
+	os.Chmod(dir, 0o700)
+	if st.Error == "" || st.Stored != 1 {
+		t.Fatalf("the index save did not fail as this case needs, or the record was not counted: %+v", st)
+	}
+	st = collectOne(root, c, sp, st, map[string]alias{}, caller, now)
+	if st.Error != "" || st.Stored != 0 || st.Known != 3 {
+		t.Errorf("the read after: %+v", st)
+	}
+	n := 0
+	sp.Range(time.Time{}, time.Time{}, func(e telemetry.Event) error {
+		if e.Source == "okta/system" {
+			n++
+		}
+		return nil
+	})
+	if n != 3 {
+		t.Errorf("%d events stored for three records", n)
+	}
 }

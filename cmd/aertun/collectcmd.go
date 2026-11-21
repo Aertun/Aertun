@@ -7,11 +7,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -337,28 +337,59 @@ func digestOf(doc any) string {
 }
 
 // storeRecords maps raw records and appends what maps, leaving out what was
-// already stored. It fills the counts of st. The page goes in as one batch:
-// every event is validated before any is written, so a bad record refuses
-// the page rather than storing half of it around the failure.
+// already stored. It fills the counts of st, and reports whether every
+// event that mapped was written. The page goes in as one batch: every event
+// is validated before any is written, so a bad record refuses the page
+// rather than storing half of it around the failure.
+//
+// What is remembered as seen is exactly what was written. AppendBatch
+// writes the lines before it syncs and saves its index, so it can fail with
+// some or all of them on disk and readable: those are stored, and asking
+// again must not store them twice; the ones it never wrote must be stored
+// when it is asked again.
 func storeRecords(sp *spool.Spool, s source.Source, docs []any,
-	st *collectStatus, aliases map[string]alias, now time.Time) error {
+	st *collectStatus, aliases map[string]alias, now time.Time) (bool, error) {
 
-	before := slices.Clone(st.Seen)
-	events := mapRecords(s, docs, st, aliases, now)
-	if _, err := sp.AppendBatch(events); err != nil {
-		// Nothing stored is nothing known: remembered, these records would
-		// be skipped as seen when the read is asked again.
-		st.Seen = before
-		return err
+	events, digests := mapRecords(s, docs, st, aliases, now)
+	into, err := sp.AppendBatch(events)
+	written := writtenOf(into, len(events), err)
+	st.Seen = remembered(st.Seen, digests[:written])
+	st.Stored += written
+	if written < len(events) {
+		return false, err
 	}
-	st.Stored += len(events)
-	return nil
+	return true, err
+}
+
+// writtenOf is how many events of a batch AppendBatch wrote, from the
+// segments it reports: all of them when it succeeded, and otherwise the
+// ones it named a segment for before it stopped.
+func writtenOf(into []string, n int, err error) int {
+	if err == nil {
+		return n
+	}
+	w := 0
+	for w < len(into) && into[w] != "" {
+		w++
+	}
+	return w
+}
+
+// remembered adds the digests of stored records to what a source has
+// seen, keeping the most recent maxSeen.
+func remembered(seen, digests []string) []string {
+	seen = append(seen, digests...)
+	if len(seen) > maxSeen {
+		seen = seen[len(seen)-maxSeen:]
+	}
+	return seen
 }
 
 // mapRecords is storeRecords without the store: the events that are new and
-// map, with st's counts and remembered digests brought up to date.
+// map, each with its record's digest, and st's counts brought up to date.
+// Nothing is remembered as seen here: the caller remembers what it stored.
 func mapRecords(s source.Source, docs []any, st *collectStatus,
-	aliases map[string]alias, now time.Time) []telemetry.Event {
+	aliases map[string]alias, now time.Time) ([]telemetry.Event, []string) {
 
 	seen := map[string]bool{}
 	for _, d := range st.Seen {
@@ -366,6 +397,7 @@ func mapRecords(s source.Source, docs []any, st *collectStatus,
 	}
 	missing := map[string]int{}
 	var out []telemetry.Event
+	var digests []string
 	for _, doc := range docs {
 		st.Records++
 		d := digestOf(doc)
@@ -391,18 +423,16 @@ func mapRecords(s source.Source, docs []any, st *collectStatus,
 			continue
 		}
 		out = append(out, e)
+		digests = append(digests, d)
+		// The same record twice in one page is one event.
 		seen[d] = true
-		st.Seen = append(st.Seen, d)
-	}
-	if len(st.Seen) > maxSeen {
-		st.Seen = st.Seen[len(st.Seen)-maxSeen:]
 	}
 	for f, n := range missing {
 		if n > missing[st.Field] || st.Field == "" {
 			st.Field = f
 		}
 	}
-	return out
+	return out, digests
 }
 
 // firstRead is how far back a source is read the first time.
@@ -492,14 +522,20 @@ func collectOne(root string, c collectable, sp *spool.Spool,
 	for _, rec := range out.Records {
 		docs = append(docs, unflatten(rec))
 	}
-	if err := storeRecords(sp, c.S, docs, &st, aliases, now); err != nil {
+	complete, err := storeRecords(sp, c.S, docs, &st, aliases, now)
+	if !complete {
 		// The checkpoint stays where it was, so the next read asks again
 		// for what this one could not store; what was stored is known by
 		// its digest and is not stored twice.
 		st.Error = err.Error()
 		return st
 	}
-	if err := commitMarks(root, out.marks); err != nil {
+	if cerr := commitMarks(root, out.marks); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		// Everything is stored and the checkpoint moved; the store said
+		// something went wrong after the write, which is still worth saying.
 		st.Error = err.Error()
 		return st
 	}
@@ -703,8 +739,15 @@ func collectFile(root string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := storeRecords(sp, s, docs, &st, aliases, now); err != nil {
-		return err
+	_, serr := storeRecords(sp, s, docs, &st, aliases, now)
+	if serr != nil {
+		// What was written is remembered, so the same file again does not
+		// store it twice.
+		status[name] = st
+		if err := saveCollectStatus(root, status); err != nil {
+			return errors.Join(serr, err)
+		}
+		return serr
 	}
 	if st.learned {
 		if err := saveAliases(root, aliases); err != nil {
