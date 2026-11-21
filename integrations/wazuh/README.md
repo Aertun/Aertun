@@ -72,11 +72,11 @@ Download a release and check it before running it. Every release is a single
 static binary with a build attestation:
 
 ```bash
-gh release download v0.2.0 --repo Aertun/Aertun --pattern 'aertun-linux-amd64*'
+gh release download v0.2.1 --repo Aertun/Aertun --pattern 'aertun-linux-amd64*'
 gh attestation verify aertun-linux-amd64 --repo Aertun/Aertun
 ```
 
-Or run the signed image, `ghcr.io/aertun/aertun:0.2.0`. To set up the store,
+Or run the signed image, `ghcr.io/aertun/aertun:0.2.1`. To set up the store,
 its Owner, a token for the command line and the TLS proxy, follow
 [deploy/README.md](https://github.com/Aertun/Aertun/blob/main/deploy/README.md).
 
