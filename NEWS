@@ -45,6 +45,14 @@ Unreleased
   is now saved only once the records are stored, and a failed store
   forgets their digests; the next read asks again.  Affects 0.1 and 0.2.
 
+* Fixed: a pushed delivery (a webhook, an Okta event hook, a shared signal,
+  another site's audit stream) whose store failed after the sender had
+  been told it was received was dropped.  It now waits in the queue and is
+  tried again on each pass, neither counted nor remembered as seen until
+  it is stored, and its automation signals are raised once, when it is.
+  After ten failed tries it is given up on with an inbound.dropped record
+  in the audit log, never silently.  Affects 0.1 and 0.2.
+
 * `aertun hook claude-code`: Claude Code under this deployment's kill
   switch, with a receipt for everything it does.  Run as its PreToolUse,
   PostToolUse and PostToolUseFailure hook, it refuses every tool call of an
