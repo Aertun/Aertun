@@ -458,8 +458,8 @@ func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
 		t.Fatalf("%d stored into a read-only store", n)
 	}
 	os.Chmod(dir, 0o700)
-	if len(inb.queue) != 1 || inb.queue[0].tries != 1 || inb.queue[0].failedAt.IsZero() {
-		t.Fatalf("the delivery did not wait for another try: %+v", inb.queue)
+	if len(inb.queue) != 1 || inb.queue[0].tries != 1 || inb.queue[0].failedAt.IsZero() || inb.failing != 1 {
+		t.Fatalf("the delivery did not wait for another try: %+v (failing %d)", inb.queue, inb.failing)
 	}
 	if st := inb.statusOf("okta"); len(st.Seen) != 0 || st.Records != 0 || st.Error == "" || st.Signals != 0 {
 		t.Errorf("a delivery never stored is counted, remembered or signalled: %+v", st)
@@ -467,15 +467,16 @@ func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
 	if len(inb.signals) != 0 {
 		t.Errorf("%d signals raised for a delivery not stored", len(inb.signals))
 	}
-	if n := inb.drain(sp); n != 1 || len(inb.queue) != 0 {
-		t.Fatalf("the second try stored %d, %d still queued", n, len(inb.queue))
+	if n := inb.drain(sp); n != 1 || len(inb.queue) != 0 || inb.failing != 0 {
+		t.Fatalf("the second try stored %d, %d still queued, %d failing", n, len(inb.queue), inb.failing)
 	}
 	if len(inb.signals) != 1 || inb.statusOf("okta").Signals != 1 {
 		t.Errorf("the suspension raised %d signals, want one", len(inb.signals))
 	}
 
-	// The line is written to the open segment and only the index save
-	// fails: stored, so neither tried again nor stored twice.
+	// The index cannot be saved: the store takes the line back out, so the
+	// delivery is not stored and waits; the next pass stores it once, and
+	// the same records delivered again are known.
 	os.Chmod(dir, 0o500)
 	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
 		at: time.Now().UTC()}}
@@ -484,14 +485,15 @@ func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
 	if inb.statusOf("okta").Error == "" {
 		t.Fatal("the index save did not fail, so this case tests nothing")
 	}
-	if len(inb.queue) != 0 {
-		t.Errorf("a delivery whose events are on disk waits to be stored again: %+v", inb.queue)
+	if len(inb.queue) != 1 || stored()["00u-bo@acme.example"] != 0 {
+		t.Fatalf("a delivery the store took back is stored or not waiting: %v %+v", stored(), inb.queue)
 	}
+	inb.drain(sp)
 	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
 		at: time.Now().UTC()}}
 	inb.drain(sp)
-	if got := stored(); got["00u-bo@acme.example"] != 1 {
-		t.Errorf("stored %v: the delivery written before its index failed was stored again", got)
+	if got := stored(); got["00u-bo@acme.example"] != 1 || len(inb.queue) != 0 {
+		t.Errorf("stored %v, %d queued: the delivery tried again was not stored exactly once", got, len(inb.queue))
 	}
 
 	// One that fails for storeRetryFor is given up on, loudly.

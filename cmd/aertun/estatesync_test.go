@@ -250,6 +250,19 @@ func TestAnEstateSyncLeavesTheEventsToCollection(t *testing.T) {
 	if mark, moved := states["okta/system"]; moved {
 		t.Fatalf("the estate sync moved the system log's checkpoint to %q (it read the log: %v)", mark.Watermark, asked)
 	}
+	if states[estateScope+"okta/system"].Watermark == "" {
+		t.Error("the estate sync kept no checkpoint of its own, so it would read the whole log every time")
+	}
+	// Its next read starts from its own checkpoint.
+	tool.asked = nil
+	if _, err := estateSync(root, now, &Caller{Name: "ada", Kind: audit.KindHuman, Verified: true}, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range tool.asked {
+		if strings.HasPrefix(a, "/api/v1/logs") && !strings.Contains(a, "since=") {
+			t.Errorf("the second estate sync read the log from the start: %s", a)
+		}
+	}
 	if err := cmdCollect(root, []string{"run", "okta/system"}); err != nil {
 		t.Fatal(err)
 	}

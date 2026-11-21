@@ -240,6 +240,9 @@ type inboundServer struct {
 	// streams are the audit streams' receivers, by feed.
 	streams map[string]*heldStream
 	queue   []pushed
+	// failing is how many queued deliveries are waiting on a store that
+	// failed: while any are, a request does not try the store itself.
+	failing int
 	signals []automate.Event
 	rate    map[string]*rateWindow
 	work    chan struct{}
@@ -276,6 +279,10 @@ type pushed struct {
 	tries    int
 	failedAt time.Time
 }
+
+// inboundStopWait bounds how long the server waits, when it stops, for the
+// worker's last pass over what waits.
+const inboundStopWait = 30 * time.Second
 
 // storeRetryFor is how long a delivery whose store keeps failing is tried
 // again, on every pass and at least every tick, before it is given up on,
@@ -448,11 +455,10 @@ func (s *inboundServer) drain(sp *spool.Spool) int {
 		}
 		s.recordDropped(p, "its store failed for "+storeRetryFor.String())
 	}
-	if len(again) > 0 {
-		s.mu.Lock()
-		s.queue = append(again, s.queue...)
-		s.mu.Unlock()
-	}
+	s.mu.Lock()
+	s.queue = append(again, s.queue...)
+	s.failing = len(again)
+	s.mu.Unlock()
 	if learned {
 		_ = saveAliases(s.root, aliases)
 	}
@@ -747,7 +753,13 @@ func (s *inboundServer) accept(p pushed) error {
 	s.mu.Unlock()
 	// Written before the answer when nothing else holds the store, so a
 	// sender told "received" was; otherwise right after whoever holds it.
-	if spoolMu.TryLock() {
+	// Not while deliveries wait on a store that failed: trying it again,
+	// with all of them, belongs to the worker, not to a request that would
+	// keep its sender waiting.
+	s.mu.Lock()
+	failing := s.failing > 0
+	s.mu.Unlock()
+	if !failing && spoolMu.TryLock() {
 		_ = useSpool(s.root, func(sp *spool.Spool) error {
 			s.drain(sp)
 			return nil
