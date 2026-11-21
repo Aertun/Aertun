@@ -210,3 +210,63 @@ func TestASyncWaitsOutSomebodyOnlyLooking(t *testing.T) {
 		t.Fatalf("a second sync ran beside the first: %v", err)
 	}
 }
+
+// TestAnEstateSyncLeavesTheEventsToCollection: the estate sync reads every
+// endpoint of a tool, the system log among them, and stores no events. It
+// must not move the log's checkpoint: scheduled collection would then
+// start after events nobody stored.
+func TestAnEstateSyncLeavesTheEventsToCollection(t *testing.T) {
+	now := time.Now().UTC()
+	events := []struct {
+		id string
+		at time.Time
+	}{{"e1", now.Add(-2 * time.Hour)}, {"e2", now.Add(-time.Hour)}}
+	tool := &fakeTool{answer: func(r *http.Request) (int, string, http.Header) {
+		if r.URL.Path != "/api/v1/logs" {
+			return 200, "[]", nil
+		}
+		// A tool that honours "since", as Okta does.
+		since, _ := time.Parse(time.RFC3339, r.URL.Query().Get("since"))
+		var page []string
+		for _, e := range events {
+			if e.at.After(since) {
+				page = append(page, oktaEvent(e.id, "dana", "SUCCESS", e.at))
+			}
+		}
+		return 200, "[" + strings.Join(page, ",") + "]", nil
+	}}
+	root := collectSite(t, tool)
+	if _, err := estateSync(root, now, &Caller{Name: "ada", Kind: audit.KindHuman, Verified: true}, false); err != nil {
+		t.Fatal(err)
+	}
+	asked := false
+	for _, a := range tool.asked {
+		asked = asked || strings.HasPrefix(a, "/api/v1/logs")
+	}
+	states, err := loadStates(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mark, moved := states["okta/system"]; moved {
+		t.Fatalf("the estate sync moved the system log's checkpoint to %q (it read the log: %v)", mark.Watermark, asked)
+	}
+	if states[estateScope+"okta/system"].Watermark == "" {
+		t.Error("the estate sync kept no checkpoint of its own, so it would read the whole log every time")
+	}
+	// Its next read starts from its own checkpoint.
+	tool.asked = nil
+	if _, err := estateSync(root, now, &Caller{Name: "ada", Kind: audit.KindHuman, Verified: true}, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range tool.asked {
+		if strings.HasPrefix(a, "/api/v1/logs") && !strings.Contains(a, "since=") {
+			t.Errorf("the second estate sync read the log from the start: %s", a)
+		}
+	}
+	if err := cmdCollect(root, []string{"run", "okta/system"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedEvents(t, root); len(got) != 2 {
+		t.Errorf("%d events collected after an estate sync, of two", len(got))
+	}
+}

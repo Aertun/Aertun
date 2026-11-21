@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -238,6 +239,9 @@ type inboundServer struct {
 	// streams are the audit streams' receivers, by feed.
 	streams map[string]*heldStream
 	queue   []pushed
+	// failing is how many queued deliveries are waiting on a store that
+	// failed: while any are, a request does not try the store itself.
+	failing int
 	signals []automate.Event
 	rate    map[string]*rateWindow
 	work    chan struct{}
@@ -269,6 +273,37 @@ type pushed struct {
 	docs []any
 	set  *ssf.SET
 	at   time.Time
+	// tries is how many times storing it has failed, and failedAt when it
+	// first did.
+	tries    int
+	failedAt time.Time
+}
+
+// inboundStopWait bounds how long the server waits, when it stops, for the
+// worker's last pass over what waits.
+const inboundStopWait = 30 * time.Second
+
+// storeRetryFor is how long a delivery whose store keeps failing is tried
+// again, on every pass and at least every tick, before it is given up on,
+// loudly: long enough to outlast a disk being cleared, short enough that a
+// queue held in memory does not wait on a store that is not coming back.
+const storeRetryFor = time.Hour
+
+// records is how many records a delivery carried, for a record that it was
+// given up on: a shared signal is one.
+func (p pushed) records() int {
+	if p.set != nil {
+		return 1
+	}
+	return len(p.docs)
+}
+
+// recordDropped says, in the audit log, that a delivery was given up on.
+func (s *inboundServer) recordDropped(p pushed, why string) {
+	record(s.root, audit.Record{Action: "inbound.dropped", Resource: "/feeds/" + p.feed.Name,
+		Outcome: audit.Failure, Principal: automateBy, Kind: audit.KindService, Verified: true,
+		Detail: map[string]string{"feed": p.feed.Name, "records": fmt.Sprint(p.records()),
+			"tries": fmt.Sprint(p.tries), "why": why}})
 }
 
 type rateWindow struct {
@@ -307,6 +342,15 @@ func (s *inboundServer) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.process()
+			// What still could not be stored is lost with the process, and
+			// is said to be.
+			s.mu.Lock()
+			left := s.queue
+			s.queue = nil
+			s.mu.Unlock()
+			for _, p := range left {
+				s.recordDropped(p, "the server stopped before it could be stored")
+			}
 			s.sealPending(false)
 			s.flush()
 			return
@@ -321,6 +365,14 @@ func (s *inboundServer) run(ctx context.Context) {
 			s.sealPending(true)
 			s.flush()
 		case <-tick.C:
+			// A delivery waiting on a failed store is tried again at least
+			// this often, even on a feed that has gone quiet.
+			s.mu.Lock()
+			waiting := len(s.queue) > 0
+			s.mu.Unlock()
+			if waiting {
+				s.process()
+			}
 			s.sealPending(false)
 			s.flush()
 		}
@@ -380,11 +432,32 @@ func (s *inboundServer) drain(sp *spool.Spool) int {
 		aliases = map[string]alias{}
 	}
 	stored, learned := 0, false
+	var again []pushed
 	for _, p := range q {
-		n, l := s.store(sp, p, aliases)
+		n, l, failed := s.store(sp, p, aliases)
 		stored += n
 		learned = learned || l
+		if !failed {
+			continue
+		}
+		// The sender was told it was received, so it is not dropped on a
+		// store that failed: it waits for the next pass, and only once it
+		// has failed for storeRetryFor is it given up, with a record saying
+		// so.
+		p.tries++
+		if p.failedAt.IsZero() {
+			p.failedAt = s.now()
+		}
+		if s.now().Sub(p.failedAt) < storeRetryFor {
+			again = append(again, p)
+			continue
+		}
+		s.recordDropped(p, "its store failed for "+storeRetryFor.String())
 	}
+	s.mu.Lock()
+	s.queue = append(again, s.queue...)
+	s.failing = len(again)
+	s.mu.Unlock()
 	if learned {
 		_ = saveAliases(s.root, aliases)
 	}
@@ -397,13 +470,20 @@ func (s *inboundServer) drain(sp *spool.Spool) int {
 }
 
 // store maps one delivery into events and appends them, and turns what it
-// says into signals for the automations.
-func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alias) (int, bool) {
+// says into signals for the automations. It reports a delivery whose
+// events were not stored (its mapping could not be loaded, or the append
+// failed), so it can be tried again, with nothing about it remembered as
+// seen.
+func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alias) (int, bool, bool) {
 	s.mu.Lock()
 	st := s.statusOf(p.feed.Name)
 	s.mu.Unlock()
 	var events []telemetry.Event
+	var digests []string
 	var sigs []automate.Event
+	// mapped is what mapping the delivery found, applied to the feed's
+	// status only once its events are stored.
+	var mapped *collectStatus
 	learned := false
 	switch {
 	case p.set != nil:
@@ -419,17 +499,14 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 			st.Error = err.Error()
 			s.dirty = true
 			s.mu.Unlock()
-			return 0, false
+			return 0, false, true
 		}
-		cs := collectStatus{Seen: st.Seen}
-		events = mapRecords(src, p.docs, &cs, aliases, p.at)
-		learned = cs.learned
 		s.mu.Lock()
-		st.Seen, st.Records, st.Known, st.Missed = cs.Seen, st.Records+cs.Records, st.Known+cs.Known, st.Missed+cs.Missed
-		if cs.Field != "" {
-			st.Field = cs.Field
-		}
+		cs := collectStatus{Seen: slices.Clone(st.Seen)}
 		s.mu.Unlock()
+		events, digests = mapRecords(src, p.docs, &cs, aliases, p.at)
+		learned = cs.learned
+		mapped = &cs
 		if p.feed.Kind == inbound.Okta {
 			for _, d := range p.docs {
 				m, _ := d.(map[string]any)
@@ -439,27 +516,44 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 			}
 		}
 	}
-	stored := 0
-	var serr error
 	// One batch for one push: the writer's lock and the index's save are
 	// taken once, and a bad event refuses the whole push rather than
-	// leaving half of it stored around the failure.
-	if _, err := sp.AppendBatch(events); err != nil {
-		serr = err
-	} else {
-		stored = len(events)
-	}
+	// leaving half of it stored around the failure. AppendBatch writes the
+	// lines before it syncs and saves its index, so a failure can leave
+	// some or all of them stored: those count as stored, and only a
+	// delivery with events not written is tried again, for the rest.
+	into, serr := sp.AppendBatch(events)
+	written := writtenOf(into, len(events), serr)
+	appended := written == len(events)
 	// Sealed whether or not every record mapped: what is sealed is that the
 	// record arrived, which does not depend on reading it.
-	if p.feed.Seal && serr == nil {
-		serr = s.queueSeal(p.feed, p.docs)
+	if p.feed.Seal && appended {
+		if err := s.queueSeal(p.feed, p.docs); err != nil && serr == nil {
+			serr = err
+		}
 	}
 	s.mu.Lock()
-	st.Stored += stored
+	st.Stored += written
+	if mapped != nil {
+		// What was written is remembered as seen, so a try again stores
+		// only the rest; what mapping found counts once, when all of it is
+		// stored.
+		st.Seen = remembered(st.Seen, digests[:written])
+		if appended {
+			st.Records, st.Known, st.Missed = st.Records+mapped.Records, st.Known+mapped.Known,
+				st.Missed+mapped.Missed
+			if mapped.Field != "" {
+				st.Field = mapped.Field
+			}
+		}
+	}
 	if serr != nil {
 		st.Error = serr.Error()
 	} else {
 		st.Error = ""
+	}
+	if !appended {
+		sigs = nil // raised when the delivery is stored, not each time it is tried
 	}
 	for _, sig := range sigs {
 		st.Signals++
@@ -472,7 +566,11 @@ func (s *inboundServer) store(sp *spool.Spool, p pushed, aliases map[string]alia
 	s.signals = append(s.signals, sigs...)
 	s.dirty = true
 	s.mu.Unlock()
-	return stored, learned
+	// Tried again only when some of its events were not written. A seal or
+	// an index save that failed after they were is reported: trying the
+	// delivery again would store a shared signal's event and raise its
+	// automation signals a second time.
+	return written, learned, !appended
 }
 
 // queueSeal takes a delivery's records' digests to be sealed with the feed's
@@ -643,7 +741,13 @@ func (s *inboundServer) accept(p pushed) error {
 	s.mu.Unlock()
 	// Written before the answer when nothing else holds the store, so a
 	// sender told "received" was; otherwise right after whoever holds it.
-	if spoolMu.TryLock() {
+	// Not while deliveries wait on a store that failed: trying it again,
+	// with all of them, belongs to the worker, not to a request that would
+	// keep its sender waiting.
+	s.mu.Lock()
+	failing := s.failing > 0
+	s.mu.Unlock()
+	if !failing && spoolMu.TryLock() {
 		_ = useSpool(s.root, func(sp *spool.Spool) error {
 			s.drain(sp)
 			return nil
@@ -1589,7 +1693,8 @@ func (e *collectorEndpoint) events(name string, batch collector.Batch, now time.
 			aliases = map[string]alias{}
 		}
 		cs := collectStatus{}
-		out = append(out, mapRecords(src, auditd, &cs, aliases, now)...)
+		mapped, _ := mapRecords(src, auditd, &cs, aliases, now)
+		out = append(out, mapped...)
 		if cs.Missed > 0 {
 			field, n := cs.Field, cs.Missed
 			if field == "" {

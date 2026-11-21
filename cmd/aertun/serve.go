@@ -161,8 +161,23 @@ func cmdServe(root string, args []string) error {
 	srv.Inbound = inb
 	srv.Feeds = feedsHooks(root, inb)
 	inboundCtx, stopInbound := context.WithCancel(context.Background())
-	defer stopInbound()
-	go inb.run(inboundCtx)
+	inboundDone := make(chan struct{})
+	go func() {
+		defer close(inboundDone)
+		inb.run(inboundCtx)
+	}()
+	// On the way out the worker takes one last pass: what waits is stored,
+	// or recorded as given up, and the status written. The process waits
+	// for it, a bounded while, rather than exiting under it.
+	defer func() {
+		stopInbound()
+		select {
+		case <-inboundDone:
+		case <-time.After(inboundStopWait):
+			fmt.Fprintf(os.Stderr, "  %sthe inbound worker did not finish within %s; what it held "+
+				"is not recorded%s\n", red, inboundStopWait, reset)
+		}
+	}()
 	// Sign-ins are judged as they are made, and the rules act on them.
 	srv.SignInRisk = signInRisk(root)
 	// Two factors on every request a person makes (see mfa.go).
