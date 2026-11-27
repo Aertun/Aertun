@@ -37,6 +37,11 @@ Unreleased
   implementation (a separate CBOR reader, Python's Ed25519 and OpenSSL's
   ML-DSA-65).
 
+* A third: verifiers/typescript, one TypeScript file Node 24 runs as it
+  is, with node:crypto's Ed25519 and ML-DSA-65 and its own CBOR, COSE,
+  RFC 9162 proofs, RFC 8785 canonical JSON and reconciliation.  It too
+  decides all fifteen vectors as required; CI installs Node 24 to run it.
+
 * A second implementation: verifiers/python, a verifier for the evidence
   protocol in one file of Python's standard library (its own CBOR, COSE,
   Ed25519, ML-DSA-65 from FIPS 204, RFC 9162 proofs, RFC 8785 canonical

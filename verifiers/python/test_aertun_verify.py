@@ -106,6 +106,12 @@ class Vectors(unittest.TestCase):
                 accepted = False
             self.assertEqual(accepted, v["valid"], name)
 
+    def test_a_false_reconciliation_is_refused_by_recomputing_it(self):
+        v = vector("14-reconciliation-false-agreement.json")
+        v.pop("verdict", None)
+        with self.assertRaisesRegex(av.Invalid, "recomputing"):
+            av.check_vector(v)
+
     def test_any_change_is_refused(self):
         rng = random.Random(7)
         for name in sorted(os.listdir(VECTORS)):

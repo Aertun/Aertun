@@ -323,7 +323,8 @@ Once a log is set up, Aertun's own agent interface receipts every call it
 answers. `aertun conform` runs the protocol's [test
 vectors](spec/aep/v1/vectors) against this verifier or any other, among them
 a [second implementation in Python](verifiers/python), standard library only,
-that passes every one.
+and a [third in TypeScript](verifiers/typescript) for Node 24, which pass every
+one.
 [STABILITY.md](STABILITY.md) says what will never change, and
 [THREAT_MODEL.md](THREAT_MODEL.md) says what is and is not defended.
 

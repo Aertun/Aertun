@@ -25,6 +25,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # Node 24 for the TypeScript verifier (verifiers/typescript), which
+      # the Go suite runs against the protocol's vectors and skips on
+      # anything older; python3 for the Python one is on the runner.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
       # The gofmt of the toolchain go.mod names, not whatever is on PATH.
       - name: Formatting and vet
         run: |
