@@ -16,8 +16,8 @@
 # it: a release never publishes a package that names another version.
 #
 # PYTHONS lists the interpreters the installed package is tried under
-# (default python3). The build itself runs under python3, and the
-# TypeScript under the node on PATH.
+# (default python3). The build itself runs under python3, which must be
+# 3.11 or later, and the TypeScript under the node on PATH.
 set -euo pipefail
 # Byte order for every sort and comparison below, whatever the locale.
 export LC_ALL=C
@@ -25,6 +25,10 @@ export LC_ALL=C
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
   echo "usage: $0 OUT [VERSION]" >&2
   exit 2
+fi
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+  echo "the build runs under python3 3.11 or later, and this one is $(python3 --version)" >&2
+  exit 1
 fi
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
@@ -92,6 +96,21 @@ aertun_verify-$version.dist-info/licenses/NOTICE
 aertun_verify-$version.dist-info/top_level.txt
 aertun_verify.py"
 got_whl=$(python3 -c 'import sys, zipfile; print("\n".join(sorted(zipfile.ZipFile(sys.argv[1]).namelist())))' "$whl")
+want_sdist="aertun_verify-$version/
+aertun_verify-$version/LICENSE
+aertun_verify-$version/NOTICE
+aertun_verify-$version/PKG-INFO
+aertun_verify-$version/README.md
+aertun_verify-$version/aertun_verify.egg-info/
+aertun_verify-$version/aertun_verify.egg-info/PKG-INFO
+aertun_verify-$version/aertun_verify.egg-info/SOURCES.txt
+aertun_verify-$version/aertun_verify.egg-info/dependency_links.txt
+aertun_verify-$version/aertun_verify.egg-info/entry_points.txt
+aertun_verify-$version/aertun_verify.egg-info/top_level.txt
+aertun_verify-$version/aertun_verify.py
+aertun_verify-$version/pyproject.toml
+aertun_verify-$version/setup.cfg"
+got_sdist=$(tar -tzf "$sdist" | sort)
 want_tgz="package/LICENSE
 package/NOTICE
 package/README.md
@@ -101,6 +120,10 @@ package/package.json"
 got_tgz=$(tar -tzf "$tgz" | sort)
 if [ "$got_whl" != "$want_whl" ]; then
   printf 'the wheel holds:\n%s\nand should hold:\n%s\n' "$got_whl" "$want_whl" >&2
+  exit 1
+fi
+if [ "$got_sdist" != "$want_sdist" ]; then
+  printf 'the source distribution holds:\n%s\nand should hold:\n%s\n' "$got_sdist" "$want_sdist" >&2
   exit 1
 fi
 if [ "$got_tgz" != "$want_tgz" ]; then

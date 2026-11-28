@@ -61,7 +61,15 @@ The verifiers' packages carry the release's version, in
 and its `package-lock.json`, and the release workflow refuses a tag they do
 not carry. The commit that cuts a version changes them with the README, the
 Action and the charts. `verifiers/pack.sh OUT` builds both and checks them
-installed, as the release does.
+installed, as the release does; it builds under Python 3.11 or later.
+
+The release publishes them by trusted publishing, which a maintainer sets
+up once on each registry, naming this repository, `release.yml` and an
+environment (`pypi`, `npm`), so that only those jobs' tokens can publish:
+on PyPI as a pending publisher; on npm with `npm trust`, allowing stage
+publish. npm trusts only a package that exists, so its first version is
+created by hand: stage a throwaway prerelease and reject it, never the
+version the release will publish. A prerelease tag publishes nothing.
 
 ## Building and testing
 
