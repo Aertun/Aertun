@@ -65,6 +65,10 @@ Unreleased
   in --secret-file (made 0600 when absent), listens on loopback unless
   told otherwise, and prints the processor to add to agentgateway, which
   must come last among its processors.
+  Tested against agentgateway v1.7.0's release binary: a call that
+  worked, one that failed and a disabled agent's call each got its
+  receipt (ok, error, refused), and those receipts reconciled with an
+  agent's own, which disagreed once the agent left one call out.
 
 * `aertun research export` writes the dataset a paper's figures are drawn
   from, so that every figure traces back to a signed file.  It holds

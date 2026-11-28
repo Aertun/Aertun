@@ -440,7 +440,7 @@ func receiptExport(root string, args []string) error {
 		}
 	}
 	if !w.JSON(map[string]any{"log": l.Issuer(), "exported": len(picked), "more": more}) {
-		w.Human("%d statements from %s written to %s, each with a receipt in each algorithm\n", len(picked), l.Issuer(), *outDir)
+		w.Human("%d statements written to %s, each with the Ed25519 and ML-DSA-65 receipts of the log %s\n", len(picked), *outDir, l.Issuer())
 		if more {
 			w.Human("more match: narrow the window, or raise --limit\n")
 		}
