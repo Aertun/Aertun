@@ -123,7 +123,8 @@ func (s *Sanitiser) token(kind, v string) string {
 // Person is the pseudonym a person is named by in a bundle.
 func (s *Sanitiser) Person(name string) string { return "p-" + s.token("person", name) }
 
-func (s *Sanitiser) opaque(kind, v string) string { return "p-" + s.token(kind, v) }
+// Opaque is a pseudonym for a value of a kind that keeps no shape at all.
+func (s *Sanitiser) Opaque(kind, v string) string { return "p-" + s.token(kind, v) }
 
 // Domain keeps a domain's shape: each label but the last is pseudonymised on
 // its own, so x.corp.example and y.corp.example still share a parent; a
@@ -156,7 +157,7 @@ func (s *Sanitiser) Domain(d string) string {
 func (s *Sanitiser) Email(e string) string {
 	at := strings.LastIndexByte(e, '@')
 	if at <= 0 || at == len(e)-1 {
-		return s.opaque("value", e)
+		return s.Opaque("value", e)
 	}
 	return "p-" + s.token("local", strings.ToLower(e[:at])) + "@" + s.Domain(e[at+1:])
 }
@@ -313,7 +314,7 @@ func (s *Sanitiser) value(v string) string {
 	if looksDomain(v) {
 		return s.Domain(v)
 	}
-	return s.opaque("value", v)
+	return s.Opaque("value", v)
 }
 
 func looksDomain(v string) bool {
@@ -459,7 +460,7 @@ func (s *Sanitiser) Event(e telemetry.Event) (out telemetry.Event, changed, drop
 				if a, err := netip.ParseAddr(v); err == nil {
 					v = s.IP(a).String()
 				} else {
-					v = s.opaque("value", v)
+					v = s.Opaque("value", v)
 				}
 			case telemetry.ObservableHostname, telemetry.ObservableDomain:
 				v = s.Domain(v)

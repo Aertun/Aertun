@@ -293,3 +293,31 @@ func TestAppendThenReceipts(t *testing.T) {
 		t.Errorf("a log that shrank: %v", err)
 	}
 }
+
+// A log missing a part is not readable: opening it would make the part.
+func TestOnlyAWholeLogIsReadable(t *testing.T) {
+	dir := t.TempDir()
+	if Readable(dir) {
+		t.Fatal("an empty directory is readable as a log")
+	}
+	l, err := Open(dir, "https://receipts.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Its entries are made on first use; until then there is nothing to read.
+	if Readable(dir) {
+		t.Fatal("a log never used is readable, and reading it would make its entries")
+	}
+	if _, err := l.Size(); err != nil {
+		t.Fatal(err)
+	}
+	if !Readable(dir) {
+		t.Fatal("a log in use is not readable")
+	}
+	if err := os.Remove(filepath.Join(dir, keyFile)); err != nil {
+		t.Fatal(err)
+	}
+	if Readable(dir) {
+		t.Error("a log without its key is readable")
+	}
+}

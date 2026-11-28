@@ -88,11 +88,19 @@ func Seal(st *Statement, k *pack.Key) (*Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	edSig, mlSig, err := k.DualSign(pae(PayloadType, payload), Context)
+	return SealIn(payload, Context, k)
+}
+
+// SealIn signs payload, an in-toto statement, with both halves of k in
+// context, into the envelope every signed document here uses. Each kind of
+// document signs in a context of its own, so that one kind's signature is
+// never another's.
+func SealIn(payload []byte, context string, k *pack.Key) (*Envelope, error) {
+	edSig, mlSig, err := k.DualSign(pae(PayloadType, payload), context)
 	if err != nil {
 		return nil, err
 	}
-	id, err := KeyID(k.PublicKey())
+	id, err := pack.KeyIDIn(context, k.PublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -106,18 +114,18 @@ func Seal(st *Statement, k *pack.Key) (*Envelope, error) {
 	}, nil
 }
 
-// Open checks both signatures against a trusted key and returns the
-// statement only if both verify and it is one this version can read.
+// OpenIn checks that env carries both of pub's signatures in context and
+// returns the payload they sign, not yet parsed.
 //
 // Signatures by other keys are ignored rather than refused — DSSE allows
 // an envelope to carry countersignatures — but the trusted key's two must
 // both be present, exactly once each.
-func Open(env *Envelope, pub pack.KeyPublic) (*Statement, error) {
+func OpenIn(env *Envelope, context string, pub pack.KeyPublic) ([]byte, error) {
 	if env.PayloadType != PayloadType {
-		return nil, fmt.Errorf("the envelope carries %q, and a proof is %s",
+		return nil, fmt.Errorf("the envelope carries %q, not an in-toto statement (%s)",
 			env.PayloadType, PayloadType)
 	}
-	id, err := KeyID(pub)
+	id, err := pack.KeyIDIn(context, pub)
 	if err != nil {
 		return nil, err
 	}
@@ -141,12 +149,23 @@ func Open(env *Envelope, pub pack.KeyPublic) (*Statement, error) {
 		return nil, fmt.Errorf("nothing in this envelope was signed by the "+
 			"trusted key %s", id)
 	}
+	// One half missing is refused by DualVerifyBase64, which names it.
 	payload, err := base64.StdEncoding.DecodeString(env.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("the payload is not base64: %w", err)
 	}
-	if err := pack.DualVerifyBase64(pae(env.PayloadType, payload), Context,
+	if err := pack.DualVerifyBase64(pae(env.PayloadType, payload), context,
 		edB64, mlB64, pub); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+// Open checks both signatures against a trusted key and returns the
+// statement only if both verify and it is one this version can read.
+func Open(env *Envelope, pub pack.KeyPublic) (*Statement, error) {
+	payload, err := OpenIn(env, Context, pub)
+	if err != nil {
 		return nil, err
 	}
 	// Only now is the payload trusted enough to parse, and it is parsed

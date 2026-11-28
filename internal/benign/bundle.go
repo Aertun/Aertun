@@ -6,7 +6,6 @@ package benign
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -199,21 +198,11 @@ func Seal(m Manifest, events map[string][]telemetry.Event, k *pack.Key) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	edSig, mlSig, err := k.DualSign(proof.PAE(proof.PayloadType, payload), Context)
+	env, err := proof.SealIn(payload, Context, k)
 	if err != nil {
 		return nil, err
 	}
-	id, err := pack.KeyIDIn(Context, k.PublicKey())
-	if err != nil {
-		return nil, err
-	}
-	f := file{Format: Format, Events: events, Envelope: proof.Envelope{
-		PayloadType: proof.PayloadType, Payload: base64.StdEncoding.EncodeToString(payload),
-		Signatures: []proof.Signature{
-			{KeyID: id + ":ed25519", Sig: base64.StdEncoding.EncodeToString(edSig)},
-			{KeyID: id + ":mldsa65", Sig: base64.StdEncoding.EncodeToString(mlSig)},
-		}}}
-	return json.Marshal(f)
+	return json.Marshal(file{Format: Format, Events: events, Envelope: *env})
 }
 
 // Read reads a bundle file under MaxBundleBytes and opens it.
@@ -250,37 +239,12 @@ func Open(body []byte, pub pack.KeyPublic) (*Bundle, error) {
 	if f.Format != Format {
 		return nil, fmt.Errorf("the file says it is %q; a bundle is %s", f.Format, Format)
 	}
-	if f.Envelope.PayloadType != proof.PayloadType {
-		return nil, fmt.Errorf("the envelope carries %q, not an in-toto statement", f.Envelope.PayloadType)
-	}
-	id, err := pack.KeyIDIn(Context, pub)
+	payload, err := proof.OpenIn(&f.Envelope, Context, pub)
 	if err != nil {
 		return nil, err
 	}
-	var ed, ml string
-	for _, s := range f.Envelope.Signatures {
-		var slot *string
-		switch s.KeyID {
-		case id + ":ed25519":
-			slot = &ed
-		case id + ":mldsa65":
-			slot = &ml
-		default:
-			continue
-		}
-		if *slot != "" {
-			return nil, fmt.Errorf("the bundle carries one key's signature twice")
-		}
-		*slot = s.Sig
-	}
-	if ed == "" || ml == "" {
-		return nil, fmt.Errorf("the bundle is not signed by both halves of this key")
-	}
-	payload, err := base64.StdEncoding.DecodeString(f.Envelope.Payload)
+	id, err := pack.KeyIDIn(Context, pub)
 	if err != nil {
-		return nil, fmt.Errorf("the payload is not base64: %w", err)
-	}
-	if err := pack.DualVerifyBase64(proof.PAE(proof.PayloadType, payload), Context, ed, ml, pub); err != nil {
 		return nil, err
 	}
 	var st statement

@@ -123,19 +123,9 @@ func nameFirst(args []string) (string, []string) {
 
 // parseOver reads a window's length: whole days as 30d, or a Go duration.
 func parseOver(s string) (time.Duration, error) {
-	var d time.Duration
-	if n, ok := strings.CutSuffix(s, "d"); ok {
-		days, err := strconv.Atoi(n)
-		if err != nil || days <= 0 {
-			return 0, fmt.Errorf("--over %s is not a number of days", s)
-		}
-		d = time.Duration(days) * 24 * time.Hour
-	} else {
-		parsed, err := time.ParseDuration(s)
-		if err != nil {
-			return 0, fmt.Errorf("--over is a length of time, like 30d or 72h")
-		}
-		d = parsed
+	d, err := parseSpan("--over", "30d or 72h", s)
+	if err != nil {
+		return 0, err
 	}
 	if d < proof.MinMDRWindow || d > proof.MaxMDRWindow || d%time.Second != 0 {
 		return 0, fmt.Errorf("--over is between 1d and %dd, in whole seconds",

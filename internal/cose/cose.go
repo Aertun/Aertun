@@ -31,6 +31,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/aertun/aertun/internal/cbor"
 )
@@ -47,6 +48,20 @@ const (
 	// context RFC 9964 §5 requires.
 	AlgMLDSA65 int64 = -49
 )
+
+// AlgName is an algorithm's name as people write it, or its number when it
+// is not one of these.
+func AlgName(alg int64) string {
+	switch alg {
+	case AlgEd25519:
+		return "Ed25519"
+	case AlgEdDSA:
+		return "EdDSA"
+	case AlgMLDSA65:
+		return "ML-DSA-65"
+	}
+	return strconv.FormatInt(alg, 10)
+}
 
 // Header labels from the IANA COSE Header Parameters registry.
 const (

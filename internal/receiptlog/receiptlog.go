@@ -142,6 +142,18 @@ func Open(dir, issuer string) (*Log, error) {
 }
 
 // Exists reports whether a receipt log has been set up in dir.
+// Readable reports whether dir holds a whole log, its name, key, entries
+// and lock, which Open then reads without making anything: what a reader
+// that must not write asks before opening one.
+func Readable(dir string) bool {
+	for _, f := range []string{issuerFile, keyFile, entriesFile, lockFile} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 func Exists(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, issuerFile))
 	return err == nil

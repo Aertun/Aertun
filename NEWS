@@ -42,6 +42,29 @@ Unreleased
   RFC 9162 proofs, RFC 8785 canonical JSON and reconciliation.  It too
   decides all fifteen vectors as required; CI installs Node 24 to run it.
 
+* `aertun research export` writes the dataset a paper's figures are drawn
+  from, so that every figure traces back to a signed file.  It holds
+  eleven tables, one JSON Lines file each: the events in the window by
+  their times and kind, the findings, the detection passes, the audit log,
+  its saved heads and their Bitcoin anchors, the action receipts and
+  reconciliations in the transparency log, the benign sessions'
+  provenance, every rate a signed wind tunnel scorecard states with its
+  counts and Wilson interval (the scorecard verified against a key the
+  exporter was handed first), and signing, verifying and audit-append
+  timings measured on the exporting machine.  It names nobody: content,
+  addresses, titles, details, receipts' arguments and the published log
+  heads are left out; every person, issuer, entity and session is a
+  pseudonym under a key made for that export and thrown away, and so is
+  anything else that could name what was touched, such as an indicator's
+  digest or a refused command's words.  Detection rules keep their ids.
+  A datasheet describes every column and
+  says what was not collected and why (no rule-fire time per finding, no
+  anchor transaction).  One dual Ed25519 and ML-DSA-65 signature covers it
+  all, as an in-toto statement naming each table by its SHA-256, and
+  `aertun research verify` refuses a changed table, a dropped row, a
+  datasheet that is not the one signed, and any file the signature does
+  not name.  It asks for an administrator.
+
 * Both verifiers are packages, each depending on nothing: `pip install
   aertun-verify` (Python 3.10 or later) and `npm install aertun-verify`
   (Node 24.7 or later, compiled from the TypeScript file and type-checked

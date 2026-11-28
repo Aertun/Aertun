@@ -264,6 +264,12 @@ var commandNeeds = map[string]need{
 	// the caller could run it themselves: it opens no store and signs
 	// nothing.
 	"conform": {action: auth.ActView},
+	// A research dataset draws on the event store, the findings, the audit
+	// log, the receipt log and the benign register at once and takes what
+	// it draws out of the store, de-identified: the export asks for grant
+	// itself, as a backup does, because a row here may only narrow its
+	// parent. Verifying one reads a directory the caller named.
+	"research": {action: auth.ActView},
 	// A receipt log signs, in this deployment's name, that a statement was
 	// registered: tune, like a proof signed from the store, and register
 	// asks for it itself. Emitting a receipt or a reconciliation signs with

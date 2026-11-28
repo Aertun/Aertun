@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"time"
@@ -416,9 +417,7 @@ func ReadReconciliation(b []byte) (*scitt.Signed, Window, [32]byte, string, erro
 	if s.ContentType != ContentReconciliation {
 		return nil, w, [32]byte{}, "", fmt.Errorf("the statement is %q, not a reconciliation receipt", s.ContentType)
 	}
-	keys := []string{"v", "from", "to", "tolerance_ms", "expect", "inputs", "receipts", "actions", "complete",
-		"gaps", "gaps_total", "seq_gaps", "actor_splits", "actor_splits_total", "verdict"}
-	f, err := fields(s.Message.Payload, keys, keys)
+	f, err := fields(s.Message.Payload, reconciliationKeys, reconciliationKeys)
 	if err != nil {
 		return nil, w, [32]byte{}, "", err
 	}
@@ -468,6 +467,52 @@ func ReadReconciliation(b []byte) (*scitt.Signed, Window, [32]byte, string, erro
 		return nil, w, [32]byte{}, "", errors.New("the verdict is agree, disagree or inconclusive")
 	}
 	return s, w, inputs, verdict, nil
+}
+
+// reconciliationKeys are a reconciliation payload's fields, every one
+// required.
+var reconciliationKeys = []string{"v", "from", "to", "tolerance_ms", "expect", "inputs", "receipts",
+	"actions", "complete", "gaps", "gaps_total", "seq_gaps", "actor_splits", "actor_splits_total", "verdict"}
+
+// Tally is what a reconciliation receipt counts: the receipts and actions
+// it read, the actions every expected party reported, and the
+// disagreements of each kind, past the lists' cap.
+type Tally struct {
+	Window
+	Verdict                     string
+	Receipts, Actions, Complete int
+	Gaps, SeqGaps, ActorSplits  int
+}
+
+// ReadTally reads a reconciliation receipt's counts as ReadReconciliation
+// reads its verdict, without checking the signature: what it reported.
+func ReadTally(b []byte) (Tally, error) {
+	s, w, _, verdict, err := ReadReconciliation(b)
+	if err != nil {
+		return Tally{}, err
+	}
+	f, err := fields(s.Message.Payload, reconciliationKeys, reconciliationKeys)
+	if err != nil {
+		return Tally{}, err
+	}
+	t := Tally{Window: w, Verdict: verdict}
+	for _, c := range []struct {
+		key string
+		n   *int
+	}{{"receipts", &t.Receipts}, {"actions", &t.Actions}, {"complete", &t.Complete},
+		{"gaps_total", &t.Gaps}, {"actor_splits_total", &t.ActorSplits}} {
+		u, ok := f[c.key].(cbor.Uint)
+		if !ok || u > math.MaxInt32 {
+			return Tally{}, fmt.Errorf("%q is not a count", c.key)
+		}
+		*c.n = int(u)
+	}
+	seq, ok := f["seq_gaps"].(cbor.Array)
+	if !ok {
+		return Tally{}, errors.New(`"seq_gaps" is not a list`)
+	}
+	t.SeqGaps = len(seq)
+	return t, nil
 }
 
 // CheckReconciliation recomputes a reconciliation receipt from receipts

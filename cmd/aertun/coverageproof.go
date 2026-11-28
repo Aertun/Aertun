@@ -182,22 +182,30 @@ func envelopeDigest(env *proof.Envelope) (string, error) {
 	return proof.SHA256(payload)["sha256"], nil
 }
 
-// parseCoverageWindow reads the telemetry window: whole days as 7d, or a Go
-// duration.
-func parseCoverageWindow(s string) (time.Duration, error) {
-	var d time.Duration
+// parseSpan reads a length of time given to the flag named: a whole number
+// of days (30d), or anything time.ParseDuration reads. Bounds are the
+// caller's.
+func parseSpan(flagName, example, s string) (time.Duration, error) {
 	if n, ok := strings.CutSuffix(s, "d"); ok {
 		days, err := strconv.Atoi(n)
 		if err != nil || days <= 0 {
-			return 0, fmt.Errorf("--telemetry %s is not a number of days", s)
+			return 0, fmt.Errorf("%s %s is not a number of days", flagName, s)
 		}
-		d = time.Duration(days) * 24 * time.Hour
-	} else {
-		parsed, err := time.ParseDuration(s)
-		if err != nil {
-			return 0, fmt.Errorf("--telemetry is a length of time, like 7d or 72h")
-		}
-		d = parsed
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("%s is a length of time, like %s", flagName, example)
+	}
+	return d, nil
+}
+
+// parseCoverageWindow reads the telemetry window: whole days as 7d, or a Go
+// duration.
+func parseCoverageWindow(s string) (time.Duration, error) {
+	d, err := parseSpan("--telemetry", "7d or 72h", s)
+	if err != nil {
+		return 0, err
 	}
 	if d < minCoverageWindow || d > maxCoverageWindow || d%time.Second != 0 {
 		return 0, fmt.Errorf("--telemetry is between 1h and 90d")

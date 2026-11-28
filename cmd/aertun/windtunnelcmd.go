@@ -5,7 +5,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -558,6 +560,34 @@ func windtunnelDiff(args []string) error {
 	return nil
 }
 
+// readSignedScorecard reads a scorecard file and holds it to its own seal
+// and to both signatures by pub, returning it with the bytes as read. An
+// unsigned scorecard is refused: it makes no claim a signature would back.
+func readSignedScorecard(path string, pub pack.KeyPublic) (*windtunnel.Scorecard, []byte, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var card windtunnel.Scorecard
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&card); err != nil {
+		return nil, nil, fmt.Errorf("this is not a scorecard: %w", err)
+	}
+	if err := card.Verify(); err != nil {
+		return nil, nil, err
+	}
+	if card.Signature == nil {
+		return nil, nil, errors.New("it carries no signature: it was written without " +
+			"a key and says so itself. An unsigned document makes no claim " +
+			"a signature would back, and there is nothing here to verify")
+	}
+	if err := windtunnel.VerifyScorecard(&card, *card.Signature, pub); err != nil {
+		return nil, nil, err
+	}
+	return &card, b, nil
+}
+
 func windtunnelVerify(args []string) error {
 	fs := flag.NewFlagSet("windtunnel verify", flag.ContinueOnError)
 	key := fs.String("key", "", "the public key file the signer published "+
@@ -574,30 +604,12 @@ func windtunnelVerify(args []string) error {
 			"the document to supply its own verifier would be the forgery " +
 			"this command exists to refuse")
 	}
-	b, err := os.ReadFile(fs.Arg(0))
-	if err != nil {
-		return err
-	}
-	var card windtunnel.Scorecard
-	dec := json.NewDecoder(strings.NewReader(string(b)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&card); err != nil {
-		return fmt.Errorf("%s is not a scorecard: %w", fs.Arg(0), err)
-	}
-	if err := card.Verify(); err != nil {
-		return fmt.Errorf("%s: %w", fs.Arg(0), err)
-	}
-	if card.Signature == nil {
-		return fmt.Errorf("%s carries no signature: it was written without "+
-			"a key and says so itself. An unsigned document makes no claim "+
-			"a signature would back, and there is nothing here to verify",
-			fs.Arg(0))
-	}
 	pub, err := pack.LoadPublicKey(*key)
 	if err != nil {
 		return err
 	}
-	if err := windtunnel.VerifyScorecard(&card, *card.Signature, pub); err != nil {
+	card, _, err := readSignedScorecard(fs.Arg(0), pub)
+	if err != nil {
 		return fmt.Errorf("%s: %w", fs.Arg(0), err)
 	}
 	// From the mode, not the field: a version 1 document predates the

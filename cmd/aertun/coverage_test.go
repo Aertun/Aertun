@@ -238,6 +238,15 @@ var coverage = map[string]surfaces{
 		NoMCP: "it runs a command the caller names, which is a capability no agent " +
 			"interface should lend, and an agent has nothing to conform",
 	},
+	// The dataset a paper is drawn from, de-identified and signed.
+	"research": {
+		Why: "a dataset is a directory handed to a researcher and read with " +
+			"their own tools; what a screen would show of it is the datasheet, " +
+			"which is already a file written to be read",
+		NoMCP: "it takes data out of the store, de-identified, under an " +
+			"administrator's key; an agent has no paper to write, and an " +
+			"export it could start is one an operator did not choose",
+	},
 	// The evidence protocol's receipts: emitted by a party, registered in
 	// this deployment's log, verified and reconciled offline.
 	"receipt": {
