@@ -421,3 +421,52 @@ func TestARetriedBatchStoresOnlyWhatTheFailedTryDidNot(t *testing.T) {
 		t.Errorf("stored %s, want each record once", got)
 	}
 }
+
+// A retry whose records make different events from the try that failed
+// (the host was mapped to an agent in between) is stored whole: what the
+// first try stored is stored again rather than the cut landing anywhere
+// but where it fell.
+func TestARetriedBatchThatMapsOtherwiseIsStoredWhole(t *testing.T) {
+	root, _ := collectorSite(t)
+	register(t, root, "watcher", "aertun_read")
+	full := errors.New("disk full")
+	tries := 0
+	e := &collectorEndpoint{root: root, now: time.Now,
+		store: func(sp *spool.Spool, events []telemetry.Event) ([]string, error) {
+			tries++
+			if tries == 1 {
+				into, err := sp.AppendBatch(events[:1])
+				if err != nil {
+					t.Fatal(err)
+				}
+				return into, full
+			}
+			return sp.AppendBatch(events)
+		}}
+	mux := http.NewServeMux()
+	mux.Handle("/v1/collector", e)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	now := time.Now().UTC()
+	records := []collector.Record{hostRecord(collector.SourceWatch, "one", now),
+		hostRecord(collector.SourceWatch, "two", now)}
+	const secret = "00collectorSecret0123456789abcdef"
+	if resp := postBatch(t, srv, "b1", now, records, secret, secret); resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("the try the store failed on got %d", resp.StatusCode)
+	}
+	mapHost(t, root, "watcher", "one")
+	if resp := postBatch(t, srv, "b1", now, records, secret, secret); resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("the retry got %d: %s", resp.StatusCode, b)
+	}
+	var got []string
+	for _, ev := range storedEvents(t, root) {
+		if ev.Source == collector.SourceWatch {
+			got = append(got, ev.Raw["host"]+"/"+ev.Raw["agent"])
+		}
+	}
+	if s := strings.Join(got, ","); s != "one/,one/watcher,two/" {
+		t.Errorf("stored %s, want the first try's event and the whole retry", s)
+	}
+}

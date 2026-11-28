@@ -179,12 +179,17 @@ Unreleased
   and an expiry (`--accept FILE`, at most 180 days).
 
 * A store that fails part way through a batch no longer stores that part
-  twice when the batch comes back.  The OTLP receiver remembers exactly
-  the spans it stored and answers the rest as unstored; the collector
-  endpoint remembers how much of each signed batch it stored, and stores
-  only the rest when the collector sends the batch again; and the watches
-  over aertun's own audit log and the agent log move their cursor past
-  what was stored and no further.
+  twice when the batch comes back.  The OTLP receiver remembers the spans
+  it stored (each that carries an id) and answers the rest as unstored.
+  The collector endpoint remembers how much of each signed batch it
+  stored, and stores only the rest when the collector sends the batch
+  again and it maps to the same events; when it maps otherwise (a host
+  mapped in between), the whole batch is stored, twice rather than never.
+  The watches over aertun's own audit log and the agent log move their
+  cursor past what was stored and no further, and the detection pass
+  still runs its rules over what was stored before it reports the error,
+  so nothing stored goes unread and what it raises reaches the
+  automations.
 
 
 Version 0.2.1

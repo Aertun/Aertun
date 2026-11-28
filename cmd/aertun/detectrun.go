@@ -63,12 +63,13 @@ func detectRun(root string, args []string) error {
 	}
 	defer sp.Close()
 	sum, err := detectPass(root, *rulesAt, *since, caller, sp)
-	if err != nil {
+	if sum == nil {
 		return err
 	}
 	// What the run raised goes to the automations, as the estate's
 	// findings do: a rule about a critical finding must not depend on
-	// which part of the program found it.
+	// which part of the program found it. That includes a run that could
+	// not store all of aertun's own records, whose error is returned last.
 	automateFindings(root, sum.New)
 
 	if w.JSON(map[string]any{
@@ -79,7 +80,7 @@ func detectRun(root string, args []string) error {
 		"correlation_dropped": sum.Corr.Dropped,
 		"indicators":          sum.Indicators, "indicator_hits": sum.IntelHit,
 	}) {
-		return nil
+		return err
 	}
 	w.Human("%s%d rule(s) over %d new event(s): %d match(es), %d new "+
 		"finding(s)%s\n", bold, sum.Rules, sum.Events, sum.Matches, sum.Opened, reset)
@@ -106,7 +107,7 @@ func detectRun(root string, args []string) error {
 		w.Human("  %sthe register holds %d finding(s); read them with "+
 			"aertun finding list%s\n", dim, sum.Findings, reset)
 	}
-	return nil
+	return err
 }
 
 // noEventsYet refuses a run against a site with nothing to read: a mistake
@@ -151,6 +152,10 @@ func earlierWindow(a, b time.Time) time.Time {
 // detectPass runs the rules over what arrived since the last pass: the
 // command's body, and what the server runs the moment events are pushed to
 // it or collected on a schedule.
+//
+// When aertun's own records could not all be stored, the pass still runs
+// over the ones that were, and returns its summary with that error: what
+// it raised is saved and goes to the automations like any other pass's.
 func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *spool.Spool) (*detectSummary, error) {
 	loaded, err := rulesIn(rulesDir(root, rulesAt))
 	if err != nil {
@@ -219,17 +224,14 @@ func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *s
 		from = now.Add(-since)
 	}
 
-	// What this program itself recorded, so the rules about it read it.
-	selfEvents, err := storeSelfEvents(root, sp, now)
-	if err != nil {
-		return nil, err
-	}
-	// What its models did, the same way: a proposal, a refusal, a tool
-	// call an agent made through MCP.
-	agentEvents, err := storeAgentEvents(root, sp, now)
-	if err != nil {
-		return nil, err
-	}
+	// What this program itself recorded, so the rules about it read it,
+	// and what its models did, the same way: a proposal, a refusal, a tool
+	// call an agent made through MCP. A store that fails part way returns
+	// what it did store, which is past its cursor: this pass is the only
+	// one whose rules will read it, so the pass goes on.
+	selfEvents, selfErr := storeSelfEvents(root, sp, now)
+	agentEvents, agentErr := storeAgentEvents(root, sp, now)
+	storeErr := errors.Join(selfErr, agentErr)
 
 	var events, matches, opened, suppressed int
 	var through time.Time
@@ -424,8 +426,13 @@ func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *s
 	// What the run raised is sealed in this entry, so "Aertun raised it by
 	// then" is a claim `proof sealed --finding` can check.
 	maps.Copy(detail, sealFindings(root, raised))
+	outcome := audit.Success
+	if storeErr != nil {
+		outcome = audit.Failure
+		detail["error"] = onOneLine(storeErr.Error())
+	}
 	record(root, audit.Record{
-		Action: "detect.run", Resource: "/findings", Outcome: audit.Success,
+		Action: "detect.run", Resource: "/findings", Outcome: outcome,
 		Principal: caller.Name, Kind: caller.Kind, Model: caller.Model, Verified: caller.Verified,
 		Detail: detail,
 	})
@@ -444,7 +451,7 @@ func detectPass(root, rulesAt string, since time.Duration, caller *Caller, sp *s
 			sum.New = append(sum.New, f)
 		}
 	}
-	return sum, nil
+	return sum, storeErr
 }
 
 // findingsCapability is the finding register for the admin: the same queue

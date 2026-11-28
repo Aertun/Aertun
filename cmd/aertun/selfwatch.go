@@ -138,7 +138,7 @@ func storeSelfEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.E
 			Raw:   raw})
 		seqs = append(seqs, e.Seq)
 	}
-	return storeAndAdvance(sp.AppendBatch, selfCursorPath(root), stored, seqs, cur.Seq, last)
+	return storeAndAdvance(sp, selfCursorPath(root), stored, seqs, cur.Seq, last)
 }
 
 func agentCursorPath(root string) string {
@@ -199,31 +199,44 @@ func storeAgentEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.
 			Raw:   raw})
 		seqs = append(seqs, e.Seq)
 	}
-	return storeAndAdvance(sp.AppendBatch, agentCursorPath(root), stored, seqs, cur.Seq, last)
+	return storeAndAdvance(sp, agentCursorPath(root), stored, seqs, cur.Seq, last)
 }
 
-// storeAndAdvance stores one pass's events and moves the cursor at path:
-// past every record read when they are all stored, and when the store took
-// only the first of them, past the record of the last one it took, so the
-// next pass stores the rest once rather than all of them again.
-func storeAndAdvance(appendBatch func([]telemetry.Event) ([]string, error), path string,
-	stored []telemetry.Event, seqs []int64, cur, last int64) ([]telemetry.Event, error) {
+// storeWatched is how the watches over aertun's own logs store what they
+// copy; a test replaces it with a store that fails part way.
+var storeWatched = (*spool.Spool).AppendBatch
+
+// storeAndAdvance stores one pass's events, moves the cursor at path past
+// the records of those it stored, and returns those events for the rules:
+// the rules of the pass that moves the cursor over a record are the only
+// ones that will read it. All stored, the cursor goes past every record
+// read. A store that took only the first of them moves it past the record
+// of the last one taken and returns those with the error, so the next pass
+// stores the rest once and nothing stored goes unread. A cursor that could
+// not be written returns nothing, because the next pass reads those
+// records again.
+func storeAndAdvance(sp *spool.Spool, path string, stored []telemetry.Event, seqs []int64,
+	cur, last int64) ([]telemetry.Event, error) {
 
 	if last == cur {
 		return stored, nil
 	}
+	upTo, took := last, stored
+	var aerr error
 	if len(stored) > 0 {
-		into, aerr := appendBatch(stored)
+		var into []string
+		into, aerr = storeWatched(sp, stored)
 		if aerr != nil {
-			if n := len(into); n > 0 {
-				if err := writeCursor(path, seqs[n-1]); err != nil {
-					return nil, errors.Join(aerr, err)
-				}
+			if len(into) == 0 {
+				return nil, aerr
 			}
-			return nil, aerr
+			upTo, took = seqs[len(into)-1], stored[:len(into)]
 		}
 	}
-	return stored, writeCursor(path, last)
+	if err := writeCursor(path, upTo); err != nil {
+		return nil, errors.Join(aerr, err)
+	}
+	return took, aerr
 }
 
 func writeCursor(path string, seq int64) error {

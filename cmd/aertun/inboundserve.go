@@ -91,14 +91,16 @@ func detectAs(root string, sp *spool.Spool, name string) (int, error) {
 	if errors.Is(err, errNoRules) {
 		return 0, nil
 	}
-	if err != nil {
+	if sum == nil {
 		record(root, audit.Record{Action: "detect.run", Resource: "/findings", Outcome: audit.Failure,
 			Principal: caller.Name, Kind: caller.Kind, Model: caller.Model, Verified: true,
 			Detail: map[string]string{"error": onOneLine(err.Error())}})
 		return 0, err
 	}
+	// A pass that ran with an error (aertun's own records not all stored)
+	// recorded itself; what it raised goes to the automations all the same.
 	automateFindings(root, sum.New)
-	return len(sum.New), nil
+	return len(sum.New), err
 }
 
 // detectJob runs the rules over Aertun's own log on the server's timer.
@@ -1408,15 +1410,37 @@ type collectorEndpoint struct {
 	status  collectorStatus
 	window  rateWindow
 	stopped bool
-	// partial is how many events of a batch the store took before it
-	// failed, by batch: the collector sends the same signed batch again,
-	// and those are not stored twice. Held in memory and bounded; past the
-	// bound a retry stores the whole batch, twice rather than never.
-	partial map[string]int
+	// partial is what the store took of a batch before it failed, by
+	// batch. The collector sends the same signed batch again, and when it
+	// maps to the same events those are not stored twice. When it does not
+	// (the host mapping changed between the tries, say), the whole batch is
+	// stored: twice rather than never. Held in memory and bounded, with the
+	// same rule past the bound.
+	partial map[string]partialBatch
+}
+
+// partialBatch is how many of a batch's events were stored, and their
+// print.
+type partialBatch struct {
+	n     int
+	print [sha256.Size]byte
 }
 
 // maxPartial bounds the batches remembered as partly stored.
 const maxPartial = 1024
+
+// batchPrint is a digest of events as a try mapped them, leaving out when
+// they arrived, which a retry changes and nothing else should.
+func batchPrint(events []telemetry.Event) [sha256.Size]byte {
+	h := sha256.New()
+	for _, ev := range events {
+		ev.Received = time.Time{}
+		b, _ := json.Marshal(ev)
+		h.Write(b)
+		h.Write([]byte{'\n'})
+	}
+	return [sha256.Size]byte(h.Sum(nil))
+}
 
 func (e *collectorEndpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -1595,10 +1619,14 @@ func (e *collectorEndpoint) batch(w http.ResponseWriter, r *http.Request, name, 
 	e.status.LastAt = e.now().UTC()
 	e.mu.Unlock()
 	// What a failed try of this same batch already stored is not stored
-	// again: the batch is signed, so the same id is the same records.
+	// again, when the same records made the same events.
 	e.mu.Lock()
-	skip := min(e.partial[key], len(events))
+	p, had := e.partial[key]
 	e.mu.Unlock()
+	skip := 0
+	if had && p.n <= len(events) && batchPrint(events[:p.n]) == p.print {
+		skip = p.n
+	}
 	todo := events[skip:]
 	stored := 0
 	if len(todo) > 0 {
@@ -1615,13 +1643,20 @@ func (e *collectorEndpoint) batch(w http.ResponseWriter, r *http.Request, name, 
 			detectInServer(e.root, sp)
 			return nil
 		}); serr != nil {
+			var print [sha256.Size]byte
+			if took > 0 {
+				print = batchPrint(events[:skip+took])
+			}
 			e.mu.Lock()
 			e.status.Error = serr.Error()
 			if took > 0 {
-				if e.partial == nil || len(e.partial) >= maxPartial {
-					e.partial = map[string]int{}
+				if _, ok := e.partial[key]; !ok && len(e.partial) >= maxPartial {
+					e.partial = nil
 				}
-				e.partial[key] = skip + took
+				if e.partial == nil {
+					e.partial = map[string]partialBatch{}
+				}
+				e.partial[key] = partialBatch{n: skip + took, print: print}
 			}
 			e.status.Stored += took
 			e.mu.Unlock()

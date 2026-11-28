@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aertun/aertun/internal/audit"
+	"github.com/aertun/aertun/internal/automate"
 	"github.com/aertun/aertun/internal/spool"
 	"github.com/aertun/aertun/internal/telemetry"
 )
@@ -210,7 +211,9 @@ func TestTheRulesOverTheAuditLogFireOnWhatItWrites(t *testing.T) {
 }
 
 // A store that took only part of a batch moves the cursor past what it took
-// and no further, so the next pass reads the rest and nothing twice.
+// and no further, and returns what it took for the rules to read; the next
+// pass reads the rest and nothing twice. A cursor that cannot be written
+// returns nothing, since the next pass reads those records again.
 func TestTheCursorStopsWhereTheStoreStopped(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cursor")
 	cursor := func() int64 {
@@ -225,30 +228,40 @@ func TestTheCursorStopsWhereTheStoreStopped(t *testing.T) {
 		}
 		return c.Seq
 	}
-	events := make([]telemetry.Event, 3)
+	events := []telemetry.Event{{Message: "a"}, {Message: "b"}, {Message: "c"}}
 	seqs := []int64{11, 14, 15}
 	full := errors.New("disk full")
-
-	took := func(n int, err error) func([]telemetry.Event) ([]string, error) {
-		return func(ev []telemetry.Event) ([]string, error) {
+	took := func(n int, err error) {
+		storeWatched = func(_ *spool.Spool, ev []telemetry.Event) ([]string, error) {
 			return make([]string, n), err
 		}
 	}
-	if _, err := storeAndAdvance(took(0, full), path, events, seqs, 10, 17); !errors.Is(err, full) {
-		t.Fatalf("err = %v", err)
+	t.Cleanup(func() { storeWatched = (*spool.Spool).AppendBatch })
+	messages := func(ev []telemetry.Event) string {
+		var m []string
+		for _, e := range ev {
+			m = append(m, e.Message)
+		}
+		return strings.Join(m, ",")
+	}
+
+	took(0, full)
+	if got, err := storeAndAdvance(nil, path, events, seqs, 10, 17); !errors.Is(err, full) || len(got) != 0 {
+		t.Fatalf("nothing stored: got %q, err %v", messages(got), err)
 	}
 	if got := cursor(); got != -1 {
 		t.Fatalf("nothing stored, but the cursor moved to %d", got)
 	}
-	if _, err := storeAndAdvance(took(2, full), path, events, seqs, 10, 17); !errors.Is(err, full) {
-		t.Fatalf("err = %v", err)
+	took(2, full)
+	if got, err := storeAndAdvance(nil, path, events, seqs, 10, 17); !errors.Is(err, full) || messages(got) != "a,b" {
+		t.Fatalf("two stored: got %q for the rules, err %v", messages(got), err)
 	}
 	if got := cursor(); got != 14 {
 		t.Fatalf("two stored: cursor = %d, want 14", got)
 	}
-	got, err := storeAndAdvance(took(1, nil), path, events[2:], seqs[2:], 14, 17)
-	if err != nil || len(got) != 1 {
-		t.Fatalf("got %d events, err %v", len(got), err)
+	took(1, nil)
+	if got, err := storeAndAdvance(nil, path, events[2:], seqs[2:], 14, 17); err != nil || messages(got) != "c" {
+		t.Fatalf("the rest: got %q, err %v", messages(got), err)
 	}
 	if got := cursor(); got != 17 {
 		t.Fatalf("all stored: cursor = %d, want 17 (past records that made no event)", got)
@@ -257,10 +270,139 @@ func TestTheCursorStopsWhereTheStoreStopped(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := storeAndAdvance(took(0, full), path, nil, nil, 17, 17); err != nil {
+	took(0, full)
+	if _, err := storeAndAdvance(nil, path, nil, nil, 17, 17); err != nil {
 		t.Fatal(err)
 	}
 	if got := cursor(); got != -1 {
 		t.Fatalf("no new records, but the cursor was written: %d", got)
+	}
+	// A cursor that cannot be written: stored, but given to no rule now,
+	// because the next pass reads the same records and gives them then.
+	blocked := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocked, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		n   int
+		err error
+	}{{1, full}, {3, nil}} {
+		took(c.n, c.err)
+		got, err := storeAndAdvance(nil, filepath.Join(blocked, "cursor"), events, seqs, 10, 17)
+		if err == nil || len(got) != 0 {
+			t.Errorf("%d stored and no cursor: got %q, err %v", c.n, messages(got), err)
+		}
+	}
+}
+
+// When the store fails part way through aertun's own records, the rules
+// still read the part that was stored, in that pass: its cursor is past
+// them, so no later pass will. What they raise reaches the automations,
+// from the command and from the server alike. The next pass stores and
+// reads the rest, and nothing is stored or reported twice.
+func TestAPartlyStoredPassStillReadsWhatItStored(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		run  func(t *testing.T, root, rules string) error
+	}{
+		{"the command", func(t *testing.T, root, rules string) error {
+			return detectRun(root, []string{"--rules", rules})
+		}},
+		{"the server", func(t *testing.T, root, _ string) error {
+			sp, err := openSpool(root, spool.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer sp.Close()
+			_, err = detectAs(root, sp, "detect-on-arrival")
+			return err
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) { partlyStoredPass(t, c.run) })
+	}
+}
+
+func partlyStoredPass(t *testing.T, run func(t *testing.T, root, rules string) error) {
+	root, rules := packSite(t)
+	dana := &Caller{Name: "dana", Kind: audit.KindHuman, Verified: true}
+	for _, r := range []audit.Record{
+		dana.auditRecord("token.issue", "/", audit.Success,
+			map[string]string{"role": "admin", "for": "sam", "issued_id": "t1"}),
+		dana.auditRecord("config.set", "/", audit.Success,
+			map[string]string{"setting": "admin.behind_tls_proxy", "from": "true",
+				"to": "false", "accepted_risk": "the proxy is being replaced"}),
+		{Action: "auth.failures", Resource: "/admin", Outcome: audit.Denied,
+			Principal: "203.0.113.9", Kind: audit.KindUnknown,
+			Detail: map[string]string{"failures": "6", "surface": "admin"}},
+	} {
+		if err := recordE(root, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := automationEngine(root).Save(automate.Rule{
+		Name: "a finding is raised", Enabled: true, Mode: "act", When: "finding",
+		Then: []automate.Step{{Action: "open-case"}},
+	}, "dana"); err != nil {
+		t.Fatal(err)
+	}
+	// Everything up to the administrator's token is stored, then the disk
+	// is full.
+	full := errors.New("disk full")
+	storeWatched = func(sp *spool.Spool, ev []telemetry.Event) ([]string, error) {
+		for i, e := range ev {
+			if e.Message == "token.issue" {
+				into, err := sp.AppendBatch(ev[:i+1])
+				if err != nil {
+					t.Fatal(err)
+				}
+				return into, full
+			}
+		}
+		return sp.AppendBatch(ev)
+	}
+	t.Cleanup(func() { storeWatched = (*spool.Spool).AppendBatch })
+	if err := run(t, root, rules); !errors.Is(err, full) {
+		t.Fatalf("the pass said %v, not that the store failed", err)
+	}
+	got := bySource(queue(t, root))
+	if len(got["aertun.admin-token-issued"]) != 1 {
+		t.Fatal("the stored administrator's token was never read by the rules")
+	}
+	if len(got["aertun.setting-weakened"]) != 0 || len(got["aertun.signin-failures"]) != 0 {
+		t.Fatal("records that were not stored were reported")
+	}
+	if runs, _ := automationEngine(root).Runs(); len(runs) != 1 {
+		t.Fatalf("the finding the failing pass raised reached %d automation run(s), want 1", len(runs))
+	}
+
+	storeWatched = (*spool.Spool).AppendBatch
+	if err := run(t, root, rules); err != nil {
+		t.Fatal(err)
+	}
+	got = bySource(queue(t, root))
+	for _, want := range []string{"aertun.admin-token-issued",
+		"aertun.setting-weakened", "aertun.signin-failures"} {
+		if len(got[want]) != 1 {
+			t.Errorf("%s opened %d findings, want 1", want, len(got[want]))
+		}
+	}
+	sp, err := openSpool(root, spool.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sp.Close()
+	count := map[string]int{}
+	if err := sp.Range(time.Time{}, time.Time{}, func(e telemetry.Event) error {
+		if e.Source == SelfSource {
+			count[e.Message]++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []string{"token.issue", "config.set", "auth.failures"} {
+		if count[action] != 1 {
+			t.Errorf("%s is stored %d times, want once", action, count[action])
+		}
 	}
 }
