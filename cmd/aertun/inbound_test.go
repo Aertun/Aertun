@@ -142,9 +142,12 @@ func TestAnOktaEventHookIsStoredDetectedAndActedOn(t *testing.T) {
 		t.Errorf("a wrong secret was answered %d", w.Code)
 	}
 
+	// Each record is made once: it carries the second it was made in, and a
+	// redelivery is the same record, not one made a moment later.
+	suspend := oktaLogEvent("u-2", "user.lifecycle.suspend", "admin@acme.example", "ivo@acme.example")
 	if code := oktaPost(t, inb, secret, "e-1",
 		oktaLogEvent("u-1", "user.account.privilege.grant", "admin@acme.example", "mal@acme.example"),
-		oktaLogEvent("u-2", "user.lifecycle.suspend", "admin@acme.example", "ivo@acme.example")); code != 200 {
+		suspend); code != 200 {
 		t.Fatalf("a delivery was answered %d", code)
 	}
 	inb.process()
@@ -171,7 +174,7 @@ func TestAnOktaEventHookIsStoredDetectedAndActedOn(t *testing.T) {
 		t.Errorf("%d sessions of a person suspended in Okta are still alive", live)
 	}
 	// Okta delivers at least once: the same delivery again changes nothing.
-	if code := oktaPost(t, inb, secret, "e-1", oktaLogEvent("u-2", "user.lifecycle.suspend", "admin@acme.example", "ivo@acme.example")); code != 200 {
+	if code := oktaPost(t, inb, secret, "e-1", suspend); code != 200 {
 		t.Errorf("a repeated delivery was answered %d", code)
 	}
 	inb.process()
@@ -478,8 +481,10 @@ func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
 	// delivery is not stored and waits; the next pass stores it once, and
 	// the same records delivered again are known.
 	os.Chmod(dir, 0o500)
-	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
-		at: time.Now().UTC()}}
+	// One record, delivered twice: it carries the second it was made in, so
+	// making it again a moment later could make another record.
+	start := oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")
+	inb.queue = []pushed{{feed: f, docs: []any{start}, at: time.Now().UTC()}}
 	inb.drain(sp)
 	os.Chmod(dir, 0o700)
 	if inb.statusOf("okta").Error == "" {
@@ -489,8 +494,7 @@ func TestADeliveryWhoseStoreFailedIsTriedAgain(t *testing.T) {
 		t.Fatalf("a delivery the store took back is stored or not waiting: %v %+v", stored(), inb.queue)
 	}
 	inb.drain(sp)
-	inb.queue = []pushed{{feed: f, docs: []any{oktaLogEvent("w-2", "user.session.start", "bo@acme.example", "")},
-		at: time.Now().UTC()}}
+	inb.queue = []pushed{{feed: f, docs: []any{start}, at: time.Now().UTC()}}
 	inb.drain(sp)
 	if got := stored(); got["00u-bo@acme.example"] != 1 || len(inb.queue) != 0 {
 		t.Errorf("stored %v, %d queued: the delivery tried again was not stored exactly once", got, len(inb.queue))
