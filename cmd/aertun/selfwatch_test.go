@@ -4,6 +4,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -202,5 +206,61 @@ func TestTheRulesOverTheAuditLogFireOnWhatItWrites(t *testing.T) {
 		if len(got[want]) == 0 {
 			t.Errorf("%s did not fire on the record the program writes", want)
 		}
+	}
+}
+
+// A store that took only part of a batch moves the cursor past what it took
+// and no further, so the next pass reads the rest and nothing twice.
+func TestTheCursorStopsWhereTheStoreStopped(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cursor")
+	cursor := func() int64 {
+		t.Helper()
+		var c selfCursor
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return -1
+		}
+		if err := json.Unmarshal(b, &c); err != nil {
+			t.Fatal(err)
+		}
+		return c.Seq
+	}
+	events := make([]telemetry.Event, 3)
+	seqs := []int64{11, 14, 15}
+	full := errors.New("disk full")
+
+	took := func(n int, err error) func([]telemetry.Event) ([]string, error) {
+		return func(ev []telemetry.Event) ([]string, error) {
+			return make([]string, n), err
+		}
+	}
+	if _, err := storeAndAdvance(took(0, full), path, events, seqs, 10, 17); !errors.Is(err, full) {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cursor(); got != -1 {
+		t.Fatalf("nothing stored, but the cursor moved to %d", got)
+	}
+	if _, err := storeAndAdvance(took(2, full), path, events, seqs, 10, 17); !errors.Is(err, full) {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cursor(); got != 14 {
+		t.Fatalf("two stored: cursor = %d, want 14", got)
+	}
+	got, err := storeAndAdvance(took(1, nil), path, events[2:], seqs[2:], 14, 17)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("got %d events, err %v", len(got), err)
+	}
+	if got := cursor(); got != 17 {
+		t.Fatalf("all stored: cursor = %d, want 17 (past records that made no event)", got)
+	}
+	// Nothing new: nothing is written.
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storeAndAdvance(took(0, full), path, nil, nil, 17, 17); err != nil {
+		t.Fatal(err)
+	}
+	if got := cursor(); got != -1 {
+		t.Fatalf("no new records, but the cursor was written: %d", got)
 	}
 }

@@ -1294,7 +1294,7 @@ func mountOTLP(mux *http.ServeMux, root string) {
 		Mapping: func() (source.Source, error) {
 			return findSource(root, "otel/genai")
 		},
-		Store: func(events []telemetry.Event) error {
+		Store: func(events []telemetry.Event) (int, error) {
 			otelCarriesTheJoinName(events)
 			// The labels are read per push and a broken table refuses it:
 			// the spans go back to the exporter as unstored rather than in
@@ -1303,11 +1303,14 @@ func mountOTLP(mux *http.ServeMux, root string) {
 			// is not.
 			labels, err := loadToolLabels(root)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			otelCarriesTheToolLabels(events, labels)
-			return withSpool(root, func(sp *spool.Spool) error {
-				if _, err := sp.AppendBatch(events); err != nil {
+			stored := 0
+			err = withSpool(root, func(sp *spool.Spool) error {
+				into, err := sp.AppendBatch(events)
+				stored = len(into)
+				if err != nil {
 					return err
 				}
 				// The store is already held here, so the rules run over
@@ -1317,6 +1320,7 @@ func mountOTLP(mux *http.ServeMux, root string) {
 				detectInServer(root, sp)
 				return nil
 			})
+			return stored, err
 		},
 		// The feeds' own figure: far above anything a collector sends and
 		// far below what fills a disk.
@@ -1354,7 +1358,7 @@ func mountOTLP(mux *http.ServeMux, root string) {
 // could receive it even if it did. Evidence-grade means the fact a key
 // changed is here and the key is not.
 func mountCollector(mux *http.ServeMux, root string) {
-	e := &collectorEndpoint{root: root, now: time.Now}
+	e := &collectorEndpoint{root: root, now: time.Now, store: (*spool.Spool).AppendBatch}
 	mux.Handle("/v1/collector", e)
 	mux.Handle("/v1/collector/config", e)
 }
@@ -1395,15 +1399,24 @@ type collectorStatus struct {
 }
 
 type collectorEndpoint struct {
-	root string
-	now  func() time.Time
-	seen inbound.Seen
+	root  string
+	now   func() time.Time
+	store func(*spool.Spool, []telemetry.Event) ([]string, error)
+	seen  inbound.Seen
 
 	mu      sync.Mutex
 	status  collectorStatus
 	window  rateWindow
 	stopped bool
+	// partial is how many events of a batch the store took before it
+	// failed, by batch: the collector sends the same signed batch again,
+	// and those are not stored twice. Held in memory and bounded; past the
+	// bound a retry stores the whole batch, twice rather than never.
+	partial map[string]int
 }
+
+// maxPartial bounds the batches remembered as partly stored.
+const maxPartial = 1024
 
 func (e *collectorEndpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -1581,10 +1594,19 @@ func (e *collectorEndpoint) batch(w http.ResponseWriter, r *http.Request, name, 
 	e.status.Records += len(batch.Records)
 	e.status.LastAt = e.now().UTC()
 	e.mu.Unlock()
+	// What a failed try of this same batch already stored is not stored
+	// again: the batch is signed, so the same id is the same records.
+	e.mu.Lock()
+	skip := min(e.partial[key], len(events))
+	e.mu.Unlock()
+	todo := events[skip:]
 	stored := 0
-	if len(events) > 0 {
+	if len(todo) > 0 {
+		took := 0
 		if serr := withSpool(e.root, func(sp *spool.Spool) error {
-			if _, aerr := sp.AppendBatch(events); aerr != nil {
+			into, aerr := e.store(sp, todo)
+			took = len(into)
+			if aerr != nil {
 				return aerr
 			}
 			// What arrived is read by the rules at once, the way every
@@ -1595,14 +1617,22 @@ func (e *collectorEndpoint) batch(w http.ResponseWriter, r *http.Request, name, 
 		}); serr != nil {
 			e.mu.Lock()
 			e.status.Error = serr.Error()
+			if took > 0 {
+				if e.partial == nil || len(e.partial) >= maxPartial {
+					e.partial = map[string]int{}
+				}
+				e.partial[key] = skip + took
+			}
+			e.status.Stored += took
 			e.mu.Unlock()
 			refuse("the event store did not take the batch; send it again",
 				http.StatusServiceUnavailable)
 			return
 		}
-		stored = len(events)
+		stored = len(todo)
 	}
 	e.mu.Lock()
+	delete(e.partial, key)
 	e.status.Stored += stored
 	e.status.Error = ""
 	e.mu.Unlock()

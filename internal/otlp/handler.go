@@ -36,9 +36,10 @@ type Handler struct {
 	// Mapping returns the source GenAI spans map through, by name, so the
 	// deployment's own mapping file wins over the built-in.
 	Mapping func() (source.Source, error)
-	// Store appends events. Answering 200 only after the write is what
-	// makes a 200 mean kept.
-	Store func([]telemetry.Event) error
+	// Store appends events and says how many it stored, in order: all of
+	// them, or, with an error, those stored before it. Answering 200 only
+	// after the write is what makes a 200 mean kept.
+	Store func([]telemetry.Event) (int, error)
 	// Now is the clock; a test sets it.
 	Now func() time.Time
 	// Limit is how many pushes a minute one source may make. Zero means
@@ -148,6 +149,18 @@ func (h *Handler) allow() bool {
 	}
 	h.window.n++
 	return h.window.n <= h.limit()
+}
+
+// spanIDs is the ids among a run of events' ids, leaving out spans that
+// had none.
+func spanIDs(ids []string) []string {
+	var out []string
+	for _, id := range ids {
+		if id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // seenBefore reports whether a span id was delivered already, without
@@ -338,7 +351,7 @@ func (h *Handler) deliver(w http.ResponseWriter, r *http.Request, req exportRequ
 	h.mu.Unlock()
 
 	var events []telemetry.Event
-	var stored []string
+	var ids []string
 	var rejected int64
 	worst := ""
 	rej := func(path string) {
@@ -383,23 +396,32 @@ func (h *Handler) deliver(w http.ResponseWriter, r *http.Request, req exportRequ
 			return
 		}
 		events = append(events, e)
+		// One id per event, empty for a span that has none, so what the
+		// store took can be named exactly.
 		if sp.SpanID != "" {
 			batch[id] = true
-			stored = append(stored, id)
+			ids = append(ids, id)
+		} else {
+			ids = append(ids, "")
 		}
 	})
 	if len(events) > 0 {
-		if err := h.Store(events); err != nil {
+		n, err := h.Store(events)
+		n = min(max(n, 0), len(events))
+		if err != nil {
 			h.mu.Lock()
 			h.status.Error = err.Error()
+			h.status.Stored += n
 			h.mu.Unlock()
-			// Nothing is remembered: the exporter is told to send the
-			// batch again and every span in it must be free to arrive.
+			// What was stored before the failure is remembered, so the
+			// exporter's retry stores only the rest; everything after it
+			// must be free to arrive.
+			h.remember(spanIDs(ids[:n]), now)
 			h.fail(w, r, http.StatusServiceUnavailable, codeUnavailable,
 				"the event store did not take the batch; send it again")
 			return
 		}
-		h.remember(stored, now)
+		h.remember(spanIDs(ids), now)
 	}
 	h.mu.Lock()
 	h.status.Stored += len(events)

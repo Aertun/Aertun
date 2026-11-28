@@ -117,9 +117,9 @@ func bench(t *testing.T) (*Handler, *[]telemetry.Event) {
 	h := &Handler{
 		Token:   func() (string, error) { return "s3cret-push-token", nil },
 		Mapping: func() (source.Source, error) { return s, nil },
-		Store: func(events []telemetry.Event) error {
+		Store: func(events []telemetry.Event) (int, error) {
 			stored = append(stored, events...)
-			return nil
+			return len(events), nil
 		},
 		Now: func() time.Time {
 			return time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC)
@@ -428,12 +428,12 @@ func TestADuplicateSpanIsTakenOnce(t *testing.T) {
 func TestAStoreFailureDoesNotSwallowTheRetry(t *testing.T) {
 	h, stored := bench(t)
 	failing := true
-	h.Store = func(events []telemetry.Event) error {
+	h.Store = func(events []telemetry.Event) (int, error) {
 		if failing {
-			return fmt.Errorf("the disk is on fire")
+			return 0, fmt.Errorf("the disk is on fire")
 		}
 		*stored = append(*stored, events...)
-		return nil
+		return len(events), nil
 	}
 	if res := push(h, agentPush); res.Code != http.StatusServiceUnavailable {
 		t.Fatalf("a failed store answered %d", res.Code)
@@ -783,3 +783,43 @@ func TestTheSamplingThresholdIsTheOnlyThingReadFromTracestate(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// TestAStoreThatTookPartOfABatchIsNotGivenItTwice: the store took the first
+// spans and failed on the rest. The exporter, told to send the batch again,
+// gets the ones taken answered as duplicates and the rest stored: each
+// span once.
+func TestAStoreThatTookPartOfABatchIsNotGivenItTwice(t *testing.T) {
+	h, stored := bench(t)
+	partial := true
+	h.Store = func(events []telemetry.Event) (int, error) {
+		if partial && len(events) > 1 {
+			*stored = append(*stored, events[0])
+			return 1, fmt.Errorf("the second segment could not be made")
+		}
+		*stored = append(*stored, events...)
+		return len(events), nil
+	}
+	if res := push(h, agentPush); res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("a partly failed store answered %d", res.Code)
+	}
+	first := len(*stored)
+	if first != 1 {
+		t.Fatalf("%d stored by the failed push", first)
+	}
+	partial = false
+	if res := push(h, agentPush); res.Code != http.StatusOK {
+		t.Fatalf("the retry answered %d", res.Code)
+	}
+	seen := map[string]int{}
+	for _, e := range *stored {
+		seen[e.Raw["span_id"]]++
+	}
+	for id, n := range seen {
+		if n != 1 {
+			t.Errorf("span %s stored %d times", id, n)
+		}
+	}
+	if len(*stored) < 2 {
+		t.Errorf("the retry stored nothing more: %d in all", len(*stored))
+	}
+}

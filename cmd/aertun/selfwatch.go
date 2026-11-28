@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -88,6 +89,7 @@ func storeSelfEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.E
 		}
 	}
 	var stored []telemetry.Event
+	var seqs []int64 // the audit record each stored event came from
 	last := cur.Seq
 	// Collected and stored as one batch: the audit log is read whole, and a
 	// run that locked and fsynced the index per record pays the disk for
@@ -134,20 +136,9 @@ func storeSelfEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.E
 			Source: SelfSource, Message: e.Action,
 			Actor: telemetry.ID{Issuer: "aertun", Value: e.Principal},
 			Raw:   raw})
+		seqs = append(seqs, e.Seq)
 	}
-	if last == cur.Seq {
-		return stored, nil
-	}
-	if len(stored) > 0 {
-		if _, aerr := sp.AppendBatch(stored); aerr != nil {
-			return nil, aerr
-		}
-	}
-	b, _ := json.Marshal(selfCursor{Seq: last})
-	if err := os.MkdirAll(filepath.Dir(selfCursorPath(root)), 0o700); err != nil {
-		return stored, err
-	}
-	return stored, atomicfile.Write(selfCursorPath(root), b, 0o600)
+	return storeAndAdvance(sp.AppendBatch, selfCursorPath(root), stored, seqs, cur.Seq, last)
 }
 
 func agentCursorPath(root string) string {
@@ -171,6 +162,7 @@ func storeAgentEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.
 		}
 	}
 	var stored []telemetry.Event
+	var seqs []int64 // the audit record each stored event came from
 	last := cur.Seq
 	// One batch, for the same reason as storeSelfEvents: these records
 	// arrive together and are stored together.
@@ -205,20 +197,41 @@ func storeAgentEvents(root string, sp *spool.Spool, now time.Time) ([]telemetry.
 			Source: AgentSource, Message: e.Action,
 			Actor: telemetry.ID{Issuer: "aertun", Value: e.Principal},
 			Raw:   raw})
+		seqs = append(seqs, e.Seq)
 	}
-	if last == cur.Seq {
+	return storeAndAdvance(sp.AppendBatch, agentCursorPath(root), stored, seqs, cur.Seq, last)
+}
+
+// storeAndAdvance stores one pass's events and moves the cursor at path:
+// past every record read when they are all stored, and when the store took
+// only the first of them, past the record of the last one it took, so the
+// next pass stores the rest once rather than all of them again.
+func storeAndAdvance(appendBatch func([]telemetry.Event) ([]string, error), path string,
+	stored []telemetry.Event, seqs []int64, cur, last int64) ([]telemetry.Event, error) {
+
+	if last == cur {
 		return stored, nil
 	}
 	if len(stored) > 0 {
-		if _, aerr := sp.AppendBatch(stored); aerr != nil {
+		into, aerr := appendBatch(stored)
+		if aerr != nil {
+			if n := len(into); n > 0 {
+				if err := writeCursor(path, seqs[n-1]); err != nil {
+					return nil, errors.Join(aerr, err)
+				}
+			}
 			return nil, aerr
 		}
 	}
-	b, _ := json.Marshal(selfCursor{Seq: last})
-	if err := os.MkdirAll(filepath.Dir(agentCursorPath(root)), 0o700); err != nil {
-		return stored, err
+	return stored, writeCursor(path, last)
+}
+
+func writeCursor(path string, seq int64) error {
+	b, _ := json.Marshal(selfCursor{Seq: seq})
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
 	}
-	return stored, atomicfile.Write(agentCursorPath(root), b, 0o600)
+	return atomicfile.Write(path, b, 0o600)
 }
 
 // selfLogGrew reports whether the audit log holds anything the rules have

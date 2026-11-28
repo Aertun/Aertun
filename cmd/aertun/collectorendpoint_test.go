@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -355,5 +356,68 @@ func TestTheOTLPBoundaryCarriesTheJoinName(t *testing.T) {
 	if events[3].Raw != nil {
 		t.Errorf("a span attributing its actions to nobody gained a name: %v",
 			events[3].Raw)
+	}
+}
+
+// A batch the store took only part of before it failed is refused, and the
+// collector's retries of that same batch store the rest and not the part
+// already stored, however many tries it takes.
+func TestARetriedBatchStoresOnlyWhatTheFailedTryDidNot(t *testing.T) {
+	root, _ := collectorSite(t)
+	full := errors.New("disk full")
+	tries := 0
+	e := &collectorEndpoint{root: root, now: time.Now,
+		store: func(sp *spool.Spool, events []telemetry.Event) ([]string, error) {
+			// One event per try until the third, which takes the rest.
+			tries++
+			if tries < 3 {
+				into, err := sp.AppendBatch(events[:1])
+				if err != nil {
+					t.Fatal(err)
+				}
+				return into, full
+			}
+			return sp.AppendBatch(events)
+		}}
+	mux := http.NewServeMux()
+	mux.Handle("/v1/collector", e)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	now := time.Now().UTC()
+	records := []collector.Record{hostRecord(collector.SourceWatch, "one", now),
+		hostRecord(collector.SourceWatch, "two", now), hostRecord(collector.SourceWatch, "three", now)}
+	const secret = "00collectorSecret0123456789abcdef"
+	for try := 1; try < 3; try++ {
+		if resp := postBatch(t, srv, "b1", now, records, secret, secret); resp.StatusCode != http.StatusServiceUnavailable {
+			t.Fatalf("try %d, which the store failed on, got %d", try, resp.StatusCode)
+		}
+	}
+	if resp := postBatch(t, srv, "b1", now, records, secret, secret); resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("the retry got %d: %s", resp.StatusCode, b)
+	}
+	if e.status.Stored != 3 {
+		t.Errorf("status counts %d stored, want 3", e.status.Stored)
+	}
+	if len(e.partial) != 0 {
+		t.Errorf("a stored batch is still remembered as partial: %v", e.partial)
+	}
+	sp, err := openSpool(root, spool.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sp.Close()
+	var hosts []string
+	if err := sp.Range(time.Time{}, time.Time{}, func(ev telemetry.Event) error {
+		if ev.Source == collector.SourceWatch {
+			hosts = append(hosts, fmt.Sprint(ev.Raw["host"]))
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(hosts, ","); got != "one,two,three" {
+		t.Errorf("stored %s, want each record once", got)
 	}
 }
