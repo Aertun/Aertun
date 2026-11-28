@@ -19,6 +19,7 @@ import (
 	"github.com/aertun/aertun/internal/aep"
 	"github.com/aertun/aertun/internal/agentreg"
 	"github.com/aertun/aertun/internal/atomicfile"
+	"github.com/aertun/aertun/internal/cose"
 	"github.com/aertun/aertun/internal/receiptlog"
 	"github.com/aertun/aertun/internal/scitt"
 )
@@ -127,23 +128,36 @@ func cmdHook(root string, args []string) error {
 // hookGate refuses a registered agent's call unless it is active: the
 // same kill switch the agent interface obeys.
 func hookGate(root, name string) error {
+	if why := agentRefusal(root, name, false); why != "" {
+		return errHookDeny{why}
+	}
+	return nil
+}
+
+// agentRefusal is why a call by the agent named may not go ahead, or ""
+// when it may: the kill switch. A disabled agent is refused always; one
+// the registry does not hold, unless the caller lets unregistered callers
+// through.
+func agentRefusal(root, name string, allowUnregistered bool) string {
 	a, found, err := agentStore(root).Get(name)
 	switch {
 	case err != nil:
-		return errHookDeny{fmt.Sprintf("aertun: the agent registry could not be read, so nothing %s does is "+
-			"authorised: %v", name, err)}
+		return fmt.Sprintf("aertun: the agent registry could not be read, so nothing %s does is "+
+			"authorised: %v", name, err)
+	case !found && allowUnregistered:
+		return ""
 	case !found:
-		return errHookDeny{fmt.Sprintf("aertun: no agent %q is registered here, so it may not act "+
-			"(aertun agent add %s --owner WHO)", name, name)}
+		return fmt.Sprintf("aertun: no agent %q is registered here, so it may not act "+
+			"(aertun agent add %s --owner WHO)", name, name)
 	case a.Status != agentreg.Active:
 		why := a.DisabledWhy
 		if why == "" {
 			why = "no reason was given"
 		}
-		return errHookDeny{fmt.Sprintf("aertun: agent %q is disabled (%s), so every tool call is refused "+
-			"until somebody enables it", name, why)}
+		return fmt.Sprintf("aertun: agent %q is disabled (%s), so every tool call is refused "+
+			"until somebody enables it", name, why)
 	}
-	return nil
+	return ""
 }
 
 // toolTarget is the resource and tool name a call is receipted under.
@@ -185,17 +199,26 @@ func hookReceipt(root, agent, keyAt, issuer, builtin string, servers map[string]
 		return err
 	}
 	resource, tool := toolTarget(ev.Tool, builtin, servers)
+	l, err := receiptlog.Open(dir, "")
+	if err != nil {
+		return err
+	}
+	return issueReceipt(dir, l, signer, issuer, aep.Receipt{
+		Action:  aep.Action{Target: resource, Tool: tool, Args: args},
+		Vantage: "agent", At: now, Actor: agent, Outcome: outcome}, now)
+}
+
+// issueReceipt numbers r as the issuer's next receipt, signs it, and
+// appends it to the receipt log in dir: a party's own account, admitted
+// because this deployment made it.
+func issueReceipt(dir string, l *receiptlog.Log, signer cose.Signer, issuer string, r aep.Receipt,
+	now time.Time) error {
 	seq, err := nextSeq(dir, issuer)
 	if err != nil {
 		return err
 	}
-	r := aep.Receipt{Action: aep.Action{Target: resource, Tool: tool, Args: args}, Vantage: "agent", At: now,
-		Actor: agent, Outcome: outcome, Seq: seq, HasSeq: true}
+	r.Seq, r.HasSeq = seq, true
 	b, err := aep.Emit(signer, issuer, r, now)
-	if err != nil {
-		return err
-	}
-	l, err := receiptlog.Open(dir, "")
 	if err != nil {
 		return err
 	}

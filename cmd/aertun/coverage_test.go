@@ -238,6 +238,15 @@ var coverage = map[string]surfaces{
 		NoMCP: "it runs a command the caller names, which is a capability no agent " +
 			"interface should lend, and an agent has nothing to conform",
 	},
+	// A gateway made a witness: the policy server agentgateway calls.
+	"witness": {
+		Why: "it is a service the operator runs beside the gateway, answering " +
+			"the gateway and not a person; what it records is on the receipt " +
+			"and reconciliation screens of whoever reconciles, and the kill " +
+			"switch it applies is on the agents board",
+		NoMCP: "it speaks in the gateway's name about agents' calls; an agent " +
+			"able to run it could sign the gateway's account of its own actions",
+	},
 	// The dataset a paper is drawn from, de-identified and signed.
 	"research": {
 		Why: "a dataset is a directory handed to a researcher and read with " +

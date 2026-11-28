@@ -534,6 +534,12 @@ arrive; Aertun's audit log goes to Wazuh, with 18 rules for the kill switch,
 refuted proofs, forked peer logs, refusals, privilege and legal holds. Tested
 against a live Wazuh 4.14.10 manager.
 
+**agentgateway**, as a witness (`aertun witness agentgateway`): Aertun is the
+policy server its `mcpGuardrails` calls for every MCP tool call, signs a
+receipt from the gateway's vantage with the call's outcome, and applies the
+kill switch at the gateway, so a call an agent leaves out of its own account
+is caught where the gateway and the server both saw it.
+
 **Another vendor's AI verdicts** arrive as a file: JSON lines or CSV with the
 columns `alert`, `verdict`, `at` and optionally `confidence`, `disposition`,
 `disposition_at`, `source`. A file carrying any other column, such as the

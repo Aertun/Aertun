@@ -167,6 +167,11 @@ type Receipt struct {
 	HasSeq bool
 }
 
+// Check reports whether r is a receipt Emit would sign, without signing
+// it: for a party that must refuse an action it could not receipt before
+// the action happens, not after.
+func (r Receipt) Check() error { return r.check() }
+
 func (r *Receipt) check() error {
 	d, err := r.Action.Digest()
 	if err != nil {

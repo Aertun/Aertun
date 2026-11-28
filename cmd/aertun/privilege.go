@@ -270,6 +270,10 @@ var commandNeeds = map[string]need{
 	// itself, as a backup does, because a row here may only narrow its
 	// parent. Verifying one reads a directory the caller named.
 	"research": {action: auth.ActView},
+	// A witness signs receipts in a gateway's name with a key the caller
+	// holds and appends them to this deployment's log, as registering a
+	// receipt does, and refuses calls by the kill switch it reads.
+	"witness": {action: auth.ActTune},
 	// A receipt log signs, in this deployment's name, that a statement was
 	// registered: tune, like a proof signed from the store, and register
 	// asks for it itself. Emitting a receipt or a reconciliation signs with
@@ -808,6 +812,7 @@ var commandAreas = map[string]string{
 	"chain":   auth.AreaSecurity,
 	"mdr":     auth.AreaSecurity,
 	"receipt": auth.AreaSecurity,
+	"witness": auth.AreaSecurity,
 	"twin":    auth.AreaSecurity,
 	"forge":   auth.AreaSecurity, "forge verify": auth.AreaLog,
 	"alert": auth.AreaSecurity,
