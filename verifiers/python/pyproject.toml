@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Rashik Adhikari
+# SPDX-License-Identifier: Apache-2.0
+#
+# Built by verifiers/pack.sh, which copies this directory beside the
+# repository's LICENSE and NOTICE and builds from the copy. The package
+# carries one module and depends on nothing.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aertun-verify"
+# The release's own version; the release refuses a tag that differs.
+version = "0.3.0"
+description = "A verifier for the Aertun Evidence Protocol, version 1, in Python's standard library"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Rashik Adhikari" }]
+requires-python = ">=3.10"
+keywords = ["aertun", "scitt", "cose", "receipts", "transparency", "ml-dsa", "ai-agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Security :: Cryptography",
+]
+
+[project.urls]
+Homepage = "https://github.com/Aertun/Aertun/tree/main/verifiers/python"
+Specification = "https://github.com/Aertun/Aertun/blob/main/spec/aep/v1/README.md"
+Issues = "https://github.com/Aertun/Aertun/issues"
+
+[project.scripts]
+aertun-verify = "aertun_verify:main"
+
+[tool.setuptools]
+py-modules = ["aertun_verify"]

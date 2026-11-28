@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // SPDX-FileCopyrightText: 2026 Rashik Adhikari
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,6 +17,7 @@
 
 import { createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 
 export class Invalid extends Error {}
 
@@ -692,7 +694,7 @@ export function checkVector(v: Vector): void {
 
 if (import.meta.main) {
   if (process.argv.length !== 3) {
-    console.error("usage: node aertun_verify.ts VECTOR.json");
+    console.error(`usage: ${basename(process.argv[1])} VECTOR.json`);
     process.exit(2);
   }
   try {

@@ -128,6 +128,10 @@ func TestTheReadmeClaimsTheLicenceThisRepositoryCarries(t *testing.T) {
 	}
 }
 
+// sourceFiles are the patterns for every file that carries a header: the
+// languages this repository is written in, its verifiers' among them.
+var sourceFiles = []string{"*.go", "*.py", "*.mjs", "*.ts", "*.sh"}
+
 // Every source file says its licence, and says the same one.
 //
 // A file vendored into another codebase carries only its header, so the
@@ -135,8 +139,7 @@ func TestTheReadmeClaimsTheLicenceThisRepositoryCarries(t *testing.T) {
 func TestEverySourceFileCarriesTheLicenceHeader(t *testing.T) {
 	const want = "Apache-2.0"
 
-	out, err := exec.Command("git", "ls-files",
-		"*.go", "*.py", "*.mjs").Output()
+	out, err := exec.Command("git", append([]string{"ls-files"}, sourceFiles...)...).Output()
 	if err != nil {
 		t.Skipf("git ls-files: %v", err)
 	}
@@ -172,7 +175,7 @@ func TestEverySourceFileNamesTheCopyrightHolder(t *testing.T) {
 	if !strings.Contains(read(t, "NOTICE"), "Rashik Adhikari") {
 		t.Fatal("NOTICE does not name the holder this test expects")
 	}
-	out, err := exec.Command("git", "ls-files", "*.go", "*.py", "*.mjs").Output()
+	out, err := exec.Command("git", append([]string{"ls-files"}, sourceFiles...)...).Output()
 	if err != nil {
 		t.Skipf("git ls-files: %v", err)
 	}

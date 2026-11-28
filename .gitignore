@@ -35,3 +35,8 @@ __pycache__/
 
 # Local tool state: personal settings and worktrees, never part of the tree.
 /.claude/
+
+# What building the TypeScript verifier by hand leaves beside it.
+# verifiers/pack.sh builds from a copy and leaves nothing.
+/verifiers/typescript/node_modules/
+/verifiers/typescript/dist/

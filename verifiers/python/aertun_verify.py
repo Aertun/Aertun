@@ -18,6 +18,7 @@ test vectors against it. Import it to verify statements in a program.
 
 import hashlib
 import json
+import os
 import re
 import sys
 from decimal import Decimal
@@ -859,9 +860,11 @@ def check_vector(v):
     raise Invalid("a content type this profile does not define")
 
 
-def main(argv):
+def main(argv=None):
+    # None when installed: the aertun-verify command calls main() bare.
+    argv = sys.argv if argv is None else argv
     if len(argv) != 2:
-        print("usage: aertun_verify.py VECTOR.json", file=sys.stderr)
+        print("usage: %s VECTOR.json" % os.path.basename(argv[0]), file=sys.stderr)
         return 2
     with open(argv[1], "rb") as f:
         vector = json.load(f)

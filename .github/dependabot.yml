@@ -1,5 +1,5 @@
-# Dependabot, for the CI supply chain. go.mod has no require block, so there is
-# nothing else to bump; the Go toolchain is watched by govulncheck in ci.yml.
+# Dependabot, for the CI supply chain. go.mod has no require block, so for Go
+# there is nothing to bump; the Go toolchain is watched by govulncheck in ci.yml.
 # Actions are pinned to commit SHAs, and Dependabot rewrites the SHA and the
 # trailing version comment together.
 version: 2
@@ -32,3 +32,33 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: build
+
+  # What builds the verifiers' packages in verifiers/pack.sh: PyPA's build
+  # tools, pinned by hash, and the TypeScript compiler with Node's types,
+  # pinned in the lockfile. None of it is in a published package. A release
+  # is taken once it is two weeks old, not the hour it appears.
+  - package-ecosystem: pip
+    directory: /verifiers/python
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: npm
+    directory: /verifiers/typescript
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+    # Node's types follow the oldest Node the package runs on, not the newest.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

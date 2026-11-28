@@ -56,6 +56,13 @@ released version goes to `develop` first and is then proposed to the release
 branch. CI runs on every pull request and on pushes to all three branches;
 `main` takes nothing that has not passed it.
 
+The verifiers' packages carry the release's version, in
+`verifiers/python/pyproject.toml` and in `verifiers/typescript/package.json`
+and its `package-lock.json`, and the release workflow refuses a tag they do
+not carry. The commit that cuts a version changes them with the README, the
+Action and the charts. `verifiers/pack.sh OUT` builds both and checks them
+installed, as the release does.
+
 ## Building and testing
 
 ```bash

@@ -53,6 +53,37 @@ jobs:
       - name: The image must build and stay static
         run: docker build -t aertun:ci .
 
+  # The verifiers' packages, built and installed the way a user installs
+  # them, on the oldest Python and Node they claim and on the newest: each
+  # installed command must decide every vector as the protocol requires.
+  # The release runs the same script before it publishes anything.
+  verifiers:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["24.7.0", "lts/*"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The last one listed is python3, which builds; the package is tried
+      # under both.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: |
+            3.10
+            3.14
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Build, install and verify every vector
+        env:
+          PYTHONS: python3.10 python3.14
+        run: verifiers/pack.sh "$RUNNER_TEMP/verifiers"
+
   # The wind tunnel's scorecard, signed here and nowhere else.
   #
   # `aertun windtunnel run --key` refuses to sign unless CI=true, which

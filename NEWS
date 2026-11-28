@@ -42,6 +42,18 @@ Unreleased
   RFC 9162 proofs, RFC 8785 canonical JSON and reconciliation.  It too
   decides all fifteen vectors as required; CI installs Node 24 to run it.
 
+* Both verifiers are packages, each depending on nothing: `pip install
+  aertun-verify` (Python 3.10 or later) and `npm install aertun-verify`
+  (Node 24.7 or later, compiled from the TypeScript file and type-checked
+  under strict, with its declarations).  The release builds them from its
+  tag, installs each the way a user would, and releases nothing unless the
+  installed command decides every vector as the protocol requires and
+  each package holds exactly what it should.  It then publishes to PyPI by
+  trusted publishing, with an attestation, and stages on npm with
+  provenance for a maintainer to approve.  `verifiers/pack.sh` does the
+  same build and checks, and CI runs it on the oldest and newest Python
+  and Node.
+
 * A second implementation: verifiers/python, a verifier for the evidence
   protocol in one file of Python's standard library (its own CBOR, COSE,
   Ed25519, ML-DSA-65 from FIPS 204, RFC 9162 proofs, RFC 8785 canonical

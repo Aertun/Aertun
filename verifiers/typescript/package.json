@@ -1,0 +1,36 @@
+{
+  "name": "aertun-verify",
+  "version": "0.3.0",
+  "description": "A verifier for the Aertun Evidence Protocol, version 1, on Node's own crypto",
+  "keywords": ["aertun", "scitt", "cose", "receipts", "transparency", "ml-dsa", "ai-agents"],
+  "homepage": "https://github.com/Aertun/Aertun/tree/main/verifiers/typescript",
+  "bugs": "https://github.com/Aertun/Aertun/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aertun/Aertun.git",
+    "directory": "verifiers/typescript"
+  },
+  "license": "Apache-2.0",
+  "author": "Rashik Adhikari",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/aertun_verify.d.ts",
+      "default": "./dist/aertun_verify.js"
+    }
+  },
+  "bin": {
+    "aertun-verify": "dist/aertun_verify.js"
+  },
+  "files": ["dist/", "NOTICE"],
+  "engines": {
+    "node": ">=24.7.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "6.0.3"
+  }
+}

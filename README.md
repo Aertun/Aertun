@@ -324,7 +324,8 @@ answers. `aertun conform` runs the protocol's [test
 vectors](spec/aep/v1/vectors) against this verifier or any other, among them
 a [second implementation in Python](verifiers/python), standard library only,
 and a [third in TypeScript](verifiers/typescript) for Node 24, which pass every
-one.
+one. Both install with nothing beside them: `pip install aertun-verify`,
+`npm install aertun-verify`.
 [STABILITY.md](STABILITY.md) says what will never change, and
 [THREAT_MODEL.md](THREAT_MODEL.md) says what is and is not defended.
 
